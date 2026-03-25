@@ -1,0 +1,157 @@
+import { supabase, hasSupabase } from './supabase'
+
+const LS_KEY = 'mtg-hub-v1'
+
+function lsGet() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') } catch { return {} }
+}
+
+function lsSet(data) {
+  const current = lsGet()
+  localStorage.setItem(LS_KEY, JSON.stringify({ ...current, ...data }))
+}
+
+// ── MATCHES ──────────────────────────────────────────
+export async function getMatches(userId) {
+  if (hasSupabase && userId) {
+    const { data } = await supabase.from('matches').select('*').eq('user_id', userId).order('date', { ascending: false })
+    return data || []
+  }
+  return lsGet().matches || []
+}
+
+export async function addMatch(match, userId) {
+  if (hasSupabase && userId) {
+    const { data } = await supabase.from('matches').insert({ ...match, user_id: userId }).select().single()
+    return data
+  }
+  const matches = lsGet().matches || []
+  const newMatch = { ...match, id: Date.now() }
+  lsSet({ matches: [newMatch, ...matches] })
+  return newMatch
+}
+
+export async function deleteMatch(id, userId) {
+  if (hasSupabase && userId) {
+    await supabase.from('matches').delete().eq('id', id).eq('user_id', userId)
+    return
+  }
+  const matches = (lsGet().matches || []).filter(m => m.id !== id)
+  lsSet({ matches })
+}
+
+// ── COLLECTION ────────────────────────────────────────
+export async function getCollection(userId) {
+  if (hasSupabase && userId) {
+    const { data } = await supabase.from('collection').select('*').eq('user_id', userId)
+    return data || []
+  }
+  return lsGet().collection || []
+}
+
+export async function addCard(card, userId) {
+  if (hasSupabase && userId) {
+    const { data: existing } = await supabase.from('collection').select('*').eq('user_id', userId).eq('name', card.name).single()
+    if (existing) {
+      const { data } = await supabase.from('collection').update({ qty: existing.qty + card.qty }).eq('id', existing.id).select().single()
+      return data
+    }
+    const { data } = await supabase.from('collection').insert({ ...card, user_id: userId }).select().single()
+    return data
+  }
+  const collection = lsGet().collection || []
+  const existing = collection.find(c => c.name.toLowerCase() === card.name.toLowerCase())
+  if (existing) {
+    existing.qty += card.qty
+    lsSet({ collection })
+    return existing
+  }
+  const newCard = { ...card, id: Date.now() }
+  lsSet({ collection: [...collection, newCard] })
+  return newCard
+}
+
+export async function removeCard(id, userId) {
+  if (hasSupabase && userId) {
+    await supabase.from('collection').delete().eq('id', id).eq('user_id', userId)
+    return
+  }
+  const collection = (lsGet().collection || []).filter(c => c.id !== id)
+  lsSet({ collection })
+}
+
+// ── FRIENDS (Supabase only) ───────────────────────────
+export async function getFriends(userId) {
+  if (!hasSupabase || !userId) return []
+  const { data } = await supabase.from('friendships').select(`
+    *,
+    friend:profiles!friendships_friend_id_fkey(id, username, avatar_color)
+  `).eq('user_id', userId).eq('status', 'accepted')
+  return data || []
+}
+
+export async function getPendingRequests(userId) {
+  if (!hasSupabase || !userId) return []
+  const { data } = await supabase.from('friendships').select(`
+    *,
+    requester:profiles!friendships_user_id_fkey(id, username, avatar_color)
+  `).eq('friend_id', userId).eq('status', 'pending')
+  return data || []
+}
+
+export async function sendFriendRequest(userId, friendId) {
+  if (!hasSupabase) return
+  await supabase.from('friendships').insert({ user_id: userId, friend_id: friendId, status: 'pending' })
+}
+
+export async function acceptFriendRequest(requestId) {
+  if (!hasSupabase) return
+  await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId)
+}
+
+export async function searchUsers(query) {
+  if (!hasSupabase) return []
+  const { data } = await supabase.from('profiles').select('id, username, avatar_color').ilike('username', `%${query}%`).limit(8)
+  return data || []
+}
+
+export async function getFriendCollection(friendId) {
+  if (!hasSupabase) return []
+  const { data } = await supabase.from('collection').select('*').eq('user_id', friendId)
+  return data || []
+}
+
+export async function getWantList(userId) {
+  if (!hasSupabase || !userId) return []
+  const { data } = await supabase.from('trade_wants').select('*').eq('user_id', userId)
+  return data || []
+}
+
+export async function addWant(cardName, userId) {
+  if (!hasSupabase || !userId) return
+  await supabase.from('trade_wants').upsert({ user_id: userId, card_name: cardName })
+}
+
+export async function removeWant(cardName, userId) {
+  if (!hasSupabase || !userId) return
+  await supabase.from('trade_wants').delete().eq('user_id', userId).eq('card_name', cardName)
+}
+
+// ── EXPORT / IMPORT ───────────────────────────────────
+export function exportData(matches, collection) {
+  const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), matches, collection }, null, 2)], { type: 'application/json' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `mtg-hub-backup-${new Date().toISOString().slice(0,10)}.json`
+  a.click()
+}
+
+export function importData(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr)
+    lsSet({ matches: data.matches || [], collection: data.collection || [] })
+    return { matches: data.matches || [], collection: data.collection || [] }
+  } catch (e) {
+    throw new Error('Invalid backup file format')
+  }
+}
