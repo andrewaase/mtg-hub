@@ -15,7 +15,7 @@ export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClic
   return (
     <div id="topbar">
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <button className="btn-icon" onClick={onMenuClick} style={{ display: 'none' }} id="menu-btn">☰</button>
+        <button className="btn-icon" onClick={onMenuClick} id="menu-btn">☰</button>
         <h2>{titles[page] || 'MTG Hub'}</h2>
       </div>
       <div className="topbar-actions">

@@ -89,11 +89,46 @@ export async function getAllPrintings(cardName) {
   }
 }
 
+function parseRssXml(xmlText, source) {
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(xmlText, 'text/xml')
+    const items = Array.from(doc.querySelectorAll('item'))
+    if (items.length === 0) return null
+    return items.slice(0, 10).map(item => {
+      // Try multiple ways to get the image
+      const enclosure = item.querySelector('enclosure')
+      const mediaContent = item.querySelector('content') || item.querySelector('thumbnail')
+      const img = enclosure?.getAttribute('url') ||
+        mediaContent?.getAttribute('url') ||
+        item.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0]?.getAttribute('url') ||
+        item.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0]?.getAttribute('url') ||
+        null
+
+      // Get link — sometimes it's a CDATA node, not a standard element
+      const linkEl = item.querySelector('link')
+      const link = linkEl?.textContent?.trim() || linkEl?.nextSibling?.nodeValue?.trim() || ''
+
+      return {
+        title: item.querySelector('title')?.textContent?.trim() || 'Untitled',
+        link,
+        source,
+        pubDate: item.querySelector('pubDate')?.textContent || new Date().toISOString(),
+        image: img,
+        description: item.querySelector('description')?.textContent?.trim() || ''
+      }
+    })
+  } catch {
+    return null
+  }
+}
+
 export async function fetchNews(source) {
   let feedUrl = ''
 
   if (source === 'magic.wizards.com') {
-    feedUrl = 'https://feeds.wizards.com/en/feed/Magic-News'
+    // Try multiple known Wizards feed URLs
+    feedUrl = 'https://magic.wizards.com/en/rss/rss.xml'
   } else if (source === 'mtggoldfish') {
     feedUrl = 'https://www.mtggoldfish.com/feed'
   } else if (source === 'edhrec') {
@@ -102,33 +137,48 @@ export async function fetchNews(source) {
 
   if (!feedUrl) return []
 
-  // Multi-proxy RSS fetch chain
-  const proxyUrls = [
-    `https://api.allorigins.win/feed?url=${encodeURIComponent(feedUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`,
-    `https://rss2json.com/api.json?rss_url=${encodeURIComponent(feedUrl)}`
-  ]
-
-  for (const proxyUrl of proxyUrls) {
-    try {
-      const res = await fetchWithTimeout(proxyUrl, 5000)
-      if (!res.ok) continue
+  // 1. Try rss2json (returns JSON items directly) — correct API URL
+  try {
+    const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`
+    const res = await fetchWithTimeout(rss2jsonUrl, 6000)
+    if (res.ok) {
       const data = await res.json()
-
-      if (data.items && Array.isArray(data.items)) {
+      if (data.status === 'ok' && data.items && data.items.length > 0) {
         return data.items.slice(0, 10).map(item => ({
           title: item.title || 'Untitled',
           link: item.link || item.url || '',
-          source: source,
+          source,
           pubDate: item.pubDate || item.published || new Date().toISOString(),
-          image: item.image || item.thumbnail || null,
-          description: item.description || item.summary || ''
+          image: item.thumbnail || item.enclosure?.link || null,
+          description: item.description || item.content || ''
         }))
       }
-    } catch (e) {
-      continue
     }
-  }
+  } catch { /* fall through */ }
+
+  // 2. Try allorigins (returns raw XML in `contents` field) — parse with DOMParser
+  try {
+    const alloriginsUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`
+    const res = await fetchWithTimeout(alloriginsUrl, 6000)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.contents) {
+        const parsed = parseRssXml(data.contents, source)
+        if (parsed && parsed.length > 0) return parsed
+      }
+    }
+  } catch { /* fall through */ }
+
+  // 3. Try corsproxy (returns raw XML) — parse with DOMParser
+  try {
+    const corsproxyUrl = `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`
+    const res = await fetchWithTimeout(corsproxyUrl, 6000)
+    if (res.ok) {
+      const text = await res.text()
+      const parsed = parseRssXml(text, source)
+      if (parsed && parsed.length > 0) return parsed
+    }
+  } catch { /* fall through */ }
 
   return []
 }

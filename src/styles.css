@@ -119,6 +119,7 @@ body {
 }
 
 #topbar h2 { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
+#menu-btn { display: none; }
 
 .topbar-actions { display: flex; align-items: center; gap: 12px; }
 
@@ -1120,6 +1121,7 @@ body {
   #content { padding: 16px 14px 80px; }
   #topbar { padding: 0 16px; }
   #mobile-nav { display: block; }
+  #menu-btn { display: flex; }
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
   .card-result { grid-template-columns: 1fr; }

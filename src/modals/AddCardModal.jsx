@@ -35,10 +35,12 @@ export default function AddCardModal({ onClose, prefill, user, collection, setCo
       name: cardName,
       qty: parseInt(qty),
       condition,
-      setName: cardData?.set?.name || 'Unknown',
-      img: cardData?.image_uris?.small || null,
+      setName: cardData?.set_name || cardData?.set?.name || 'Unknown',
+      img: cardData?.image_uris?.small || cardData?.card_faces?.[0]?.image_uris?.small || null,
       colors: cardData?.color_identity || [],
       price: cardData?.prices?.usd ? parseFloat(cardData.prices.usd) : null,
+      // TCGPlayer product page — used for the "List on TCGPlayer" deep link in the sell list
+      tcgplayerUrl: cardData?.purchase_uris?.tcgplayer || null,
     }
     await addCard(card, user?.id)
     setCollection([...collection, card])

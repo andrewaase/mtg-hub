@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, hasSupabase } from './lib/supabase'
 import { getMatches, getCollection } from './lib/db'
+import { handleEbayCallback } from './lib/ebay'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import MobileNav from './components/MobileNav'
@@ -19,8 +20,15 @@ import Collection from './pages/Collection'
 import MetaTracker from './pages/MetaTracker'
 import Friends from './pages/Friends'
 
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'meta', 'friends']
+
+function getInitialPage() {
+  const hash = window.location.hash.replace('#', '')
+  return VALID_PAGES.includes(hash) ? hash : 'dashboard'
+}
+
 export default function App() {
-  const [page, setPage] = useState('dashboard')
+  const [page, setPageState] = useState(getInitialPage)
   const [user, setUser] = useState(null)
   const [matches, setMatches] = useState([])
   const [collection, setCollection] = useState([])
@@ -33,6 +41,36 @@ export default function App() {
   const [prefillCard, setPrefillCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Wrap setPage to also push browser history, enabling the back button
+  const setPage = useCallback((newPage) => {
+    setPageState(newPage)
+    window.history.pushState({ page: newPage }, '', `#${newPage}`)
+  }, [])
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    // Set the initial history entry so back button has somewhere to go
+    window.history.replaceState({ page: getInitialPage() }, '', `#${getInitialPage()}`)
+    const handlePopState = (e) => {
+      const target = e.state?.page || getInitialPage()
+      setPageState(target)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Handle eBay OAuth callback (fires when eBay redirects back with tokens in URL hash)
+  useEffect(() => {
+    const result = handleEbayCallback()
+    if (result === 'connected') {
+      showToast('eBay account connected! ✓')
+      setPageState('collection')
+    } else if (result?.startsWith('error:')) {
+      const reason = result.split(':')[1]
+      showToast(`eBay connection failed (${reason}). Try again.`)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showToast = useCallback((msg, duration = 3000) => {
     setToast(msg)

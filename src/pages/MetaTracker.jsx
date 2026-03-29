@@ -7,10 +7,10 @@ export default function MetaTracker({ openDecklist, openAddCard }) {
   const data = META_DATA[format]
   const tierColors = { S: 'tier-s', A: 'tier-a', B: 'tier-b', C: 'tier-c' }
   const tierPillStyles = {
-    S: 'background:rgba(255,215,0,.2);color:#ffd700',
-    A: 'background:rgba(201,168,76,.2);color:var(--accent-gold)',
-    B: 'background:rgba(74,144,217,.15);color:var(--accent-blue)',
-    C: 'background:rgba(155,89,182,.15);color:#c07de0',
+    S: { background: 'rgba(255,215,0,.2)', color: '#ffd700' },
+    A: { background: 'rgba(201,168,76,.2)', color: 'var(--accent-gold)' },
+    B: { background: 'rgba(74,144,217,.15)', color: 'var(--accent-blue)' },
+    C: { background: 'rgba(155,89,182,.15)', color: '#c07de0' },
   }
 
   return (
