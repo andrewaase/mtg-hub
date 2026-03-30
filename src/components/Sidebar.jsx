@@ -9,6 +9,7 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
     { id: 'news', icon: '📰', label: 'MTG News', section: 'Resources' },
     { id: 'cards', icon: '🔍', label: 'Card Lookup', section: 'Resources' },
     { id: 'collection', icon: '📦', label: 'My Collection', section: 'Resources' },
+    { id: 'decks', icon: '🃏', label: 'My Decks', section: 'Resources' },
     { id: 'friends', icon: '🤝', label: 'Friends & Trades', section: 'Social', requiresSupabase: true },
   ]
 

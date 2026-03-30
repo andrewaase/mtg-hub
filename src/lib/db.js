@@ -137,6 +137,45 @@ export async function removeWant(cardName, userId) {
   await supabase.from('trade_wants').delete().eq('user_id', userId).eq('card_name', cardName)
 }
 
+// ── DECKS ─────────────────────────────────────────────
+export async function getDecks(userId) {
+  if (hasSupabase && userId) {
+    const { data } = await supabase.from('decks').select('*').eq('user_id', userId).order('updated_at', { ascending: false })
+    return data || []
+  }
+  return lsGet().decks || []
+}
+
+export async function saveDeck(deck, userId) {
+  const now = new Date().toISOString()
+  if (hasSupabase && userId) {
+    if (deck.id) {
+      const { data } = await supabase.from('decks').update({ ...deck, updated_at: now }).eq('id', deck.id).eq('user_id', userId).select().single()
+      return data || deck
+    }
+    const { data } = await supabase.from('decks').insert({ ...deck, user_id: userId, created_at: now, updated_at: now }).select().single()
+    return data || deck
+  }
+  const decks = lsGet().decks || []
+  if (deck.id) {
+    const updated = decks.map(d => d.id === deck.id ? { ...deck, updatedAt: now } : d)
+    lsSet({ decks: updated })
+    return { ...deck, updatedAt: now }
+  }
+  const newDeck = { ...deck, id: Date.now(), createdAt: now, updatedAt: now }
+  lsSet({ decks: [newDeck, ...decks] })
+  return newDeck
+}
+
+export async function deleteDeck(id, userId) {
+  if (hasSupabase && userId) {
+    await supabase.from('decks').delete().eq('id', id).eq('user_id', userId)
+    return
+  }
+  const decks = (lsGet().decks || []).filter(d => d.id !== id)
+  lsSet({ decks })
+}
+
 // ── EXPORT / IMPORT ───────────────────────────────────
 export function exportData(matches, collection) {
   const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), matches, collection }, null, 2)], { type: 'application/json' })

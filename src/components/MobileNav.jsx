@@ -7,6 +7,7 @@ export default function MobileNav({ page, setPage }) {
     { id: 'news', icon: '📰', label: 'News' },
     { id: 'cards', icon: '🔍', label: 'Cards' },
     { id: 'collection', icon: '📦', label: 'Collection' },
+    { id: 'decks', icon: '🃏', label: 'Decks' },
   ]
 
   return (

@@ -19,8 +19,9 @@ import CardLookup from './pages/CardLookup'
 import Collection from './pages/Collection'
 import MetaTracker from './pages/MetaTracker'
 import Friends from './pages/Friends'
+import Decks from './pages/Decks'
 
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'meta', 'friends']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'meta', 'friends', 'decks']
 
 function getInitialPage() {
   const hash = window.location.hash.replace('#', '')
@@ -122,6 +123,7 @@ export default function App() {
               {page === 'collection' && <Collection {...pageProps} />}
               {page === 'meta' && <MetaTracker {...pageProps} />}
               {page === 'friends' && <Friends {...pageProps} />}
+              {page === 'decks' && <Decks {...pageProps} />}
             </>
           )}
         </div>
