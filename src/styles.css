@@ -1573,3 +1573,57 @@ body {
 .mana-R { background: #d3202a; color: #fff; }
 .mana-G { background: #00733e; color: #fff; }
 .mana-C { background: #ccc;    color: #333; }
+
+/* ============================================================
+   FINANCE FEATURES — Collection, Dashboard, Wishlist
+   ============================================================ */
+
+/* For-sale badge on collection cards */
+.col-card.for-sale {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 1px var(--accent-gold);
+}
+
+/* Tag/badge button on collection cards */
+.col-card-tag-btn {
+  font-size: .65rem;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.col-card-tag-btn:hover { border-color: var(--accent-teal); color: var(--accent-teal); }
+.col-card-tag-btn.active { border-color: var(--accent-gold); background: rgba(201,168,76,.12); color: var(--accent-gold); }
+
+/* Gainers/Losers mover rows */
+.mover-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.mover-row-last-no-border { border-bottom: none; }
+.mover-row img { width: 36px; height: 50px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.mover-row-info { flex: 1; min-width: 0; }
+.mover-row-name { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mover-row-set  { font-size: .72rem; color: var(--text-muted); }
+.mover-row-delta { font-size: .85rem; font-weight: 700; flex-shrink: 0; }
+
+/* Bulk-refresh progress bar */
+.progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+  margin: 8px 0;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-teal), #6ee7d8);
+  transition: width .3s ease;
+}
