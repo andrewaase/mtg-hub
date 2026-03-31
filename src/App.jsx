@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase, hasSupabase } from './lib/supabase'
 import { getMatches, getCollection } from './lib/db'
 import { handleEbayCallback } from './lib/ebay'
+import { takeSnapshot } from './lib/priceHistory'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import MobileNav from './components/MobileNav'
@@ -20,8 +21,9 @@ import Collection from './pages/Collection'
 import MetaTracker from './pages/MetaTracker'
 import Friends from './pages/Friends'
 import Decks from './pages/Decks'
+import Wishlist from './pages/Wishlist'
 
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'meta', 'friends', 'decks']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'meta', 'friends', 'decks', 'wishlist']
 
 function getInitialPage() {
   const hash = window.location.hash.replace('#', '')
@@ -43,15 +45,13 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Wrap setPage to also push browser history, enabling the back button
   const setPage = useCallback((newPage) => {
     setPageState(newPage)
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
   }, [])
 
-  // Handle browser back/forward buttons
+  // Browser back/forward
   useEffect(() => {
-    // Set the initial history entry so back button has somewhere to go
     window.history.replaceState({ page: getInitialPage() }, '', `#${getInitialPage()}`)
     const handlePopState = (e) => {
       const target = e.state?.page || getInitialPage()
@@ -61,7 +61,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  // Handle eBay OAuth callback (fires when eBay redirects back with tokens in URL hash)
+  // eBay OAuth callback
   useEffect(() => {
     const result = handleEbayCallback()
     if (result === 'connected') {
@@ -86,7 +86,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Load data
+  // Load data, then take price snapshot + check wishlist alerts
   useEffect(() => {
     async function load() {
       setLoading(true)
@@ -94,9 +94,27 @@ export default function App() {
       setMatches(m)
       setCollection(c)
       setLoading(false)
+
+      // Daily portfolio snapshot (no-op if already taken today)
+      if (c.length > 0) takeSnapshot(c)
+
+      // Wishlist price alert check
+      try {
+        const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
+        const wishlist = stored.wishlist || []
+        const alerts = wishlist.filter(i =>
+          i.targetPrice != null && i.currentPrice != null && i.currentPrice <= i.targetPrice
+        )
+        if (alerts.length > 0) {
+          setTimeout(() => showToast(
+            `🎯 ${alerts.length} wishlist card${alerts.length > 1 ? 's' : ''} at or below target price!`,
+            5000
+          ), 1500)
+        }
+      } catch { /* ignore */ }
     }
     load()
-  }, [user])
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageProps = {
     user, matches, setMatches, collection, setCollection, showToast, setPage,
@@ -115,25 +133,26 @@ export default function App() {
         <div id="content">
           {!loading && (
             <>
-              {page === 'dashboard' && <Dashboard {...pageProps} />}
-              {page === 'log' && <MatchLog {...pageProps} />}
-              {page === 'stats' && <Stats {...pageProps} />}
-              {page === 'news' && <News {...pageProps} />}
-              {page === 'cards' && <CardLookup {...pageProps} />}
+              {page === 'dashboard'  && <Dashboard {...pageProps} />}
+              {page === 'log'        && <MatchLog {...pageProps} />}
+              {page === 'stats'      && <Stats {...pageProps} />}
+              {page === 'news'       && <News {...pageProps} />}
+              {page === 'cards'      && <CardLookup {...pageProps} />}
               {page === 'collection' && <Collection {...pageProps} />}
-              {page === 'meta' && <MetaTracker {...pageProps} />}
-              {page === 'friends' && <Friends {...pageProps} />}
-              {page === 'decks' && <Decks {...pageProps} />}
+              {page === 'meta'       && <MetaTracker {...pageProps} />}
+              {page === 'friends'    && <Friends {...pageProps} />}
+              {page === 'decks'      && <Decks {...pageProps} />}
+              {page === 'wishlist'   && <Wishlist {...pageProps} />}
             </>
           )}
         </div>
       </div>
       <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} />
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} showToast={showToast} />}
+      {showAuth    && <AuthModal onClose={() => setShowAuth(false)} showToast={showToast} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
-      {showAddCard && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
-      {showCamera && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}
+      {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
+      {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}
       {decklistDeck && <DecklistModal deck={decklistDeck} onClose={() => setDecklistDeck(null)} setPage={setPage} />}
       {toast && <Toast msg={toast} />}
     </div>
