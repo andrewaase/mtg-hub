@@ -3,20 +3,29 @@ import { createWorker } from 'tesseract.js'
 import { addCard } from '../lib/db'
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Card layout constants
+//
+// All percentages are relative to the FULL VIDEO FRAME.
+// The dashed card-outline guide tells the user exactly where to position
+// their card — when the card fills the guide, these zones land precisely
+// on the right strips of the card.
+//
+// Two name zones handle the two dominant card frame families:
+//   STANDARD   — name at very top of card  (standard, extended art, etc.)
+//   SHOWCASE   — name in a mid-card banner (TMNT showcase, full-art, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }  // card outline guide
+
+// Crops are [xPct, yPct, wPct, hPct] within the video frame
+const CROP_NAME_STD  = [0.05, 0.02, 0.82, 0.12]   // top  2-14%:  standard card name
+const CROP_NAME_ALT  = [0.05, 0.37, 0.82, 0.20]   // mid 37-57%:  showcase / full-art name
+const CROP_TYPE      = [0.04, 0.50, 0.78, 0.17]   // mid 50-67%:  type line
+const CROP_COLLECTOR = [0.04, 0.86, 0.87, 0.11]   // bot 86-97%:  collector number
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Image helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Crop a region of the live video, upscale for resolution, then apply
- * per-pixel contrast normalisation so text is readable regardless of whether
- * the card is a standard frame, borderless, showcase, or full-art printing.
- *
- * Contrast normalisation:
- *   1. Grayscale     — removes colour noise from the card art
- *   2. Range stretch — darkest pixel → 0, brightest → 255
- *   3. Auto-invert   — if avg brightness < 110 the image is dark-on-dark;
- *                      invert so Tesseract always sees dark text on light bg
- */
 function cropAndProcess(video, xPct, yPct, wPct, hPct, scale = 4) {
   const vw = video.videoWidth, vh = video.videoHeight
   const sx = Math.floor(vw * xPct), sy = Math.floor(vh * yPct)
@@ -51,7 +60,6 @@ function cropAndProcess(video, xPct, yPct, wPct, hPct, scale = 4) {
   return c
 }
 
-/** Tiny 32×32 thumbnail for cheap motion detection. */
 function thumbCanvas(video) {
   const c = document.createElement('canvas')
   c.width = 32; c.height = 32
@@ -59,7 +67,6 @@ function thumbCanvas(video) {
   return c
 }
 
-/** Average per-pixel brightness difference between two 32×32 canvases. */
 function frameDiff(c1, c2) {
   const d1 = c1.getContext('2d').getImageData(0, 0, 32, 32).data
   const d2 = c2.getContext('2d').getImageData(0, 0, 32, 32).data
@@ -72,7 +79,6 @@ function frameDiff(c1, c2) {
 // Text helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Remove anything that could never appear in a card name. */
 function cleanName(raw) {
   return (raw || '')
     .replace(/[^a-zA-Z0-9 ',\-\.]/g, '')
@@ -80,10 +86,6 @@ function cleanName(raw) {
     .trim()
 }
 
-/**
- * Extract a collector number from the bottom strip.
- * Handles: "147/272"  "★147"  "P47"  "S5"  plain "147"
- */
 function extractCollector(raw) {
   if (!raw) return null
   const slash = raw.match(/\b(\d{1,4})\/\d+\b/)
@@ -95,27 +97,16 @@ function extractCollector(raw) {
   return null
 }
 
-/**
- * Parse a type line OCR result into an array of meaningful type words
- * suitable for Scryfall `t:` filters.
- *
- * Examples:
- *   "Legendary Creature — Human Wizard"  → ['legendary','creature','human','wizard']
- *   "Instant"                            → ['instant']
- *   "Enchantment — Aura"                 → ['enchantment','aura']
- */
 function extractTypeWords(raw) {
   if (!raw) return []
-  // Replace the em-dash and common OCR artefacts with spaces
   const clean = (raw || '').replace(/[—–\-]/g, ' ').replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim()
   const words = clean.toLowerCase().split(' ').filter(Boolean)
-
-  // Recognised MTG type words (supertypes + card types + common subtypes)
   const KNOWN = new Set([
     'legendary','basic','snow','world',
     'creature','instant','sorcery','enchantment','artifact','planeswalker','land','battle','tribal',
     'human','wizard','elf','dragon','angel','demon','goblin','zombie','vampire','merfolk',
     'warrior','cleric','rogue','shaman','soldier','knight','druid','spirit','elemental',
+    'ninja','mutant','rat','pirate','turtle',
     'aura','equipment','vehicle','saga','shrine',
     'mountain','forest','island','plains','swamp',
     'jace','liliana','chandra','garruk','ajani','nissa','sorin','teferi','karn','urza',
@@ -124,22 +115,14 @@ function extractTypeWords(raw) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scryfall lookup
+// Scryfall lookup  (6-tier fallback chain)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Lookup priority:
- *  1. Name + collector number        →  exact printing (best for alt art)
- *  2. Name only                      →  Scryfall fuzzy /cards/named
- *  3. Name only                      →  autocomplete (handles partial/garbled OCR)
- *  4. Type words + collector number  →  when name OCR fails but type line is readable
- *  5. Collector number only          →  last resort; catches borderless where name fails
- */
 async function lookupCard(name, colNum, typeWords = []) {
   let card = null
   let quality = 'fuzzy'
 
-  // 1 — exact printing via name + collector number
+  // 1 — exact printing: name + collector
   if (name.length >= 3 && colNum) {
     try {
       const res = await fetch(
@@ -165,7 +148,7 @@ async function lookupCard(name, colNum, typeWords = []) {
     } catch { /* continue */ }
   }
 
-  // 3 — autocomplete (handles garbled / partially-read names)
+  // 3 — autocomplete (garbled / partial names)
   if (!card && name.length >= 3) {
     try {
       const acRes = await fetch(
@@ -187,12 +170,8 @@ async function lookupCard(name, colNum, typeWords = []) {
     } catch { /* continue */ }
   }
 
-  // 4 — type line + collector number
-  //   Works when name OCR is completely garbled on borderless / full-art cards
-  //   but the type line strip (middle of card) OCR succeeds.
-  //   Most useful: "legendary creature" + cn:X narrows to very few cards.
+  // 4 — type words + collector (works when name OCR fails on showcase/borderless)
   if (!card && typeWords.length >= 1 && colNum) {
-    // Use at most the first 2 type words to avoid over-filtering
     const typeFilter = typeWords.slice(0, 2).map(t => `t:${t}`).join(' ')
     try {
       const res = await fetch(
@@ -200,18 +179,14 @@ async function lookupCard(name, colNum, typeWords = []) {
       )
       if (res.ok) {
         const json = await res.json()
-        // Only accept if we get a single unambiguous result, or take first of few
-        if (json.data?.length === 1) {
-          card = json.data[0]; quality = 'type'
-        } else if (json.data?.length >= 2 && json.data?.length <= 4) {
-          // Prefer the result whose name most resembles what we OCR'd
+        if (json.data?.length >= 1 && json.data?.length <= 4) {
           card = json.data[0]; quality = 'type'
         }
       }
     } catch { /* continue */ }
   }
 
-  // 5 — name + type words (when collector OCR failed, use type to disambiguate fuzzy name)
+  // 5 — name + primary type (when collector fails)
   if (!card && name.length >= 3 && typeWords.length >= 1) {
     const primaryType = typeWords.find(t =>
       ['creature','instant','sorcery','enchantment','artifact','planeswalker','land','battle'].includes(t)
@@ -229,7 +204,7 @@ async function lookupCard(name, colNum, typeWords = []) {
     }
   }
 
-  // 6 — collector number only (borderless / alt art where name OCR is unusable)
+  // 6 — collector number only (last resort)
   if (!card && colNum) {
     try {
       const res = await fetch(
@@ -252,17 +227,16 @@ async function lookupCard(name, colNum, typeWords = []) {
 export default function CameraModal({
   onClose, showToast, user, collection, setCollection, openAddCard
 }) {
-  // Three dedicated workers, each tuned for its region
-  const w1Ref = useRef(null)       // card name  (top strip)
-  const w2Ref = useRef(null)       // collector # (bottom strip)
-  const w3Ref = useRef(null)       // type line  (middle strip)
+  const w1Ref = useRef(null)       // card name (standard + showcase positions)
+  const w2Ref = useRef(null)       // collector number
+  const w3Ref = useRef(null)       // type line
   const ocrReadyRef = useRef(false)
 
   const scanningRef  = useRef(false)
   const frozenRef    = useRef(false)
   const prevThumbRef = useRef(null)
   const stableRef    = useRef(0)
-  const STABLE_NEEDED = 2   // 2 × 300 ms = 600 ms hold-still
+  const STABLE_NEEDED = 2
 
   const videoRef = useRef(null)
   const [cameraReady, setCameraReady] = useState(false)
@@ -271,7 +245,7 @@ export default function CameraModal({
 
   const [nameRead,      setNameRead]      = useState('')
   const [collectorRead, setCollectorRead] = useState('')
-  const [typeRead,      setTypeRead]      = useState('')  // type line display
+  const [typeRead,      setTypeRead]      = useState('')
 
   const [foundCard,    setFoundCard]    = useState(null)
   const [matchQuality, setMatchQuality] = useState(null)
@@ -290,19 +264,14 @@ export default function CameraModal({
         ])
         if (!active) { w1.terminate(); w2.terminate(); w3.terminate(); return }
 
-        // Name worker — letters, digits, common punctuation
         await w1.setParameters({
           tessedit_pageseg_mode: '7',
           tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ',-.",
         })
-
-        // Collector worker — digits and slash only
         await w2.setParameters({
           tessedit_pageseg_mode: '7',
           tessedit_char_whitelist: '0123456789/',
         })
-
-        // Type-line worker — letters and spaces only (no digits needed for type line)
         await w3.setParameters({
           tessedit_pageseg_mode: '7',
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
@@ -350,7 +319,7 @@ export default function CameraModal({
 
   const stopTracks = () => videoRef.current?.srcObject?.getTracks().forEach(t => t.stop())
 
-  // ── Stability-based scan trigger ──────────────────────────────────────────
+  // ── Stability trigger ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!cameraReady) return
     const id = setInterval(stabilityCheck, 300)
@@ -383,20 +352,35 @@ export default function CameraModal({
     setOcrStatus('scanning')
 
     try {
-      // Three regions processed and OCR'd in parallel:
+      // w1 does TWO sequential scans (standard name position, then showcase position)
+      // while w2 and w3 run in parallel alongside it.
       //
-      //  w1 — Name strip:      y=3–28%   (top of card, covers title bar)
-      //  w2 — Collector strip: y=72–97%  (bottom strip, collector number)
-      //  w3 — Type line:       y=48–60%  (middle, just below the art box)
-      //
-      // All three run simultaneously in separate Web Worker threads.
-      const [nd, cd, td] = await Promise.all([
-        w1Ref.current.recognize(cropAndProcess(video, 0.03, 0.03, 0.82, 0.25, 4)),
-        w2Ref.current.recognize(cropAndProcess(video, 0.03, 0.72, 0.87, 0.25, 3)),
-        w3Ref.current.recognize(cropAndProcess(video, 0.02, 0.48, 0.80, 0.14, 4)),
+      // Standard name zone  (y 2–14%):   catches top-bar names on normal frames
+      // Showcase name zone  (y 37–57%):   catches mid-card banner names (TMNT, etc.)
+      // Collector zone      (y 86–97%):   collector number at very bottom
+      // Type line zone      (y 50–67%):   type line just below the art box
+      const [nameResult, cd, td] = await Promise.all([
+        // w1 — try standard position first, then showcase position
+        (async () => {
+          const std = await w1Ref.current.recognize(
+            cropAndProcess(video, ...CROP_NAME_STD, 4)
+          )
+          const n1 = cleanName(std.data.text)
+          // Only do the showcase scan if the standard result is weak
+          if (n1.length >= 4) return { text: n1, zone: 'std' }
+          const alt = await w1Ref.current.recognize(
+            cropAndProcess(video, ...CROP_NAME_ALT, 4)
+          )
+          const n2 = cleanName(alt.data.text)
+          return n1.length >= n2.length
+            ? { text: n1, zone: 'std' }
+            : { text: n2, zone: 'alt' }
+        })(),
+        w2Ref.current.recognize(cropAndProcess(video, ...CROP_COLLECTOR, 3)),
+        w3Ref.current.recognize(cropAndProcess(video, ...CROP_TYPE, 4)),
       ])
 
-      const name      = cleanName(nd.data.text)
+      const name      = nameResult.text
       const colNum    = extractCollector(cd.data.text)
       const typeWords = extractTypeWords(td.data.text)
 
@@ -476,22 +460,23 @@ export default function CameraModal({
 
   function handleClose() { stopTracks(); onClose() }
 
-  // ── Derived display values ─────────────────────────────────────────────────
+  // ── Derived display ───────────────────────────────────────────────────────
   const img          = foundCard?.image_uris?.small || foundCard?.card_faces?.[0]?.image_uris?.small
   const alreadyOwned = foundCard
     ? (collection || []).find(c => c.name.toLowerCase() === foundCard.name.toLowerCase())
     : null
 
   const qualityLabel = {
-    exact:     { text: '✓✓ Exact match',       color: '#4ade80',  bg: 'rgba(74,222,128,0.2)'  },
-    fuzzy:     { text: '✓ Name match',          color: '#fbbf24',  bg: 'rgba(251,191,36,0.2)'  },
-    type:      { text: '✓ Type line match',     color: '#c084fc',  bg: 'rgba(192,132,252,0.2)' },
-    collector: { text: '✓ Collector # match',   color: '#93c5fd',  bg: 'rgba(147,197,253,0.2)' },
+    exact:     { text: '✓✓ Exact match',      color: '#4ade80',  bg: 'rgba(74,222,128,0.2)'  },
+    fuzzy:     { text: '✓ Name match',         color: '#fbbf24',  bg: 'rgba(251,191,36,0.2)'  },
+    type:      { text: '✓ Type line match',    color: '#c084fc',  bg: 'rgba(192,132,252,0.2)' },
+    collector: { text: '✓ Collector # match',  color: '#93c5fd',  bg: 'rgba(147,197,253,0.2)' },
   }[matchQuality] || null
 
-  const nameColor = foundCard ? '#4caf50' : '#4a9eff'
-  const collColor = foundCard ? '#4caf50' : '#f59e0b'
-  const typeColor = foundCard ? '#4caf50' : '#c084fc'
+  const hit  = !!foundCard
+  const blue   = hit ? '#4caf50' : '#4a9eff'
+  const amber  = hit ? '#4caf50' : '#f59e0b'
+  const purple = hit ? '#4caf50' : '#c084fc'
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -515,7 +500,7 @@ export default function CameraModal({
           <div>
             <h3 style={{ margin: '0 0 2px', fontSize: '1rem' }}>📷 Scan Card</h3>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-              Hold card still · reads name, type line & collector #
+              Fill card to the white frame · works with any printing
             </div>
           </div>
           <button onClick={handleClose} style={{
@@ -541,42 +526,104 @@ export default function CameraModal({
             overflow: 'hidden', background: '#000', marginBottom: '10px',
           }}>
             <video ref={videoRef} autoPlay playsInline muted
-              style={{ width: '100%', display: 'block', minHeight: '200px' }} />
+              style={{ width: '100%', display: 'block', minHeight: '220px' }} />
 
-            {/* Blue box — card name, top 3–28% */}
+            {/* ── Card alignment guide — white dashed outline ── */}
             <div style={{
-              position: 'absolute', left: '3%', top: '3%', width: '82%', height: '25%',
-              border: `2px solid ${nameColor}`, borderRadius: '4px',
+              position: 'absolute',
+              left: `${GUIDE.x * 100}%`,
+              top:  `${GUIDE.y * 100}%`,
+              width: `${GUIDE.w * 100}%`,
+              height: `${GUIDE.h * 100}%`,
+              border: '2px dashed rgba(255,255,255,0.55)',
+              borderRadius: '6px',
+              pointerEvents: 'none',
+              boxSizing: 'border-box',
+            }} />
+
+            {/* Align instruction — only visible before a card is found */}
+            {!foundCard && ocrStatus === 'ready' && (
+              <div style={{
+                position: 'absolute', left: '50%', top: '50%',
+                transform: 'translate(-50%,-50%)',
+                color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem',
+                textAlign: 'center', pointerEvents: 'none',
+                lineHeight: 1.5,
+              }}>
+                Fill card to white outline
+              </div>
+            )}
+
+            {/* Blue box — standard name, top 2–14% */}
+            <div style={{
+              position: 'absolute',
+              left: `${CROP_NAME_STD[0] * 100}%`,
+              top:  `${CROP_NAME_STD[1] * 100}%`,
+              width: `${CROP_NAME_STD[2] * 100}%`,
+              height:`${CROP_NAME_STD[3] * 100}%`,
+              border: `2px solid ${blue}`, borderRadius: '4px',
               transition: 'border-color .25s', pointerEvents: 'none',
-              boxShadow: foundCard ? '0 0 10px rgba(76,175,80,0.4)' : 'none',
+              boxShadow: hit ? '0 0 8px rgba(76,175,80,0.4)' : 'none',
             }} />
             <span style={{
-              position: 'absolute', left: '3%', top: 'calc(3% + 26%)',
-              fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)', pointerEvents: 'none',
+              position: 'absolute',
+              left: `${CROP_NAME_STD[0] * 100}%`,
+              top: `calc(${(CROP_NAME_STD[1] + CROP_NAME_STD[3]) * 100}% + 2px)`,
+              fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none',
             }}>Name</span>
 
-            {/* Purple box — type line, 48–62% */}
+            {/* Teal dashed box — showcase / alt-art name, 37–57% */}
             <div style={{
-              position: 'absolute', left: '2%', top: '48%', width: '80%', height: '14%',
-              border: `2px solid ${typeColor}`, borderRadius: '4px',
+              position: 'absolute',
+              left: `${CROP_NAME_ALT[0] * 100}%`,
+              top:  `${CROP_NAME_ALT[1] * 100}%`,
+              width: `${CROP_NAME_ALT[2] * 100}%`,
+              height:`${CROP_NAME_ALT[3] * 100}%`,
+              border: `1.5px dashed ${blue}`, borderRadius: '4px',
+              opacity: 0.55,
               transition: 'border-color .25s', pointerEvents: 'none',
-              boxShadow: foundCard ? '0 0 8px rgba(192,132,252,0.3)' : 'none',
             }} />
             <span style={{
-              position: 'absolute', left: '2%', top: 'calc(48% - 13px)',
-              fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)', pointerEvents: 'none',
+              position: 'absolute',
+              left: `${CROP_NAME_ALT[0] * 100}%`,
+              top: `calc(${CROP_NAME_ALT[1] * 100}% - 13px)`,
+              fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)', pointerEvents: 'none',
+            }}>Alt name</span>
+
+            {/* Purple box — type line, 50–67% */}
+            <div style={{
+              position: 'absolute',
+              left: `${CROP_TYPE[0] * 100}%`,
+              top:  `${CROP_TYPE[1] * 100}%`,
+              width: `${CROP_TYPE[2] * 100}%`,
+              height:`${CROP_TYPE[3] * 100}%`,
+              border: `2px solid ${purple}`, borderRadius: '4px',
+              transition: 'border-color .25s', pointerEvents: 'none',
+              boxShadow: hit ? '0 0 6px rgba(192,132,252,0.3)' : 'none',
+            }} />
+            <span style={{
+              position: 'absolute',
+              left: `${CROP_TYPE[0] * 100}%`,
+              top: `calc(${CROP_TYPE[1] * 100}% - 13px)`,
+              fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none',
             }}>Type</span>
 
-            {/* Amber box — collector #, bottom 72–97% */}
+            {/* Amber box — collector, 86–97% */}
             <div style={{
-              position: 'absolute', left: '3%', top: '72%', width: '87%', height: '25%',
-              border: `2px solid ${collColor}`, borderRadius: '4px',
+              position: 'absolute',
+              left: `${CROP_COLLECTOR[0] * 100}%`,
+              top:  `${CROP_COLLECTOR[1] * 100}%`,
+              width: `${CROP_COLLECTOR[2] * 100}%`,
+              height:`${CROP_COLLECTOR[3] * 100}%`,
+              border: `2px solid ${amber}`, borderRadius: '4px',
               transition: 'border-color .25s', pointerEvents: 'none',
-              boxShadow: foundCard ? '0 0 10px rgba(76,175,80,0.4)' : 'none',
+              boxShadow: hit ? '0 0 8px rgba(76,175,80,0.4)' : 'none',
             }} />
             <span style={{
-              position: 'absolute', left: '3%', top: 'calc(72% - 14px)',
-              fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)', pointerEvents: 'none',
+              position: 'absolute',
+              left: `${CROP_COLLECTOR[0] * 100}%`,
+              top: `calc(${CROP_COLLECTOR[1] * 100}% - 13px)`,
+              fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none',
             }}>Collector #</span>
 
             {/* Status pill */}
@@ -592,7 +639,7 @@ export default function CameraModal({
               </div>
             )}
 
-            {/* ── Card preview overlay (inside video, always visible) ── */}
+            {/* ── Card preview overlay ── */}
             {foundCard && (
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -659,7 +706,7 @@ export default function CameraModal({
           </div>
         )}
 
-        {/* OCR readout — shows what was read in each zone */}
+        {/* OCR readout */}
         {(nameRead || collectorRead || typeRead) && (
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', fontSize: '0.7rem', flexWrap: 'wrap' }}>
             {nameRead && (
@@ -701,7 +748,6 @@ export default function CameraModal({
           }}>⚠ OCR engine failed to load. Try refreshing.</div>
         )}
 
-        {/* Session log */}
         {addedCards.length > 0 && (
           <div style={{
             padding: '7px 11px', marginBottom: '10px',
@@ -713,13 +759,12 @@ export default function CameraModal({
           </div>
         )}
 
-        {/* Tips */}
         <div style={{
           fontSize: '0.68rem', color: 'var(--text-muted)',
           lineHeight: 1.6, marginBottom: '12px',
         }}>
           <strong style={{ color: 'var(--text-secondary)' }}>Tips:</strong>{' '}
-          Fill the card to the frame · Good lighting helps · Works with any art style ·
+          Fill card to the white outline · Move closer if boxes miss the text ·
           Blue = name · Purple = type line · Amber = collector # ·
           {' '}Wrong card? Tap 🔄 Rescan
         </div>
