@@ -84,7 +84,7 @@ async function lookupCard(name) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CameraModal({
-  onClose, showToast, user, collection, setCollection, openAddCard
+  onClose, showToast, user, collection, setCollection, openAddCard, setPage
 }) {
   const scanningRef  = useRef(false)
   const frozenRef    = useRef(false)
@@ -209,11 +209,13 @@ export default function CameraModal({
   }
 
   // ── Add to collection ─────────────────────────────────────────────────────
-  async function handleAdd() {
+  async function handleAdd(options = {}) {
     if (!foundCard || adding) return
     const snap = foundCard
     setAdding(true)
     try {
+      const priceUsd     = snap.prices?.usd     ? parseFloat(snap.prices.usd)     : null
+      const priceUsdFoil = snap.prices?.usd_foil ? parseFloat(snap.prices.usd_foil) : null
       const card = {
         name:         snap.name,
         qty:          1,
@@ -221,7 +223,9 @@ export default function CameraModal({
         setName:      snap.set_name,
         img:          snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null,
         colors:       snap.color_identity || [],
-        price:        snap.prices?.usd ? parseFloat(snap.prices.usd) : null,
+        price:        priceUsdFoil ?? priceUsd,
+        isFoil:       priceUsdFoil != null && priceUsdFoil > 0,
+        forSale:      options.forSale || false,
         tcgplayerUrl: snap.purchase_uris?.tcgplayer || null,
       }
       const saved = await addCard(card, user?.id)
@@ -235,6 +239,13 @@ export default function CameraModal({
       setAddedCards(prev => [...prev, snap.name])
       showToast(`✓ Added ${snap.name}`)
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
+
+      if (options.forSale && setPage) {
+        stopTracks(); onClose()
+        setPage('collection')
+        return
+      }
+
       doRescan()
     } catch (err) {
       console.error('[Scanner] add failed:', err)
@@ -262,6 +273,8 @@ export default function CameraModal({
 
   // ── Derived display ───────────────────────────────────────────────────────
   const img          = foundCard?.image_uris?.small || foundCard?.card_faces?.[0]?.image_uris?.small
+  const priceUsd     = foundCard?.prices?.usd     ? parseFloat(foundCard.prices.usd)     : null
+  const priceUsdFoil = foundCard?.prices?.usd_foil ? parseFloat(foundCard.prices.usd_foil) : null
   const alreadyOwned = foundCard
     ? (collection || []).find(c => c.name.toLowerCase() === foundCard.name.toLowerCase())
     : null
@@ -270,8 +283,6 @@ export default function CameraModal({
     exact: { text: '✓✓ Exact match', color: '#4ade80', bg: 'rgba(74,222,128,0.2)'  },
     fuzzy: { text: '✓ Name match',   color: '#fbbf24', bg: 'rgba(251,191,36,0.2)'  },
   }[matchQuality] || null
-
-  const hit = !!foundCard
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -402,9 +413,17 @@ export default function CameraModal({
                   <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>
                     {foundCard.set_name}
                     {foundCard.collector_number && ` · #${foundCard.collector_number}`}
-                    {foundCard.prices?.usd && (
-                      <span style={{ color: '#4ade80', marginLeft: '8px', fontWeight: 600 }}>
-                        ${foundCard.prices.usd}
+                  </div>
+                  {/* Prices */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
+                    {priceUsd != null && (
+                      <span style={{ fontSize: '.75rem', color: '#4ade80', fontWeight: 600 }}>
+                        ${priceUsd.toFixed(2)}
+                      </span>
+                    )}
+                    {priceUsdFoil != null && (
+                      <span style={{ fontSize: '.75rem', color: '#a78bfa', fontWeight: 600 }}>
+                        ✦ Foil ${priceUsdFoil.toFixed(2)}
                       </span>
                     )}
                   </div>
@@ -424,13 +443,21 @@ export default function CameraModal({
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
-                  <button onClick={handleAdd} disabled={adding} style={{
+                  <button onClick={() => handleAdd()} disabled={adding} style={{
                     background: '#4ade80', color: '#000', border: 'none',
                     borderRadius: '8px', padding: '8px 16px',
                     fontWeight: 700, fontSize: '.82rem',
                     cursor: adding ? 'wait' : 'pointer',
                     opacity: adding ? 0.7 : 1, whiteSpace: 'nowrap', minWidth: '72px',
                   }}>{adding ? '…' : '+ Add'}</button>
+                  <button onClick={() => handleAdd({ forSale: true })} disabled={adding} style={{
+                    background: 'rgba(201,168,76,0.2)', color: '#c9a84c',
+                    border: '1px solid rgba(201,168,76,0.4)',
+                    borderRadius: '8px', padding: '6px 10px',
+                    fontWeight: 600, fontSize: '.72rem',
+                    cursor: adding ? 'wait' : 'pointer',
+                    opacity: adding ? 0.7 : 1, whiteSpace: 'nowrap',
+                  }}>Add &amp; List</button>
                   <button onClick={doRescan} style={{
                     background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none',
                     borderRadius: '6px', padding: '5px 10px',
@@ -476,7 +503,7 @@ export default function CameraModal({
         }}>
           <strong style={{ color: 'var(--text-secondary)' }}>Tips:</strong>{' '}
           Fill card to the white outline · Hold steady for a moment · Works with foil, alt-art &amp; showcase frames ·
-          Wrong card? Tap 🔄 Rescan
+          Wrong card? Tap 🔄 Rescan · Use <em>Add &amp; List</em> to immediately mark for sale
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
