@@ -4,30 +4,30 @@
    ============================================================ */
 
 :root {
-  /* --- Backgrounds: deep navy-slate, warmer than pure black --- */
-  --bg-primary:   #0c1120;
-  --bg-secondary: #121929;
-  --bg-card:      #192236;
-  --bg-hover:     #213045;
-  --border:       #2a3d5a;
-  --border-subtle: #1c2b42;
+  /* --- Backgrounds: near-black, neutral --- */
+  --bg-primary:   #0d0d0f;
+  --bg-secondary: #111113;
+  --bg-card:      #1a1a1c;
+  --bg-hover:     #222226;
+  --border:       #252528;
+  --border-subtle: #1c1c1f;
 
   /* --- Accents --- */
-  --accent-teal:       #3ecfb2;
-  --accent-teal-glow:  rgba(62, 207, 178, .13);
-  --accent-gold:       #c9a84c;
-  --accent-gold-light: #e8c46a;
-  --accent-gold-glow:  rgba(201, 168, 76, .12);
-  --accent-green:      #48bb78;
-  --accent-red:        #f0647a;
+  --accent-teal:       #f59e0b;
+  --accent-teal-glow:  rgba(245, 158, 11, .13);
+  --accent-gold:       #f59e0b;
+  --accent-gold-light: #fbbf24;
+  --accent-gold-glow:  rgba(245, 158, 11, .12);
+  --accent-green:      #4ade80;
+  --accent-red:        #f87171;
   --accent-blue:       #63a4ff;
   --accent-purple:     #a78bfa;
-  --accent-white:      #ece8df;
+  --accent-white:      #f5f5f5;
 
-  /* --- Text: warm ivory, not stark white --- */
-  --text-primary:   #ece8df;
-  --text-secondary: #8896b0;
-  --text-muted:     #4a5678;
+  /* --- Text --- */
+  --text-primary:   #f5f5f5;
+  --text-secondary: #888888;
+  --text-muted:     #444448;
 
   /* --- Layout --- */
   --sidebar-width:      220px;
@@ -1624,6 +1624,172 @@ body {
 .progress-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent-teal), #6ee7d8);
+  background: linear-gradient(90deg, var(--accent-teal), #fbbf24);
   transition: width .3s ease;
+}
+
+/* ============================================================
+   MANABOX-STYLE COMPONENTS
+   ============================================================ */
+
+/* Quick-action cards on Home */
+.quickaction-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.quickaction-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  transition: all .18s;
+  text-decoration: none;
+}
+.quickaction-card:hover { border-color: var(--accent-teal); transform: translateY(-2px); }
+.quickaction-card-icon { font-size: 1.4rem; }
+.quickaction-card-label { font-size: .85rem; font-weight: 600; color: var(--text-primary); }
+.quickaction-wide {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+/* Circular donut portfolio chart */
+.donut-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px 10px;
+}
+
+/* Deck art grid */
+.deck-art-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.deck-art-tile {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  aspect-ratio: 3/2;
+  cursor: pointer;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: transform .18s, border-color .18s;
+}
+.deck-art-tile:hover { transform: translateY(-3px); border-color: var(--accent-teal); }
+.deck-art-tile-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.deck-art-tile-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,.9) 0%, rgba(0,0,0,.3) 55%, transparent 100%);
+}
+.deck-art-tile-body {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 10px 12px;
+}
+.deck-art-tile-name {
+  font-size: .82rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.deck-art-tile-format {
+  font-size: .62rem;
+  color: rgba(255,255,255,.55);
+  margin-top: 2px;
+}
+.deck-art-tile-placeholder {
+  width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  opacity: .3;
+}
+.deck-group-label {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--text-muted);
+  padding: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Card detail full-bleed (scanner result) */
+.card-detail-art {
+  width: 100%;
+  aspect-ratio: 5/4;
+  object-fit: cover;
+  object-position: top;
+  border-radius: var(--radius) var(--radius) 0 0;
+  display: block;
+}
+.card-detail-body {
+  padding: 14px 16px;
+}
+.card-detail-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.card-detail-type {
+  font-size: .75rem;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  font-style: italic;
+}
+.card-detail-oracle {
+  font-size: .8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.price-toggle {
+  display: flex;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  margin-top: 10px;
+}
+.price-toggle-btn {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  border-radius: 6px;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  background: transparent;
+  color: var(--text-muted);
+}
+.price-toggle-btn.active {
+  background: var(--accent-teal);
+  color: #000;
 }

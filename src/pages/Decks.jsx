@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getDecks, saveDeck, deleteDeck } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS, deckToText } from '../lib/deckUtils'
 import { getDeckValueSync, fetchUnknownDeckPrices } from '../lib/pricing'
@@ -9,10 +9,11 @@ const FORMAT_ALL = 'All'
 export default function Decks({ user, collection, showToast }) {
   const [decks, setDecks]           = useState([])
   const [loading, setLoading]       = useState(true)
-  const [selected, setSelected]     = useState(null)   // deck currently being viewed
+  const [selected, setSelected]     = useState(null)
   const [showImport, setShowImport] = useState(false)
-  const [editDeck, setEditDeck]     = useState(null)   // deck being edited (passed to modal)
+  const [editDeck, setEditDeck]     = useState(null)
   const [formatFilter, setFormatFilter] = useState(FORMAT_ALL)
+  const [activeTab, setActiveTab]   = useState('my')   // 'my' | 'explore'
   const [copied, setCopied]         = useState(false)
 
   useEffect(() => {
@@ -79,60 +80,81 @@ export default function Decks({ user, collection, showToast }) {
     )
   }
 
+  // Group decks by a tag/group field (or ungrouped)
+  const grouped = {}
+  filtered.forEach(deck => {
+    const group = deck.group || 'My Decks'
+    if (!grouped[group]) grouped[group] = []
+    grouped[group].push(deck)
+  })
+
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={() => { setEditDeck(null); setShowImport(true) }}>
-          + New Deck
-        </button>
-        <button className="btn btn-ghost" onClick={() => { setEditDeck(null); setShowImport(true) }}>
-          📥 Import
-        </button>
-        <span style={{ marginLeft: 'auto', fontSize: '.82rem', color: 'var(--text-muted)' }}>
-          {decks.length} deck{decks.length !== 1 ? 's' : ''}
-        </span>
+      {/* Tabs: My Decks | Explore */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
+        {[['my', '🃏 Decks'], ['explore', '🔍 Explore']].map(([key, label]) => (
+          <button key={key} onClick={() => setActiveTab(key)} style={{
+            padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '.88rem', fontWeight: 600,
+            color: activeTab === key ? 'var(--accent-teal)' : 'var(--text-muted)',
+            borderBottom: activeTab === key ? '2px solid var(--accent-teal)' : '2px solid transparent',
+            marginBottom: '-1px', transition: 'color .15s',
+          }}>{label}</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        {activeTab === 'my' && (
+          <button className="btn btn-primary btn-sm" style={{ alignSelf: 'center', marginRight: '16px', fontSize: '.78rem' }}
+            onClick={() => { setEditDeck(null); setShowImport(true) }}>+ New</button>
+        )}
       </div>
 
-      {/* Format filter */}
-      {decks.length > 0 && (
-        <div className="tabs" style={{ marginBottom: '20px' }}>
-          {formats.map(f => (
-            <button
-              key={f}
-              className={`tab ${formatFilter === f ? 'active' : ''}`}
-              onClick={() => setFormatFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && decks.length === 0 && (
+      {activeTab === 'explore' ? (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
-          <div className="empty-icon">🃏</div>
-          <p>No decks yet.<br />Import a decklist to get started.</p>
-          <button className="btn btn-primary" onClick={() => setShowImport(true)} style={{ marginTop: '16px' }}>
-            + Import Deck
-          </button>
+          <div className="empty-icon">🔍</div>
+          <p>Browse popular decks from the community.<br />Coming soon — check Meta Tracker for now.</p>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Format filter */}
+          {decks.length > 0 && (
+            <div className="tabs" style={{ marginBottom: '16px' }}>
+              {formats.map(f => (
+                <button key={f} className={`tab ${formatFilter === f ? 'active' : ''}`} onClick={() => setFormatFilter(f)}>{f}</button>
+              ))}
+            </div>
+          )}
 
-      {/* Deck grid */}
-      {filtered.length > 0 && (
-        <div className="grid-3">
-          {filtered.map(deck => (
-            <DeckCard
-              key={deck.id}
-              deck={deck}
-              onClick={() => setSelected(deck)}
-              onEdit={() => { setEditDeck(deck); setShowImport(true) }}
-              onDelete={() => handleDelete(deck)}
-            />
+          {/* Empty state */}
+          {!loading && decks.length === 0 && (
+            <div className="empty-state" style={{ padding: '60px 20px' }}>
+              <div className="empty-icon">🃏</div>
+              <p>No decks yet.<br />Import a decklist to get started.</p>
+              <button className="btn btn-primary" onClick={() => setShowImport(true)} style={{ marginTop: '16px' }}>
+                + Import Deck
+              </button>
+            </div>
+          )}
+
+          {/* Card-art deck grid grouped */}
+          {Object.entries(grouped).map(([group, groupDecks]) => (
+            <div key={group} style={{ padding: '0 16px' }}>
+              {Object.keys(grouped).length > 1 && (
+                <div className="deck-group-label">🗂 {group}</div>
+              )}
+              <div className="deck-art-grid">
+                {groupDecks.map(deck => (
+                  <DeckArtTile
+                    key={deck.id}
+                    deck={deck}
+                    onClick={() => setSelected(deck)}
+                    onEdit={() => { setEditDeck(deck); setShowImport(true) }}
+                    onDelete={() => handleDelete(deck)}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
-        </div>
+        </>
       )}
 
       {showImport && (
@@ -146,56 +168,47 @@ export default function Decks({ user, collection, showToast }) {
   )
 }
 
-// ── Deck card (grid tile) ─────────────────────────────────────────────────
+// ── Deck art tile ────────────────────────────────────────────────────────────
 
-function DeckCard({ deck, onClick, onEdit, onDelete }) {
-  const { main, side } = countCards(deck)
-  const fmt = FORMAT_COLORS[deck.format] || { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' }
-  const isCmdr = isCommanderFormat(deck.format)
-  const updated = deck.updatedAt || deck.updated_at
+function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
+  const [artUrl, setArtUrl] = useState(null)
+  const fetchedRef = useRef(false)
+
+  useEffect(() => {
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    const cardName = deck.commander || deck.mainboard?.[0]?.name
+    if (!cardName) return
+    fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(card => {
+        const url = card?.image_uris?.art_crop || card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.art_crop
+        if (url) setArtUrl(url)
+      })
+      .catch(() => {})
+  }, [deck])
+
+  const { main } = countCards(deck)
+  const isCmdr   = isCommanderFormat(deck.format)
 
   return (
-    <div
-      className="stat-card"
-      style={{ cursor: 'pointer', position: 'relative' }}
-      onClick={onClick}
-    >
-      {/* Format badge */}
-      <div style={{
-        display: 'inline-block', fontSize: '.65rem', fontWeight: 700,
-        padding: '2px 8px', borderRadius: '4px', marginBottom: '10px',
-        background: fmt.bg, color: fmt.color, textTransform: 'uppercase', letterSpacing: '.5px'
-      }}>
-        {deck.format}
-      </div>
-
-      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>
-        {deck.name}
-      </div>
-
-      {isCmdr && deck.commander && (
-        <div style={{ fontSize: '.75rem', color: 'var(--accent-gold)', marginBottom: '4px' }}>
-          ⚔ {deck.commander}
+    <div className="deck-art-tile" onClick={onClick}>
+      {artUrl
+        ? <img src={artUrl} alt={deck.name} className="deck-art-tile-img" />
+        : <div className="deck-art-tile-placeholder" style={{ background: `linear-gradient(135deg, ${FORMAT_COLORS[deck.format]?.bg || '#1a1a1c'}, #0d0d0f)` }}>🃏</div>
+      }
+      <div className="deck-art-tile-overlay" />
+      <div className="deck-art-tile-body">
+        <div className="deck-art-tile-name">{deck.name}</div>
+        <div className="deck-art-tile-format">
+          {deck.format}{isCmdr && deck.commander ? ` · ${deck.commander}` : ''} · {main} cards
         </div>
-      )}
-
-      <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-        {main} cards{side > 0 ? ` · ${side} sideboard` : ''}
       </div>
-
-      {updated && (
-        <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-          {new Date(updated).toLocaleDateString()}
-        </div>
-      )}
-
-      {/* Action buttons — stop propagation so clicks don't open the detail view */}
-      <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}
+      {/* Action buttons */}
+      <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}
            onClick={e => e.stopPropagation()}>
-        <button className="btn btn-ghost btn-sm" style={{ fontSize: '.7rem' }}
-                onClick={onEdit}>✏️ Edit</button>
-        <button className="btn btn-ghost btn-sm" style={{ fontSize: '.7rem', color: '#ef5350' }}
-                onClick={onDelete}>🗑️</button>
+        <button onClick={onEdit} style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#fff', cursor: 'pointer' }}>✏️</button>
+        <button onClick={onDelete} style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#f87171', cursor: 'pointer' }}>🗑</button>
       </div>
     </div>
   )
