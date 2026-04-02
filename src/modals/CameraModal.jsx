@@ -41,7 +41,20 @@ function captureCardImage(video) {
 // Scryfall lookup
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function lookupCard(name) {
+async function lookupCard(name, setCode = null, collectorNumber = null) {
+  // 0 — exact printing via set code + collector number (best for alt-art/foil/showcase)
+  if (setCode && collectorNumber) {
+    try {
+      const res = await fetch(
+        `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(collectorNumber)}`
+      )
+      if (res.ok) {
+        const json = await res.json()
+        if (json.object === 'card') return { card: json, quality: 'exact' }
+      }
+    } catch { /* continue */ }
+  }
+
   // 1 — exact name
   try {
     const res = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`)
@@ -192,11 +205,11 @@ export default function CameraModal({
       })
 
       if (!res.ok) throw new Error(`scan-card ${res.status}`)
-      const { name } = await res.json()
+      const { name, setCode, collectorNumber } = await res.json()
 
       if (name && name.toLowerCase() !== 'unknown' && name.length >= 2) {
         setNameRead(name)
-        const { card, quality } = await lookupCard(name)
+        const { card, quality } = await lookupCard(name, setCode, collectorNumber)
         if (card) {
           frozenRef.current = true
           stableRef.current = 0

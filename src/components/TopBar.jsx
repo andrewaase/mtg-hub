@@ -14,20 +14,18 @@ export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClic
   }
 
   const title = titles[page] || 'MTG Hub'
+  const hideTitle = page === 'dashboard'
 
   return (
     <div id="topbar">
-      {/* Left: menu button (mobile) / menu button + title (desktop) */}
       <div className="topbar-left">
         <button className="btn-icon" onClick={onMenuClick} id="menu-btn" aria-label="Open menu">
           ☰
         </button>
-        {/* Title shown inline on desktop via CSS */}
-        <h2 className="topbar-title-inline">{title}</h2>
+        {!hideTitle && <h2 className="topbar-title-inline">{title}</h2>}
       </div>
 
-      {/* Title centered on mobile via CSS absolute positioning */}
-      <h2 className="topbar-title-center">{title}</h2>
+      {!hideTitle && <h2 className="topbar-title-center">{title}</h2>}
 
       {/* Right: actions */}
       <div className="topbar-actions">

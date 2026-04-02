@@ -147,7 +147,7 @@ export default function App() {
           )}
         </div>
       </div>
-      <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} />
+      <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={() => setShowCamera(true)} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
       {showAuth    && <AuthModal onClose={() => setShowAuth(false)} showToast={showToast} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
