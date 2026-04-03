@@ -9,6 +9,17 @@ export default function CardLookup({ showToast, openAddCard }) {
   const [printings, setPrintings] = useState([])
   const [loading, setLoading] = useState(false)
 
+  // Pick up a random card passed from the Dashboard
+  useEffect(() => {
+    if (window.__randomCard) {
+      const card = window.__randomCard
+      window.__randomCard = null
+      setCardData(card)
+      setSearch(card.name)
+      getAllPrintings(card.name).then(setPrintings).catch(() => {})
+    }
+  }, [])
+
   useEffect(() => {
     if (search.length < 2) { setSuggestions([]); return }
     const timer = setTimeout(async () => {

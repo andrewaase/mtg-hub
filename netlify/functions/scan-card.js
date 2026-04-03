@@ -1,5 +1,5 @@
 // netlify/functions/scan-card.js
-// Accepts a base64 JPEG of a MTG card and returns the card name via Claude Vision.
+// Accepts a base64 JPEG of a MTG card and returns name + set code + collector number via Claude Vision.
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -35,7 +35,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 64,
+        max_tokens: 120,
         messages: [
           {
             role: 'user',
@@ -46,7 +46,13 @@ exports.handler = async (event) => {
               },
               {
                 type: 'text',
-                text: 'What is the name of this Magic: The Gathering card? Reply with only the exact card name, nothing else. If you cannot identify a Magic card in the image, reply with exactly: unknown',
+                text: `This is a Magic: The Gathering card. Read the card carefully and reply with ONLY a JSON object in this exact format (no markdown, no extra text):
+{"name":"<exact card name>","setCode":"<2-4 letter set code from bottom of card, lowercase>","collectorNumber":"<collector number from bottom of card>"}
+
+The set code is the 2-4 letter abbreviation printed at the bottom of the card (e.g. "one", "bro", "mh3", "ltr", "tmt").
+The collector number is the number printed at the bottom (e.g. "112", "261a").
+If you cannot read a field, use null.
+If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"collectorNumber":null}`,
               },
             ],
           },
@@ -61,12 +67,27 @@ exports.handler = async (event) => {
     }
 
     const json = await response.json()
-    const name = json.content?.[0]?.text?.trim() || 'unknown'
+    const raw  = json.content?.[0]?.text?.trim() || ''
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+    // Parse the JSON response
+    try {
+      const parsed = JSON.parse(raw)
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:            parsed.name            || 'unknown',
+          setCode:         parsed.setCode         || null,
+          collectorNumber: parsed.collectorNumber || null,
+        }),
+      }
+    } catch {
+      // Fallback: treat raw text as just the name
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: raw || 'unknown', setCode: null, collectorNumber: null }),
+      }
     }
   } catch (err) {
     console.error('[scan-card] fetch error:', err)

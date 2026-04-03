@@ -1,23 +1,93 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { removeCard, exportData } from '../lib/db'
 import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
 import SetTracker from '../components/SetTracker'
 
-const COLOR_TABS      = ['all', 'W', 'U', 'B', 'R', 'G']
-const COLOR_LABELS    = { W: '☀️ White', U: '💧 Blue', B: '💀 Black', R: '🔥 Red', G: '🌿 Green' }
-const CONDITION_SORT  = { NM: 0, LP: 1, MP: 2, HP: 3 }
+const COLOR_OPTIONS = [
+  { id: 'W', label: '☀️ White' },
+  { id: 'U', label: '💧 Blue' },
+  { id: 'B', label: '💀 Black' },
+  { id: 'R', label: '🔥 Red' },
+  { id: 'G', label: '🌿 Green' },
+  { id: 'C', label: '⬡ Colorless' },
+]
+const RARITY_OPTIONS    = ['common', 'uncommon', 'rare', 'mythic']
+const CONDITION_OPTIONS = ['NM', 'LP', 'MP', 'HP']
+
+function ChipRow({ options, value, onChange, multi = false, labelFn }) {
+  function toggle(id) {
+    if (multi) {
+      const next = value.includes(id) ? value.filter(v => v !== id) : [...value, id]
+      onChange(next)
+    } else {
+      onChange(value === id ? null : id)
+    }
+  }
+  const isActive = (id) => multi ? value.includes(id) : value === id
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      {options.map(opt => {
+        const id = typeof opt === 'string' ? opt : opt.id
+        const label = labelFn ? labelFn(opt) : (typeof opt === 'string' ? opt : opt.label)
+        return (
+          <button
+            key={id}
+            onClick={() => toggle(id)}
+            style={{
+              padding: '5px 12px',
+              borderRadius: '99px',
+              border: `1.5px solid ${isActive(id) ? 'var(--accent-teal)' : 'var(--border)'}`,
+              background: isActive(id) ? 'rgba(245,158,11,.15)' : 'var(--bg-secondary)',
+              color: isActive(id) ? 'var(--accent-teal)' : 'var(--text-secondary)',
+              fontSize: '.72rem', fontWeight: isActive(id) ? 700 : 400,
+              cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast }) {
-  const [view,        setView]        = useState('all')      // 'all' | 'sell' | 'sets' | 'trade'
-  const [filter,      setFilter]      = useState('all')
-  const [search,      setSearch]      = useState('')
-  const [listingId,   setListingId]   = useState(null)
-  const [refreshing,  setRefreshing]  = useState(false)
-  const [refreshProg, setRefreshProg] = useState(null)       // { done, total }
-  const [tradeSelect, setTradeSelect] = useState(new Set())  // card ids selected for trade calc
+  const [view,         setView]         = useState('all')
+  const [search,       setSearch]       = useState('')
+  const [showFilters,  setShowFilters]  = useState(false)
+  const [listingId,    setListingId]    = useState(null)
+  const [refreshing,   setRefreshing]   = useState(false)
+  const [refreshProg,  setRefreshProg]  = useState(null)
+  const [tradeSelect,  setTradeSelect]  = useState(new Set())
+
+  // ── Filter state ──
+  const [filterColors,    setFilterColors]    = useState([])
+  const [filterRarity,    setFilterRarity]    = useState(null)
+  const [filterCondition, setFilterCondition] = useState(null)
+  const [filterFoil,      setFilterFoil]      = useState(null)   // 'foil' | 'nonfoil' | null
+  const [filterMinPrice,  setFilterMinPrice]  = useState('')
+  const [filterMaxPrice,  setFilterMaxPrice]  = useState('')
 
   const ebayConnected = isEbayConnected()
+
+  const activeFilterCount = [
+    filterColors.length > 0,
+    filterRarity != null,
+    filterCondition != null,
+    filterFoil != null,
+    filterMinPrice !== '',
+    filterMaxPrice !== '',
+  ].filter(Boolean).length
+
+  function clearFilters() {
+    setFilterColors([])
+    setFilterRarity(null)
+    setFilterCondition(null)
+    setFilterFoil(null)
+    setFilterMinPrice('')
+    setFilterMaxPrice('')
+  }
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -36,9 +106,9 @@ export default function Collection({ collection, setCollection, user, openAddCar
   }
 
   function handleExport() {
-    const csv = 'Name,Quantity,Condition,Set,For Sale,Sale Price\n' +
+    const csv = 'Name,Quantity,Condition,Set,Foil,For Sale,Sale Price\n' +
       collection.map(c =>
-        `"${c.name}",${c.qty},${c.condition || ''},"${c.setName || ''}",${c.forSale ? 'Yes' : 'No'},${c.salePrice || ''}`
+        `"${c.name}",${c.qty},${c.condition || ''},"${c.setName || ''}",${c.isFoil ? 'Yes' : 'No'},${c.forSale ? 'Yes' : 'No'},${c.salePrice || ''}`
       ).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = document.createElement('a')
@@ -59,7 +129,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
     setListingId(null)
   }
 
-  // ── Bulk price refresh ────────────────────────────────────────────────────
   async function handleBulkRefresh() {
     if (refreshing || collection.length === 0) return
     setRefreshing(true)
@@ -68,16 +137,13 @@ export default function Collection({ collection, setCollection, user, openAddCar
       onProgress: (done, total) => setRefreshProg({ done, total }),
     })
     if (updates.length > 0) {
-      setCollection(collection.map(c => {
-        const u = updates.find(x => x.id === c.id)
-        return u ? { ...c, price: u.price } : c
-      }))
-      // Persist to localStorage
-      const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
-      stored.collection = collection.map(c => {
+      const next = collection.map(c => {
         const u = updates.find(x => x.id === c.id)
         return u ? { ...c, price: u.price } : c
       })
+      setCollection(next)
+      const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
+      stored.collection = next
       localStorage.setItem('mtg-hub-v1', JSON.stringify(stored))
       showToast(`Updated prices for ${updates.length} card${updates.length !== 1 ? 's' : ''} ✓`)
     } else {
@@ -87,7 +153,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
     setRefreshProg(null)
   }
 
-  // ── Trade calculator ──────────────────────────────────────────────────────
+  // ── Trade ─────────────────────────────────────────────────────────────────
   function toggleTradeSelect(id) {
     setTradeSelect(prev => {
       const next = new Set(prev)
@@ -96,9 +162,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
     })
   }
 
-  const tradeCards     = collection.filter(c => tradeSelect.has(c.id))
-  const tradeValue     = tradeCards.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
-  const tradeActive    = view === 'trade'
+  const tradeCards  = collection.filter(c => tradeSelect.has(c.id))
+  const tradeValue  = tradeCards.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
 
   function copyTradeList() {
     const text = tradeCards.map(c =>
@@ -110,13 +175,27 @@ export default function Collection({ collection, setCollection, user, openAddCar
     )
   }
 
-  // ── Filtering ─────────────────────────────────────────────────────────────
-
-  const base     = view === 'sell' ? collection.filter(c => c.forSale) : collection
-  const byColor  = filter === 'all' ? base : base.filter(c => (c.colors || []).includes(filter))
-  const filtered = search
-    ? byColor.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
-    : byColor
+  // ── Filtering (memoized) ──────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let base = view === 'sell' ? collection.filter(c => c.forSale) : collection
+    if (search)
+      base = base.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+    if (filterColors.length > 0)
+      base = base.filter(c => filterColors.some(col => (c.colors || []).includes(col)))
+    if (filterRarity)
+      base = base.filter(c => (c.rarity || '').toLowerCase() === filterRarity)
+    if (filterCondition)
+      base = base.filter(c => (c.condition || 'NM') === filterCondition)
+    if (filterFoil === 'foil')
+      base = base.filter(c => c.isFoil)
+    if (filterFoil === 'nonfoil')
+      base = base.filter(c => !c.isFoil)
+    if (filterMinPrice !== '')
+      base = base.filter(c => (parseFloat(c.price) || 0) >= parseFloat(filterMinPrice))
+    if (filterMaxPrice !== '')
+      base = base.filter(c => (parseFloat(c.price) || 0) <= parseFloat(filterMaxPrice))
+    return base
+  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice])
 
   const total        = collection.reduce((s, c) => s + (c.qty || 1), 0)
   const totalValue   = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
@@ -129,41 +208,35 @@ export default function Collection({ collection, setCollection, user, openAddCar
         <input
           type="text"
           className="form-input"
-          placeholder="Search…"
+          placeholder="Search cards…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ maxWidth: '200px' }}
+          style={{ flex: 1, minWidth: 0, maxWidth: '220px' }}
         />
         <button className="btn btn-primary" onClick={() => openAddCard()}>+ Add</button>
-        <button className="btn btn-ghost"   onClick={() => openCamera()}>📷 Scan</button>
-        <button className="btn btn-ghost"   onClick={handleExport} title="Export CSV">⬇️</button>
-        <button className="btn btn-ghost"   onClick={handleBackup} title="Backup JSON">💾</button>
+        <button className="btn btn-ghost" onClick={() => openCamera()}>📷 Scan</button>
         <button
           className="btn btn-ghost"
           onClick={handleBulkRefresh}
           disabled={refreshing}
-          title="Re-fetch prices from Scryfall for all cards"
+          title="Re-fetch prices from Scryfall"
           style={{ fontSize: '.78rem' }}
         >
-          {refreshing ? `${refreshProg?.done || 0}/${refreshProg?.total || '?'}` : '🔄 Refresh Prices'}
+          {refreshing ? `${refreshProg?.done || 0}/${refreshProg?.total || '?'}` : '🔄'}
         </button>
-
+        <button className="btn btn-ghost" onClick={handleExport} title="Export CSV">⬇️</button>
+        <button className="btn btn-ghost" onClick={handleBackup} title="Backup JSON">💾</button>
         <span style={{ marginLeft: 'auto', fontSize: '.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {total} cards
           {totalValue > 0 && (
-            <span style={{ color: 'var(--accent-gold)', marginLeft: '8px' }}>
-              ${totalValue.toFixed(2)}
-            </span>
-          )}
-          {forSaleCount > 0 && (
-            <span style={{ color: 'var(--accent-teal)', marginLeft: '8px' }}>· {forSaleCount} for sale</span>
+            <span style={{ color: 'var(--accent-gold)', marginLeft: '8px' }}>${totalValue.toFixed(2)}</span>
           )}
         </span>
       </div>
 
       {/* Refresh progress bar */}
       {refreshing && refreshProg && (
-        <div style={{ height: '4px', background: 'var(--bg-hover)', borderRadius: '99px', marginBottom: '12px', overflow: 'hidden' }}>
+        <div style={{ height: '3px', background: 'var(--bg-hover)', borderRadius: '99px', marginBottom: '12px', overflow: 'hidden' }}>
           <div style={{
             height: '100%', background: 'var(--accent-teal)', borderRadius: '99px',
             width: `${(refreshProg.done / refreshProg.total) * 100}%`,
@@ -173,26 +246,151 @@ export default function Collection({ collection, setCollection, user, openAddCar
       )}
 
       {/* ── View tabs ── */}
-      <div className="tabs" style={{ marginBottom: '0' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', marginBottom: '0', overflowX: 'auto' }}>
         {[
           ['all',   `All (${collection.length})`],
-          ['sell',  `🏷️ Sell ${forSaleCount > 0 ? `(${forSaleCount})` : ''}`],
-          ['trade', '⚖️ Trade Calc'],
-          ['sets',  '🗺️ Set Tracker'],
+          ['sell',  `🏷️ Sell${forSaleCount > 0 ? ` (${forSaleCount})` : ''}`],
+          ['trade', '⚖️ Trade'],
+          ['sets',  '🗺️ Sets'],
         ].map(([id, label]) => (
-          <button key={id} className={`tab ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>
+          <button
+            key={id}
+            onClick={() => setView(id)}
+            style={{
+              padding: '10px 14px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '.8rem', fontWeight: view === id ? 700 : 400,
+              color: view === id ? 'var(--accent-teal)' : 'var(--text-muted)',
+              borderBottom: view === id ? '2px solid var(--accent-teal)' : '2px solid transparent',
+              marginBottom: '-1px', whiteSpace: 'nowrap', transition: 'color .15s',
+            }}
+          >
             {label}
           </button>
         ))}
 
-        {/* eBay status */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
           {ebayConnected
-            ? <span style={{ fontSize: '.72rem', color: 'var(--accent-green)', fontWeight: 600 }}>✓ eBay</span>
-            : <button className="btn btn-ghost btn-sm" onClick={connectEbay} style={{ fontSize: '.68rem' }}>🔗 Connect eBay</button>
+            ? <span style={{ fontSize: '.7rem', color: 'var(--accent-green)', fontWeight: 600 }}>✓ eBay</span>
+            : <button className="btn btn-ghost btn-sm" onClick={connectEbay} style={{ fontSize: '.68rem' }}>🔗 eBay</button>
           }
         </div>
       </div>
+
+      {/* ── Filter row (All + Sell views) ── */}
+      {(view === 'all' || view === 'sell') && (
+        <div style={{ marginTop: '12px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: showFilters ? '12px' : '0' }}>
+            <button
+              onClick={() => setShowFilters(f => !f)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '6px 12px', borderRadius: '99px',
+                border: `1.5px solid ${activeFilterCount > 0 ? 'var(--accent-teal)' : 'var(--border)'}`,
+                background: activeFilterCount > 0 ? 'rgba(245,158,11,.1)' : 'var(--bg-secondary)',
+                color: activeFilterCount > 0 ? 'var(--accent-teal)' : 'var(--text-secondary)',
+                cursor: 'pointer', fontSize: '.75rem', fontWeight: 600,
+              }}
+            >
+              ⚙️ Filter
+              {activeFilterCount > 0 && (
+                <span style={{
+                  background: 'var(--accent-teal)', color: '#1a1000',
+                  borderRadius: '99px', padding: '0 6px', fontSize: '.65rem', fontWeight: 800, minWidth: '18px', textAlign: 'center',
+                }}>
+                  {activeFilterCount}
+                </span>
+              )}
+              <span style={{ opacity: 0.5, fontSize: '.65rem' }}>{showFilters ? '▲' : '▼'}</span>
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '.7rem', color: 'var(--text-muted)',
+                }}
+              >
+                Clear all
+              </button>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: '.72rem', color: 'var(--text-muted)' }}>
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {showFilters && (
+            <div style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: '14px', padding: '14px 16px',
+              display: 'flex', flexDirection: 'column', gap: '14px',
+              marginBottom: '12px',
+            }}>
+              {/* Colors */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Color</div>
+                <ChipRow options={COLOR_OPTIONS} value={filterColors} onChange={setFilterColors} multi />
+              </div>
+
+              {/* Rarity */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Rarity</div>
+                <ChipRow
+                  options={RARITY_OPTIONS}
+                  value={filterRarity}
+                  onChange={setFilterRarity}
+                  labelFn={r => ({ common: '● Common', uncommon: '◈ Uncommon', rare: '◆ Rare', mythic: '✦ Mythic' }[r] || r)}
+                />
+              </div>
+
+              {/* Condition */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Condition</div>
+                <ChipRow options={CONDITION_OPTIONS} value={filterCondition} onChange={setFilterCondition} />
+              </div>
+
+              {/* Foil */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Finish</div>
+                <ChipRow
+                  options={['foil', 'nonfoil']}
+                  value={filterFoil}
+                  onChange={setFilterFoil}
+                  labelFn={v => v === 'foil' ? '✦ Foil' : 'Non-Foil'}
+                />
+              </div>
+
+              {/* Price range */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Price Range</div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>$</span>
+                    <input
+                      type="number" min="0" step="0.01" placeholder="Min"
+                      value={filterMinPrice}
+                      onChange={e => setFilterMinPrice(e.target.value)}
+                      className="form-input"
+                      style={{ width: '72px', padding: '5px 8px', fontSize: '.78rem' }}
+                    />
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>–</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>$</span>
+                    <input
+                      type="number" min="0" step="0.01" placeholder="Max"
+                      value={filterMaxPrice}
+                      onChange={e => setFilterMaxPrice(e.target.value)}
+                      className="form-input"
+                      style={{ width: '72px', padding: '5px 8px', fontSize: '.78rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Set Tracker ── */}
       {view === 'sets' && (
@@ -204,7 +402,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
       {/* ── Trade Calculator ── */}
       {view === 'trade' && (
         <div style={{ marginTop: '16px' }}>
-          {/* Sticky trade total bar */}
           {tradeSelect.size > 0 && (
             <div style={{
               background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -232,7 +429,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
           ) : (
             <>
               <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                Tap cards to add them to your trade pile. The running total updates in real time.
+                Tap cards to add them to your trade pile.
               </div>
               <div className="collection-grid">
                 {collection.map(card => {
@@ -242,6 +439,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
                       key={card.id}
                       onClick={() => toggleTradeSelect(card.id)}
                       style={{
+                        position: 'relative',
                         background: sel ? 'rgba(201,168,76,.12)' : 'var(--bg-card)',
                         border: `2px solid ${sel ? 'var(--accent-gold)' : 'var(--border)'}`,
                         borderRadius: '12px', overflow: 'hidden', cursor: 'pointer',
@@ -275,37 +473,32 @@ export default function Collection({ collection, setCollection, user, openAddCar
         </div>
       )}
 
-      {/* ── Color filter (All view only) ── */}
-      {(view === 'all' || view === 'sell') && (
-        <div className="tabs" style={{ borderTop: 'none', marginBottom: '16px' }}>
-          {COLOR_TABS.map(f => (
-            <button key={f} className={`tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-              {f === 'all' ? 'All Colors' : COLOR_LABELS[f]}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* ── Empty states ── */}
-      {(view === 'all' || view === 'sell') && filtered.length === 0 && view === 'all' && (
+      {view === 'all' && filtered.length === 0 && activeFilterCount === 0 && !search && (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
           <div className="empty-icon">💎</div>
           <p>Collection is empty.<br />Add cards manually or scan them!</p>
           <button className="btn btn-primary" onClick={() => openAddCard()} style={{ marginTop: '16px' }}>+ Add Card</button>
         </div>
       )}
-
-      {view === 'sell' && filtered.length === 0 && (
+      {(view === 'all' || view === 'sell') && filtered.length === 0 && (activeFilterCount > 0 || search) && (
+        <div className="empty-state" style={{ padding: '40px 20px' }}>
+          <div className="empty-icon">🔍</div>
+          <p>No cards match your filters.</p>
+          <button className="btn btn-ghost" onClick={clearFilters} style={{ marginTop: '12px' }}>Clear filters</button>
+        </div>
+      )}
+      {view === 'sell' && filtered.length === 0 && !search && activeFilterCount === 0 && (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
           <div className="empty-icon">🏷️</div>
-          <p>No cards marked for sale yet.<br />Tap the 🏷️ on any card to add it here.</p>
-          <button className="btn btn-ghost" onClick={() => setView('all')} style={{ marginTop: '16px' }}>← Back to Collection</button>
+          <p>No cards marked for sale yet.<br />Tap the 🏷️ on any card to list it.</p>
+          <button className="btn btn-ghost" onClick={() => setView('all')} style={{ marginTop: '16px' }}>← All Cards</button>
         </div>
       )}
 
       {/* ── All Cards grid ── */}
       {view === 'all' && filtered.length > 0 && (
-        <div className="collection-grid">
+        <div className="collection-grid" style={{ marginTop: '8px' }}>
           {filtered.map(card => (
             <div key={card.id} className={`col-card ${card.forSale ? 'for-sale' : ''}`}>
               {card.img && <img src={card.img} alt={card.name} />}
@@ -318,12 +511,13 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   </div>
                 )}
                 {card.condition && (
-                  <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginTop: '1px' }}>{card.condition}</div>
+                  <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                    {card.condition}{card.isFoil ? ' · ✦ Foil' : ''}
+                  </div>
                 )}
               </div>
               <span className="col-card-qty">×{card.qty}</span>
 
-              {/* For Sale toggle */}
               <button
                 className="col-card-tag-btn"
                 title={card.forSale ? 'Remove from sell list' : 'Mark for sale'}
@@ -339,7 +533,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
               >
                 🏷️
               </button>
-
               <button className="col-card-remove" onClick={() => handleRemove(card.id)}>✕</button>
             </div>
           ))}
@@ -370,8 +563,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
               card={card}
               ebayConnected={ebayConnected}
               listing={listingId === card.id}
-              onUpdatePrice={p  => updateCard(card.id, { salePrice: p })}
-              onUpdateQty={q    => updateCard(card.id, { sellQty: q })}
+              onUpdatePrice={p => updateCard(card.id, { salePrice: p })}
+              onUpdateQty={q  => updateCard(card.id, { sellQty: q })}
               onRemoveFromSell={() => updateCard(card.id, { forSale: false })}
               onList={() => handleList({ ...card })}
             />
@@ -387,7 +580,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
 function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, onRemoveFromSell, onList }) {
   const tcgUrl = card.tcgplayerUrl ||
     `https://www.tcgplayer.com/search/magic/product?q=${encodeURIComponent(card.name)}&view=grid`
-
   const suggested = suggestPrice(parseFloat(card.price) || 0)
 
   return (
@@ -398,13 +590,11 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
       gridTemplateColumns: 'auto 1fr auto auto',
       alignItems: 'center', gap: '10px',
     }}>
-      {/* Card image */}
       {card.img
         ? <img src={card.img} alt={card.name} style={{ width: '42px', borderRadius: '4px', flexShrink: 0 }} />
         : <div style={{ width: '42px', height: '60px', background: 'var(--bg-secondary)', borderRadius: '4px', flexShrink: 0 }} />
       }
 
-      {/* Card info */}
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: '.86rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{card.name}</div>
         <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -421,7 +611,6 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
         )}
       </div>
 
-      {/* Price + Qty */}
       <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end', flexShrink: 0 }}>
         <div>
           <label style={{ display: 'block', fontSize: '.58rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: '3px' }}>Price</label>
@@ -449,7 +638,6 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
         </div>
       </div>
 
-      {/* Platform buttons + remove */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
         <a
           href={tcgUrl}

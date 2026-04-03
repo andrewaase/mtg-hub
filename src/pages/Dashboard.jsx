@@ -126,11 +126,8 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
             <span className="quickaction-card-label">Card Lookup</span>
           </button>
           <button className="quickaction-card quickaction-wide" onClick={async () => {
-            const names = ['Lightning Bolt', 'Black Lotus', 'Counterspell', 'Dark Ritual',
-              'Wrath of God', 'Brainstorm', 'Swords to Plowshares', 'Force of Will']
-            const name = names[Math.floor(Math.random() * names.length)]
             try {
-              const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`)
+              const res = await fetch('https://api.scryfall.com/cards/random')
               if (res.ok) {
                 const card = await res.json()
                 window.__randomCard = card
