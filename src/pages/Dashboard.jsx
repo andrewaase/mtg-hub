@@ -114,36 +114,6 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
   return (
     <div>
 
-      {/* ── Quick Actions ── */}
-      <div style={{ padding: '16px 16px 0' }}>
-        <div className="quickaction-grid">
-          <button className="quickaction-card" onClick={() => setPage?.('collection')}>
-            <span className="quickaction-card-icon">⇄</span>
-            <span className="quickaction-card-label">My Listings</span>
-          </button>
-          <button className="quickaction-card" onClick={() => setPage?.('cards')}>
-            <span className="quickaction-card-icon">📖</span>
-            <span className="quickaction-card-label">Card Lookup</span>
-          </button>
-          <button className="quickaction-card quickaction-wide" onClick={async () => {
-            try {
-              const res = await fetch('https://api.scryfall.com/cards/random')
-              if (res.ok) {
-                const card = await res.json()
-                window.__randomCard = card
-                setPage?.('cards')
-              }
-            } catch { /* ignore */ }
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span className="quickaction-card-icon">🎲</span>
-              <span className="quickaction-card-label">Random Card</span>
-            </div>
-            <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>Discover something new →</span>
-          </button>
-        </div>
-      </div>
-
       {/* ── Portfolio Donut ── */}
       <div className="card" style={{ margin: '12px 16px 0', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 0' }}>

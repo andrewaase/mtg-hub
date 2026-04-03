@@ -74,7 +74,19 @@ export default function CardLookup({ showToast, openAddCard }) {
           )}
         </div>
         <button className="btn btn-primary" onClick={() => search && searchCard(search)}>🔍 Search</button>
-        <button className="btn btn-ghost" onClick={() => { const cards = ['Black Lotus', 'Lightning Bolt', 'Counterspell', 'Dark Ritual', 'Ancestral Recall']; searchCard(cards[Math.floor(Math.random() * cards.length)]) }}>🎲 Random</button>
+        <button className="btn btn-ghost" onClick={async () => {
+          setLoading(true)
+          try {
+            const res = await fetch('https://api.scryfall.com/cards/random')
+            if (res.ok) {
+              const card = await res.json()
+              setCardData(card)
+              setSearch(card.name)
+              getAllPrintings(card.name).then(setPrintings).catch(() => {})
+            }
+          } catch { /* ignore */ }
+          setLoading(false)
+        }}>🎲 Random</button>
       </div>
 
       {loading && (
