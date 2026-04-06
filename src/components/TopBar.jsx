@@ -14,7 +14,7 @@ export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClic
   }
 
   const title = titles[page] || 'MTG Hub'
-  const hideTitle = page === 'dashboard'
+  const hideTitle = true
 
   return (
     <div id="topbar">

@@ -113,15 +113,17 @@ export default function CameraModal({
   const [torchOn,        setTorchOn]        = useState(false)
   const [torchSupported, setTorchSupported] = useState(false)
 
-  const [nameRead,    setNameRead]    = useState('')
-  const [foundCard,   setFoundCard]   = useState(null)
-  const [matchQuality,setMatchQuality]= useState(null)
-  const [addedCards,  setAddedCards]  = useState([])
-  const [adding,      setAdding]      = useState(false)
-  const [detailTab,   setDetailTab]   = useState('versions') // 'versions' | 'ruling'
-  const [priceMode,   setPriceMode]   = useState('normal')   // 'normal' | 'foil'
-  const [printings,   setPrintings]   = useState([])
-  const [rulings,     setRulings]     = useState([])
+  const [nameRead,     setNameRead]     = useState('')
+  const [foundCard,    setFoundCard]    = useState(null)
+  const [matchQuality, setMatchQuality] = useState(null)
+  const [addedCards,   setAddedCards]   = useState([])
+  const [adding,       setAdding]       = useState(false)
+  const [lookingUp,    setLookingUp]    = useState(false)   // true while fetching Scryfall
+  const [lookupFailed, setLookupFailed] = useState(false)   // true if Scryfall returned nothing
+  const [detailTab,    setDetailTab]    = useState('versions') // 'versions' | 'ruling'
+  const [priceMode,    setPriceMode]    = useState('normal')   // 'normal' | 'foil'
+  const [printings,    setPrintings]    = useState([])
+  const [rulings,      setRulings]      = useState([])
   const [loadingDetail, setLoadingDetail] = useState(false)
 
   // ── Camera ────────────────────────────────────────────────────────────────
@@ -207,9 +209,13 @@ export default function CameraModal({
       if (!res.ok) throw new Error(`scan-card ${res.status}`)
       const { name, setCode, collectorNumber } = await res.json()
 
-      if (name && name.toLowerCase() !== 'unknown' && name.length >= 2) {
-        setNameRead(name)
-        const { card, quality } = await lookupCard(name, setCode, collectorNumber)
+      const cleanName = (name || '').trim().replace(/["""'']/g, '"').replace(/["""'']/g, "'")
+      if (cleanName && cleanName.toLowerCase() !== 'unknown' && cleanName.length >= 2) {
+        setNameRead(cleanName)
+        setLookingUp(true)
+        setLookupFailed(false)
+        const { card, quality } = await lookupCard(cleanName, setCode, collectorNumber)
+        setLookingUp(false)
         if (card) {
           frozenRef.current = true
           stableRef.current = 0
@@ -227,6 +233,8 @@ export default function CameraModal({
             setPrintings(printsData?.data?.slice(0, 12) || [])
             setRulings(rulingsData?.data?.slice(0, 8) || [])
           }).catch(() => {}).finally(() => setLoadingDetail(false))
+        } else {
+          setLookupFailed(true)
         }
       }
     } catch (e) {
@@ -290,6 +298,8 @@ export default function CameraModal({
     setFoundCard(null)
     setMatchQuality(null)
     setNameRead('')
+    setLookingUp(false)
+    setLookupFailed(false)
     setPrintings([])
     setRulings([])
   }
@@ -531,8 +541,20 @@ export default function CameraModal({
             )}
 
             {nameRead && (
-              <div style={{ margin: '10px 16px 0', padding: '5px 9px', fontSize: '0.7rem', background: 'rgba(245,158,11,0.08)', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Identified: <span style={{ color: 'var(--accent-teal)' }}>{nameRead}</span>
+              <div style={{ margin: '10px 16px 0', padding: '8px 12px', background: 'rgba(245,158,11,0.08)', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Identified</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--accent-teal)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nameRead}</div>
+                {lookingUp && (
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-teal)', animation: 'pulse 1s infinite' }} />
+                    Fetching card details…
+                  </div>
+                )}
+                {lookupFailed && !lookingUp && (
+                  <div style={{ fontSize: '0.65rem', color: '#f87171', marginTop: '4px' }}>
+                    Could not fetch card details. Try rescanning or hold the card steadier.
+                  </div>
+                )}
               </div>
             )}
 
