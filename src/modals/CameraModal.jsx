@@ -1,8 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { addCard } from '../lib/db'
 
-// Card outline guide — percentages relative to the full video frame.
-// Tell the user to fill their card to this box.
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,7 +22,6 @@ function frameDiff(c1, c2) {
   return total / (d1.length / 16)
 }
 
-// Capture the card guide area as a base64 JPEG, scaled to max 800px wide.
 function captureCardImage(video) {
   const vw = video.videoWidth, vh = video.videoHeight
   const sx = Math.floor(vw * GUIDE.x), sy = Math.floor(vh * GUIDE.y)
@@ -42,7 +39,6 @@ function captureCardImage(video) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function lookupCard(name, setCode = null, collectorNumber = null) {
-  // 0 — exact printing via set code + collector number (best for alt-art/foil/showcase)
   if (setCode && collectorNumber) {
     try {
       const res = await fetch(
@@ -54,8 +50,6 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
       }
     } catch { /* continue */ }
   }
-
-  // 1 — exact name
   try {
     const res = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`)
     if (res.ok) {
@@ -63,8 +57,6 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
       if (json.object === 'card') return { card: json, quality: 'exact' }
     }
   } catch { /* continue */ }
-
-  // 2 — fuzzy name
   try {
     const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`)
     if (res.ok) {
@@ -72,8 +64,6 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
       if (json.object === 'card') return { card: json, quality: 'fuzzy' }
     }
   } catch { /* continue */ }
-
-  // 3 — autocomplete (handles garbled names)
   try {
     const acRes = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(name)}`)
     if (acRes.ok) {
@@ -88,8 +78,30 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
       }
     }
   } catch { /* continue */ }
-
   return { card: null, quality: null }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chip component
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Chip({ children, active, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '5px 12px', borderRadius: '99px',
+        border: `1.5px solid ${active ? 'var(--accent-teal)' : 'rgba(255,255,255,0.15)'}`,
+        background: active ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.06)',
+        color: active ? 'var(--accent-teal)' : 'rgba(255,255,255,0.7)',
+        fontSize: '.75rem', fontWeight: active ? 700 : 400,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.35 : 1,
+        transition: 'all .15s', whiteSpace: 'nowrap',
+      }}
+    >{children}</button>
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,32 +111,28 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
 export default function CameraModal({
   onClose, showToast, user, collection, setCollection, openAddCard, setPage
 }) {
-  const scanningRef  = useRef(false)
-  const frozenRef    = useRef(false)
-  const prevThumbRef = useRef(null)
-  const stableRef    = useRef(0)
+  const scanningRef   = useRef(false)
+  const frozenRef     = useRef(false)
+  const prevThumbRef  = useRef(null)
+  const stableRef     = useRef(0)
   const STABLE_NEEDED = 2
 
   const videoRef  = useRef(null)
   const streamRef = useRef(null)
   const [cameraReady,    setCameraReady]    = useState(false)
   const [cameraError,    setCameraError]    = useState(null)
-  const [scanStatus,     setScanStatus]     = useState('ready')   // 'ready' | 'scanning' | 'error'
+  const [scanStatus,     setScanStatus]     = useState('ready')
   const [torchOn,        setTorchOn]        = useState(false)
   const [torchSupported, setTorchSupported] = useState(false)
 
-  const [nameRead,     setNameRead]     = useState('')
-  const [foundCard,    setFoundCard]    = useState(null)
-  const [matchQuality, setMatchQuality] = useState(null)
-  const [addedCards,   setAddedCards]   = useState([])
-  const [adding,       setAdding]       = useState(false)
-  const [lookingUp,    setLookingUp]    = useState(false)   // true while fetching Scryfall
-  const [lookupFailed, setLookupFailed] = useState(false)   // true if Scryfall returned nothing
-  const [detailTab,    setDetailTab]    = useState('versions') // 'versions' | 'ruling'
-  const [priceMode,    setPriceMode]    = useState('normal')   // 'normal' | 'foil'
-  const [printings,    setPrintings]    = useState([])
-  const [rulings,      setRulings]      = useState([])
-  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [nameRead,      setNameRead]      = useState('')
+  const [foundCard,     setFoundCard]     = useState(null)
+  const [addedCards,    setAddedCards]    = useState([])
+  const [adding,        setAdding]        = useState(false)
+  const [lookingUp,     setLookingUp]     = useState(false)
+  const [lookupFailed,  setLookupFailed]  = useState(false)
+  const [priceMode,     setPriceMode]     = useState('normal')
+  const [printings,     setPrintings]     = useState([])
 
   // ── Camera ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -157,12 +165,8 @@ export default function CameraModal({
     const track = streamRef.current?.getVideoTracks()[0]
     if (!track) return
     const next = !torchOn
-    try {
-      await track.applyConstraints({ advanced: [{ torch: next }] })
-      setTorchOn(next)
-    } catch (e) {
-      console.warn('[Scanner] torch toggle failed:', e)
-    }
+    try { await track.applyConstraints({ advanced: [{ torch: next }] }); setTorchOn(next) }
+    catch (e) { console.warn('[Scanner] torch toggle failed:', e) }
   }
 
   // ── Stability trigger ─────────────────────────────────────────────────────
@@ -188,7 +192,7 @@ export default function CameraModal({
     prevThumbRef.current = curr
   }
 
-  // ── Core scan — Claude Vision ─────────────────────────────────────────────
+  // ── Core scan ─────────────────────────────────────────────────────────────
   async function scanFrame() {
     if (scanningRef.current || frozenRef.current) return
     const video = videoRef.current
@@ -199,40 +203,32 @@ export default function CameraModal({
 
     try {
       const image = captureCardImage(video)
-
       const res = await fetch('/.netlify/functions/scan-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image }),
       })
-
       if (!res.ok) throw new Error(`scan-card ${res.status}`)
       const { name, setCode, collectorNumber } = await res.json()
 
-      const cleanName = (name || '').trim().replace(/["""'']/g, '"').replace(/["""'']/g, "'")
+      const cleanName = (name || '').trim().replace(/["""]/g, '"').replace(/[''']/g, "'")
       if (cleanName && cleanName.toLowerCase() !== 'unknown' && cleanName.length >= 2) {
         setNameRead(cleanName)
         setLookingUp(true)
         setLookupFailed(false)
-        const { card, quality } = await lookupCard(cleanName, setCode, collectorNumber)
+        const { card } = await lookupCard(cleanName, setCode, collectorNumber)
         setLookingUp(false)
         if (card) {
           frozenRef.current = true
           stableRef.current = 0
           setFoundCard(card)
-          setMatchQuality(quality)
           setPriceMode('normal')
-          setDetailTab('versions')
           if (navigator.vibrate) navigator.vibrate(40)
-          // Fetch printings and rulings in background
-          setLoadingDetail(true)
-          Promise.all([
-            fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`).then(r => r.ok ? r.json() : null),
-            card.rulings_uri ? fetch(card.rulings_uri).then(r => r.ok ? r.json() : null) : Promise.resolve(null),
-          ]).then(([printsData, rulingsData]) => {
-            setPrintings(printsData?.data?.slice(0, 12) || [])
-            setRulings(rulingsData?.data?.slice(0, 8) || [])
-          }).catch(() => {}).finally(() => setLoadingDetail(false))
+          // Fetch all printings in background
+          fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => setPrintings(data?.data?.slice(0, 20) || []))
+            .catch(() => {})
         } else {
           setLookupFailed(true)
         }
@@ -251,8 +247,9 @@ export default function CameraModal({
     const snap = foundCard
     setAdding(true)
     try {
-      const priceUsd     = snap.prices?.usd     ? parseFloat(snap.prices.usd)     : null
+      const priceUsd     = snap.prices?.usd      ? parseFloat(snap.prices.usd)      : null
       const priceUsdFoil = snap.prices?.usd_foil ? parseFloat(snap.prices.usd_foil) : null
+      const isFoil = priceMode === 'foil' && priceUsdFoil != null
       const card = {
         name:         snap.name,
         qty:          1,
@@ -260,8 +257,8 @@ export default function CameraModal({
         setName:      snap.set_name,
         img:          snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null,
         colors:       snap.color_identity || [],
-        price:        priceUsdFoil ?? priceUsd,
-        isFoil:       priceUsdFoil != null && priceUsdFoil > 0,
+        price:        isFoil ? priceUsdFoil : (priceUsd ?? priceUsdFoil),
+        isFoil,
         forSale:      options.forSale || false,
         tcgplayerUrl: snap.purchase_uris?.tcgplayer || null,
       }
@@ -276,13 +273,7 @@ export default function CameraModal({
       setAddedCards(prev => [...prev, snap.name])
       showToast(`✓ Added ${snap.name}`)
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
-
-      if (options.forSale && setPage) {
-        stopTracks(); onClose()
-        setPage('collection')
-        return
-      }
-
+      if (options.forSale && setPage) { stopTracks(); onClose(); setPage('collection'); return }
       doRescan()
     } catch (err) {
       console.error('[Scanner] add failed:', err)
@@ -296,289 +287,306 @@ export default function CameraModal({
     stableRef.current = 0
     prevThumbRef.current = null
     setFoundCard(null)
-    setMatchQuality(null)
     setNameRead('')
     setLookingUp(false)
     setLookupFailed(false)
     setPrintings([])
-    setRulings([])
-  }
-
-  function handleCustomize() {
-    if (!foundCard) return
-    stopTracks(); onClose()
-    openAddCard({ name: foundCard.name })
   }
 
   function handleClose() { stopTracks(); onClose() }
 
-  // ── Derived display ───────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const artImg       = foundCard?.image_uris?.normal || foundCard?.card_faces?.[0]?.image_uris?.normal
   const smallImg     = foundCard?.image_uris?.small  || foundCard?.card_faces?.[0]?.image_uris?.small
-  const priceUsd     = foundCard?.prices?.usd     ? parseFloat(foundCard.prices.usd)     : null
+  const priceUsd     = foundCard?.prices?.usd      ? parseFloat(foundCard.prices.usd)      : null
   const priceUsdFoil = foundCard?.prices?.usd_foil ? parseFloat(foundCard.prices.usd_foil) : null
   const displayPrice = priceMode === 'foil' && priceUsdFoil != null ? priceUsdFoil : priceUsd
   const alreadyOwned = foundCard
     ? (collection || []).find(c => c.name.toLowerCase() === foundCard.name.toLowerCase())
     : null
+  const extraPrints  = printings.length > 1 ? printings.length - 1 : 0
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div
-      onClick={e => { if (e.target === e.currentTarget) handleClose() }}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)',
-        zIndex: 200, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        padding: '0 0 24px',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: '480px', background: 'var(--bg-secondary)', minHeight: '100dvh' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000', overflow: 'hidden' }}>
 
-        {/* ── If card found: full-bleed detail view ── */}
+      {/* ── Live camera — always visible ── */}
+      <video
+        ref={videoRef}
+        autoPlay playsInline muted
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+
+      {/* ── Dark gradient at bottom for sheet readability ── */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%',
+        background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.55) 40%, rgba(0,0,0,0.9) 100%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── Top bar: close + torch ── */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        padding: 'env(safe-area-inset-top, 16px) 16px 0',
+        paddingTop: 'max(env(safe-area-inset-top), 16px)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        zIndex: 10,
+      }}>
+        <button onClick={handleClose} style={{
+          background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '50%', width: '38px', height: '38px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', fontSize: '1rem', color: '#fff', backdropFilter: 'blur(8px)',
+        }}>✕</button>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {torchSupported && (
+            <button onClick={toggleTorch} style={{
+              background: torchOn ? 'rgba(255,220,50,0.85)' : 'rgba(0,0,0,0.5)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '50%', width: '38px', height: '38px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', fontSize: '1.1rem', backdropFilter: 'blur(8px)',
+            }}>{torchOn ? '🔦' : '💡'}</button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Camera error ── */}
+      {cameraError && (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '12px',
+        }}>
+          <div style={{ fontSize: '3rem' }}>📷</div>
+          <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, textAlign: 'center', padding: '0 32px' }}>{cameraError}</p>
+        </div>
+      )}
+
+      {/* ── Card guide outline (no card yet) ── */}
+      {!foundCard && !cameraError && (
+        <div style={{
+          position: 'absolute',
+          left: `${GUIDE.x * 100}%`, top: '8%',
+          width: `${GUIDE.w * 100}%`, height: '55%',
+          border: '2px dashed rgba(255,255,255,0.4)', borderRadius: '8px',
+          pointerEvents: 'none', boxSizing: 'border-box',
+        }} />
+      )}
+
+      {/* ── Card art overlay on camera (when identified) ── */}
+      {foundCard && artImg && (
+        <div
+          onClick={doRescan}
+          style={{
+            position: 'absolute', top: '8%', left: '50%', transform: 'translateX(-50%)',
+            width: '82%', maxHeight: '52%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <img
+            src={artImg}
+            alt={foundCard.name}
+            style={{
+              width: '100%', height: '100%', objectFit: 'contain',
+              borderRadius: '10px',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(245,158,11,0.3)',
+              filter: 'drop-shadow(0 0 24px rgba(245,158,11,0.25))',
+              animation: 'scanCardIn .25s ease-out',
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Scanning indicator ── */}
+      {scanStatus === 'scanning' && !foundCard && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          background: 'rgba(0,0,0,0.72)', color: '#f59e0b',
+          padding: '6px 18px', borderRadius: '20px', fontSize: '0.75rem',
+          whiteSpace: 'nowrap', backdropFilter: 'blur(8px)',
+        }}>✦ Reading card…</div>
+      )}
+
+      {/* ── "Tap to scan again" hint ── */}
+      {foundCard && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(8% + 52% + 8px)',
+          left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: '6px',
+          background: 'rgba(0,0,0,0.55)', borderRadius: '20px',
+          padding: '5px 14px', backdropFilter: 'blur(8px)',
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }} onClick={doRescan}>
+          <span style={{ fontSize: '.65rem' }}>💡</span>
+          <span style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.75)' }}>Tap to scan again</span>
+        </div>
+      )}
+
+      {/* ── Looking up indicator (name found, fetching Scryfall) ── */}
+      {lookingUp && !foundCard && (
+        <div style={{
+          position: 'absolute', bottom: '200px', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          background: 'rgba(0,0,0,0.7)', borderRadius: '20px',
+          padding: '6px 16px', backdropFilter: 'blur(8px)',
+        }}>
+          <span style={{ fontSize: '.68rem', color: 'var(--accent-teal)' }}>✦</span>
+          <span style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.8)' }}>
+            {nameRead ? `Found "${nameRead}"…` : 'Looking up…'}
+          </span>
+        </div>
+      )}
+
+      {lookupFailed && !foundCard && !lookingUp && nameRead && (
+        <div style={{
+          position: 'absolute', bottom: '200px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.7)', borderRadius: '20px',
+          padding: '6px 16px', backdropFilter: 'blur(8px)', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '.72rem', color: '#f87171' }}>Could not find "{nameRead}"</div>
+          <div style={{ fontSize: '.62rem', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>Hold card steadier and try again</div>
+        </div>
+      )}
+
+      {/* ── Added cards log (floats above sheet) ── */}
+      {addedCards.length > 0 && (
+        <div style={{
+          position: 'absolute', bottom: foundCard ? '230px' : '130px',
+          left: '16px', right: '16px',
+          padding: '7px 12px', background: 'rgba(74,222,128,0.15)', borderRadius: '10px',
+          border: '1px solid rgba(74,222,128,0.25)', backdropFilter: 'blur(8px)',
+          fontSize: '.75rem',
+        }}>
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Added: </span>
+          <span style={{ color: '#4ade80', fontWeight: 600 }}>{addedCards.join(' · ')}</span>
+        </div>
+      )}
+
+      {/* ── Bottom sheet ── */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: 'rgba(18,18,20,0.97)',
+        borderRadius: '20px 20px 0 0',
+        backdropFilter: 'blur(20px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+      }}>
+        {/* Drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
+          <div style={{ width: '32px', height: '3px', borderRadius: '99px', background: 'rgba(255,255,255,0.15)' }} />
+        </div>
+
         {foundCard ? (
-          <>
-            {/* Full-bleed card art */}
-            <div style={{ position: 'relative' }}>
-              {artImg
-                ? <img src={artImg} alt={foundCard.name} className="card-detail-art" />
-                : <div style={{ width: '100%', aspectRatio: '5/4', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
-              }
-              {/* Close */}
-              <button onClick={handleClose} style={{
-                position: 'absolute', top: '12px', left: '12px',
-                background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '50%',
-                width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: '.9rem', color: '#fff',
-              }}>✕</button>
-              {/* Rescan */}
-              <button onClick={doRescan} style={{
-                position: 'absolute', top: '12px', right: '12px',
-                background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '20px',
-                padding: '6px 12px', cursor: 'pointer', fontSize: '.72rem', color: '#fff',
-              }}>🔄 Rescan</button>
-              {/* Already owned badge */}
-              {alreadyOwned && (
-                <div style={{
-                  position: 'absolute', bottom: '12px', left: '12px',
-                  background: 'rgba(0,0,0,.7)', borderRadius: '20px', padding: '4px 10px',
-                  fontSize: '.68rem', color: '#93c5fd', fontWeight: 600,
-                }}>Own ×{alreadyOwned.qty}</div>
+          <div style={{ padding: '10px 16px 16px' }}>
+            {/* Card row */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+              marginBottom: '10px',
+            }}>
+              {smallImg && (
+                <img src={smallImg} alt={foundCard.name}
+                  style={{ width: '44px', borderRadius: '6px', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }} />
               )}
-            </div>
-
-            {/* Card info */}
-            <div className="card-detail-body">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                <div>
-                  <div className="card-detail-name">{foundCard.name}</div>
-                  <div className="card-detail-type">{foundCard.type_line}</div>
-                  <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                    {foundCard.set_name}{foundCard.collector_number ? ` · #${foundCard.collector_number}` : ''}
-                  </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '.9rem', color: '#fff', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {foundCard.name}
                 </div>
-                {foundCard.power != null && (
-                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '.9rem', fontWeight: 800, flexShrink: 0, color: 'var(--text-primary)' }}>
-                    {foundCard.power}/{foundCard.toughness}
-                  </div>
-                )}
+                <div style={{ fontSize: '.7rem', color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
+                  {foundCard.set_name}
+                  {alreadyOwned && <span style={{ color: '#93c5fd', marginLeft: '6px' }}>Own ×{alreadyOwned.qty}</span>}
+                </div>
               </div>
-
-              {/* Price toggle */}
-              <div className="price-toggle">
-                <button className={`price-toggle-btn ${priceMode === 'normal' ? 'active' : ''}`} onClick={() => setPriceMode('normal')}>
-                  Normal{priceUsd != null ? ` · $${priceUsd.toFixed(2)}` : ''}
-                </button>
-                <button className={`price-toggle-btn ${priceMode === 'foil' ? 'active' : ''}`} onClick={() => setPriceMode('foil')}
-                  disabled={priceUsdFoil == null} style={{ opacity: priceUsdFoil == null ? 0.4 : 1 }}>
-                  ✦ Foil{priceUsdFoil != null ? ` · $${priceUsdFoil.toFixed(2)}` : ''}
-                </button>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '.58rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Market</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-teal)' }}>
+                  {displayPrice != null ? `$${displayPrice.toFixed(2)}` : '—'}
+                </div>
               </div>
-
-              {/* Oracle text */}
-              {foundCard.oracle_text && (
-                <div className="card-detail-oracle">{foundCard.oracle_text}</div>
-              )}
-
-              {/* Versions / Ruling tabs */}
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', margin: '14px -16px 0', padding: '0 16px' }}>
-                {[['versions', 'Versions'], ['ruling', 'Ruling']].map(([key, label]) => (
-                  <button key={key} onClick={() => setDetailTab(key)} style={{
-                    padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: '.82rem', fontWeight: 600,
-                    color: detailTab === key ? 'var(--accent-teal)' : 'var(--text-muted)',
-                    borderBottom: detailTab === key ? '2px solid var(--accent-teal)' : '2px solid transparent',
-                    marginBottom: '-1px',
-                  }}>{label}</button>
-                ))}
-              </div>
-
-              {/* Tab content */}
-              <div style={{ marginTop: '14px', minHeight: '80px' }}>
-                {loadingDetail && <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>Loading…</div>}
-                {!loadingDetail && detailTab === 'versions' && (
-                  printings.length > 0 ? (
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {printings.map(p => (
-                        <div key={p.id} style={{ textAlign: 'center', width: '56px' }}>
-                          {p.image_uris?.small
-                            ? <img src={p.image_uris.small} alt={p.set_name} style={{ width: '56px', borderRadius: '4px', border: p.id === foundCard.id ? '2px solid var(--accent-teal)' : '2px solid transparent' }} />
-                            : <div style={{ width: '56px', height: '78px', background: 'var(--bg-card)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.6rem', color: 'var(--text-muted)' }}>{p.set?.toUpperCase()}</div>
-                          }
-                          <div style={{ fontSize: '.58rem', color: 'var(--text-muted)', marginTop: '2px' }}>{p.set?.toUpperCase()}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No other printings found</div>
-                  )
-                )}
-                {!loadingDetail && detailTab === 'ruling' && (
-                  rulings.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {rulings.map((r, i) => (
-                        <div key={i} style={{ fontSize: '.78rem', color: 'var(--text-secondary)', lineHeight: 1.5, paddingBottom: '10px', borderBottom: i < rulings.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginBottom: '3px' }}>{r.published_at}</div>
-                          {r.comment}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No rulings found</div>
-                  )
-                )}
-              </div>
+              <button
+                onClick={() => { stopTracks(); onClose(); openAddCard({ name: foundCard.name }) }}
+                style={{
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '50%', width: '30px', height: '30px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: '1rem', flexShrink: 0,
+                }}
+              >›</button>
             </div>
 
-            {/* Added cards log */}
-            {addedCards.length > 0 && (
-              <div style={{ margin: '0 16px 12px', padding: '8px 12px', background: 'rgba(74,222,128,0.07)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.18)', fontSize: '.78rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Added: </span>
-                <span style={{ color: '#4ade80' }}>{addedCards.join(' · ')}</span>
-              </div>
-            )}
+            {/* Chips row: Normal | Foil | #Collector | +X prints */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+              <Chip active={priceMode === 'normal'} onClick={() => setPriceMode('normal')}>Normal</Chip>
+              <Chip
+                active={priceMode === 'foil'}
+                onClick={() => setPriceMode('foil')}
+                disabled={priceUsdFoil == null}
+              >✦ Foil</Chip>
+              {foundCard.collector_number && (
+                <Chip>#{foundCard.collector_number}</Chip>
+              )}
+              {extraPrints > 0 && (
+                <Chip>+{extraPrints} prints</Chip>
+              )}
+            </div>
 
             {/* Action buttons */}
-            <div style={{ display: 'flex', gap: '10px', padding: '0 16px 16px' }}>
-              <button onClick={() => handleAdd()} disabled={adding} style={{
-                flex: 1, background: 'var(--accent-teal)', color: '#000', border: 'none',
-                borderRadius: '12px', padding: '14px',
-                fontWeight: 800, fontSize: '.9rem', cursor: adding ? 'wait' : 'pointer',
-                opacity: adding ? 0.7 : 1,
-              }}>{adding ? '…' : '+ Add to Collection'}</button>
-              <button onClick={() => handleAdd({ forSale: true })} disabled={adding} style={{
-                flex: 1, background: 'rgba(245,158,11,0.15)', color: 'var(--accent-teal)',
-                border: '1px solid rgba(245,158,11,0.35)',
-                borderRadius: '12px', padding: '14px',
-                fontWeight: 700, fontSize: '.9rem', cursor: adding ? 'wait' : 'pointer',
-                opacity: adding ? 0.7 : 1,
-              }}>Add &amp; List</button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => handleAdd()}
+                disabled={adding}
+                style={{
+                  flex: 1, background: 'var(--accent-teal)', color: '#000', border: 'none',
+                  borderRadius: '12px', padding: '13px 8px',
+                  fontWeight: 800, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
+                  opacity: adding ? 0.7 : 1,
+                }}
+              >{adding ? '…' : '+ Add to Collection'}</button>
+              <button
+                onClick={() => handleAdd({ forSale: true })}
+                disabled={adding}
+                style={{
+                  flex: 1, background: 'rgba(245,158,11,0.12)', color: 'var(--accent-teal)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  borderRadius: '12px', padding: '13px 8px',
+                  fontWeight: 700, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
+                  opacity: adding ? 0.7 : 1,
+                }}
+              >Add &amp; List</button>
             </div>
-          </>
+          </div>
         ) : (
-          /* ── Camera view (no card found yet) ── */
-          <div>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
-              <div>
-                <h3 style={{ margin: '0 0 2px', fontSize: '1rem' }}>📷 Scan Card</h3>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Fill card to the white frame · powered by Claude Vision</div>
+          /* Idle / scanning state */
+          <div style={{ padding: '10px 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div>
+              <div style={{ fontSize: '.82rem', color: '#fff', fontWeight: 600, marginBottom: '2px' }}>
+                {cameraError ? 'Camera unavailable' : 'Ready to scan'}
               </div>
-              <button onClick={handleClose} style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: '50%', width: '32px', height: '32px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: '1rem', color: 'var(--text-primary)', flexShrink: 0,
-              }}>✕</button>
+              <div style={{ fontSize: '.68rem', color: 'rgba(255,255,255,0.4)' }}>
+                {cameraError ? cameraError : 'Hold card steady within the frame'}
+              </div>
             </div>
-
-            {cameraError ? (
-              <div style={{ padding: '32px', textAlign: 'center' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📷</div>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>{cameraError}</p>
-              </div>
-            ) : (
-              <div style={{ position: 'relative', background: '#000' }}>
-                <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', display: 'block', minHeight: '260px' }} />
-
-                {torchSupported && (
-                  <button onClick={toggleTorch} style={{
-                    position: 'absolute', top: '10px', right: '10px',
-                    background: torchOn ? 'rgba(255,220,50,0.9)' : 'rgba(0,0,0,0.55)',
-                    border: '1px solid ' + (torchOn ? 'rgba(255,220,50,0.5)' : 'rgba(255,255,255,0.2)'),
-                    borderRadius: '50%', width: '36px', height: '36px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', fontSize: '1.1rem', zIndex: 10,
-                  }}>{torchOn ? '🔦' : '💡'}</button>
-                )}
-
-                {/* Card guide outline */}
-                <div style={{
-                  position: 'absolute',
-                  left: `${GUIDE.x * 100}%`, top: `${GUIDE.y * 100}%`,
-                  width: `${GUIDE.w * 100}%`, height: `${GUIDE.h * 100}%`,
-                  border: '2px dashed rgba(255,255,255,0.55)', borderRadius: '6px',
-                  pointerEvents: 'none', boxSizing: 'border-box',
-                }} />
-
-                {!foundCard && scanStatus === 'ready' && (
-                  <div style={{
-                    position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
-                    color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem',
-                    textAlign: 'center', pointerEvents: 'none', lineHeight: 1.5,
-                  }}>Fill card to white outline</div>
-                )}
-
-                {scanStatus === 'scanning' && (
-                  <div style={{
-                    position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)',
-                    background: 'rgba(0,0,0,0.72)', color: '#f59e0b',
-                    padding: '4px 16px', borderRadius: '20px', fontSize: '0.72rem',
-                    whiteSpace: 'nowrap', pointerEvents: 'none',
-                  }}>✦ Reading card…</div>
-                )}
-              </div>
-            )}
-
-            {nameRead && (
-              <div style={{ margin: '10px 16px 0', padding: '8px 12px', background: 'rgba(245,158,11,0.08)', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Identified</div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--accent-teal)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nameRead}</div>
-                {lookingUp && (
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-teal)', animation: 'pulse 1s infinite' }} />
-                    Fetching card details…
-                  </div>
-                )}
-                {lookupFailed && !lookingUp && (
-                  <div style={{ fontSize: '0.65rem', color: '#f87171', marginTop: '4px' }}>
-                    Could not fetch card details. Try rescanning or hold the card steadier.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {addedCards.length > 0 && (
-              <div style={{ margin: '10px 16px 0', padding: '7px 11px', background: 'rgba(74,222,128,0.07)', borderRadius: '8px', border: '1px solid rgba(74,222,128,0.18)', fontSize: '.78rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Added: </span>
-                <span style={{ color: '#4ade80' }}>{addedCards.join(' · ')}</span>
-              </div>
-            )}
-
-            <div style={{ padding: '14px 16px', fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              Hold steady · Works with foil &amp; alt-art · After scanning tap <strong style={{ color: 'var(--text-secondary)' }}>Add &amp; List</strong> to mark for sale
-            </div>
-
-            <div style={{ padding: '0 16px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={handleClose} style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: '10px', padding: '10px 24px',
-                color: 'var(--text-primary)', cursor: 'pointer', fontSize: '.88rem', fontWeight: 600,
-              }}>Done</button>
-            </div>
+            <button
+              onClick={handleClose}
+              style={{
+                background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '10px', padding: '9px 20px', flexShrink: 0,
+                color: '#fff', cursor: 'pointer', fontSize: '.84rem', fontWeight: 600,
+              }}
+            >Done</button>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes scanCardIn {
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   )
 }
