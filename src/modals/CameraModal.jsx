@@ -176,8 +176,9 @@ export default function CameraModal({
   const [adding,        setAdding]        = useState(false)
   const [lookingUp,     setLookingUp]     = useState(false)
   const [lookupFailed,  setLookupFailed]  = useState(false)
-  const [priceMode,     setPriceMode]     = useState('normal')
-  const [printings,     setPrintings]     = useState([])
+  const [priceMode,      setPriceMode]      = useState('normal')
+  const [printings,      setPrintings]      = useState([])
+  const [showPrintings,  setShowPrintings]  = useState(false)
 
   // ── Camera ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -336,6 +337,7 @@ export default function CameraModal({
     setLookingUp(false)
     setLookupFailed(false)
     setPrintings([])
+    setShowPrintings(false)
   }
 
   function handleClose() { stopTracks(); onClose() }
@@ -563,7 +565,7 @@ export default function CameraModal({
             </div>
 
             {/* Chips row: Normal | Foil | #Collector | +X prints */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
               <Chip active={priceMode === 'normal'} onClick={() => setPriceMode('normal')}>Normal</Chip>
               <Chip
                 active={priceMode === 'foil'}
@@ -574,9 +576,87 @@ export default function CameraModal({
                 <Chip>#{foundCard.collector_number}</Chip>
               )}
               {extraPrints > 0 && (
-                <Chip>+{extraPrints} prints</Chip>
+                <Chip
+                  active={showPrintings}
+                  onClick={() => setShowPrintings(p => !p)}
+                >+{extraPrints} prints {showPrintings ? '▲' : '▼'}</Chip>
               )}
             </div>
+
+            {/* Printings panel */}
+            {showPrintings && printings.length > 0 && (
+              <div style={{
+                marginBottom: '12px',
+                maxHeight: '220px', overflowY: 'auto',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px',
+                background: 'rgba(255,255,255,0.04)',
+              }}>
+                {printings.map((p, i) => {
+                  const pNormal = p.prices?.usd      ? parseFloat(p.prices.usd)      : null
+                  const pFoil   = p.prices?.usd_foil ? parseFloat(p.prices.usd_foil) : null
+                  const isSelected = p.id === foundCard.id
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setFoundCard(p)
+                        setPriceMode('normal')
+                        setShowPrintings(false)
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        width: '100%', padding: '9px 12px',
+                        background: isSelected ? 'rgba(245,158,11,0.1)' : 'transparent',
+                        border: 'none',
+                        borderBottom: i < printings.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                        cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      {/* Card thumbnail */}
+                      {p.image_uris?.small
+                        ? <img src={p.image_uris.small} alt={p.set_name}
+                            style={{ width: '36px', borderRadius: '4px', flexShrink: 0,
+                              border: isSelected ? '1.5px solid var(--accent-teal)' : '1.5px solid transparent' }} />
+                        : <div style={{ width: '36px', height: '50px', borderRadius: '4px',
+                            background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
+                      }
+                      {/* Set info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '.76rem', fontWeight: 600, color: isSelected ? 'var(--accent-teal)' : '#fff',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.set_name}
+                        </div>
+                        <div style={{ fontSize: '.62rem', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }}>
+                          #{p.collector_number} · {p.set?.toUpperCase()}
+                          {p.finishes?.includes('foil') && !p.finishes?.includes('nonfoil') &&
+                            <span style={{ color: '#c084fc', marginLeft: '4px' }}>✦ Foil only</span>}
+                        </div>
+                      </div>
+                      {/* Prices */}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        {pNormal != null && (
+                          <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--accent-teal)' }}>
+                            ${pNormal.toFixed(2)}
+                          </div>
+                        )}
+                        {pFoil != null && (
+                          <div style={{ fontSize: '.65rem', color: '#c084fc' }}>
+                            ✦ ${pFoil.toFixed(2)}
+                          </div>
+                        )}
+                        {pNormal == null && pFoil == null && (
+                          <div style={{ fontSize: '.65rem', color: 'rgba(255,255,255,0.3)' }}>—</div>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <div style={{ fontSize: '.7rem', color: 'var(--accent-teal)', flexShrink: 0 }}>✓</div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: '8px' }}>
