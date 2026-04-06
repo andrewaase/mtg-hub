@@ -39,45 +39,90 @@ function captureCardImage(video) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function lookupCard(name, setCode = null, collectorNumber = null) {
-  if (setCode && collectorNumber) {
+  // Helper: try fetching a single Scryfall card URL
+  async function tryScryfallCard(url) {
     try {
+      const res = await fetch(url)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.object === 'card') return json
+      }
+    } catch { /* continue */ }
+    return null
+  }
+
+  // Tier 0a — exact set + collector number (ideal for alt/showcase/foil)
+  if (setCode && collectorNumber) {
+    const card = await tryScryfallCard(
+      `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(collectorNumber)}`
+    )
+    if (card) return { card, quality: 'exact' }
+
+    // Tier 0b — same but strip leading zeros (foil cards often print "0300", Scryfall stores "300")
+    const stripped = collectorNumber.replace(/^0+(\d)/, '$1')
+    if (stripped !== collectorNumber) {
+      const card2 = await tryScryfallCard(
+        `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(stripped)}`
+      )
+      if (card2) return { card: card2, quality: 'exact' }
+    }
+  }
+
+  // Tier 1 — search by name within the identified set (finds full-art/showcase versions)
+  // This is the key fallback for special treatments where the collector number is off
+  if (setCode) {
+    try {
+      const q = `!"${name}" set:${setCode}`
       const res = await fetch(
-        `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(collectorNumber)}`
+        `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&order=collector_number`
       )
       if (res.ok) {
         const json = await res.json()
-        if (json.object === 'card') return { card: json, quality: 'exact' }
+        // If multiple results in set (e.g. regular + extended art), pick the one
+        // whose collector number is closest to what Claude read
+        if (json.data?.length > 0) {
+          if (collectorNumber && json.data.length > 1) {
+            const target = parseInt(collectorNumber, 10)
+            const closest = json.data.reduce((best, c) => {
+              const diff = Math.abs(parseInt(c.collector_number, 10) - target)
+              const bestDiff = Math.abs(parseInt(best.collector_number, 10) - target)
+              return diff < bestDiff ? c : best
+            })
+            return { card: closest, quality: 'exact' }
+          }
+          return { card: json.data[0], quality: 'exact' }
+        }
       }
     } catch { /* continue */ }
   }
-  try {
-    const res = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`)
-    if (res.ok) {
-      const json = await res.json()
-      if (json.object === 'card') return { card: json, quality: 'exact' }
-    }
-  } catch { /* continue */ }
-  try {
-    const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`)
-    if (res.ok) {
-      const json = await res.json()
-      if (json.object === 'card') return { card: json, quality: 'fuzzy' }
-    }
-  } catch { /* continue */ }
+
+  // Tier 2 — exact name (default/most-recent printing)
+  const byName = await tryScryfallCard(
+    `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`
+  )
+  if (byName) return { card: byName, quality: 'exact' }
+
+  // Tier 3 — fuzzy name
+  const byFuzzy = await tryScryfallCard(
+    `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`
+  )
+  if (byFuzzy) return { card: byFuzzy, quality: 'fuzzy' }
+
+  // Tier 4 — autocomplete (handles garbled OCR)
   try {
     const acRes = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(name)}`)
     if (acRes.ok) {
       const acJson = await acRes.json()
       const top = acJson.data?.[0]
       if (top) {
-        const detRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(top)}`)
-        if (detRes.ok) {
-          const det = await detRes.json()
-          if (det.object === 'card') return { card: det, quality: 'fuzzy' }
-        }
+        const card = await tryScryfallCard(
+          `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(top)}`
+        )
+        if (card) return { card, quality: 'fuzzy' }
       }
     }
   } catch { /* continue */ }
+
   return { card: null, quality: null }
 }
 
