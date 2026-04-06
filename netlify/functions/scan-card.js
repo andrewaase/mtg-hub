@@ -69,25 +69,44 @@ If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"colle
     const json = await response.json()
     const raw  = json.content?.[0]?.text?.trim() || ''
 
-    // Parse the JSON response
-    try {
-      const parsed = JSON.parse(raw)
+    // Strip markdown code fences that Claude sometimes adds despite instructions
+    // e.g. ```json {...} ``` → {...}
+    const stripped = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim()
+
+    // Helper to return a parsed result
+    function makeResult(parsed) {
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:            parsed.name            || 'unknown',
-          setCode:         parsed.setCode         || null,
-          collectorNumber: parsed.collectorNumber || null,
+          name:            (parsed.name            || 'unknown').trim(),
+          setCode:         parsed.setCode          || null,
+          collectorNumber: parsed.collectorNumber  || null,
         }),
       }
-    } catch {
-      // Fallback: treat raw text as just the name
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: raw || 'unknown', setCode: null, collectorNumber: null }),
-      }
+    }
+
+    // 1 — try parsing the stripped string directly
+    try {
+      return makeResult(JSON.parse(stripped))
+    } catch { /* continue */ }
+
+    // 2 — try to extract a JSON object anywhere in the string
+    const match = stripped.match(/\{[\s\S]*?\}/)
+    if (match) {
+      try {
+        return makeResult(JSON.parse(match[0]))
+      } catch { /* continue */ }
+    }
+
+    // 3 — last resort: the raw text is probably just the card name
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: stripped || 'unknown', setCode: null, collectorNumber: null }),
     }
   } catch (err) {
     console.error('[scan-card] fetch error:', err)
