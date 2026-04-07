@@ -1,31 +1,38 @@
 import { hasSupabase } from '../lib/supabase'
+import logoSvg from '../assets/vaulted_singles_logo.svg'
 
 export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClick }) {
-  const titles = {
-    dashboard:  'Dashboard',
-    log:        'Match Log',
-    stats:      'Stats',
-    news:       'MTG News',
-    cards:      'Card Lookup',
-    collection: 'My Collection',
-    meta:       'Meta Tracker',
-    friends:    'Friends & Trades',
-    decks:      'My Decks',
-  }
-
-  const title = titles[page] || 'MTG Hub'
-  const hideTitle = true
-
   return (
     <div id="topbar">
       <div className="topbar-left">
         <button className="btn-icon" onClick={onMenuClick} id="menu-btn" aria-label="Open menu">
           ☰
         </button>
-        {!hideTitle && <h2 className="topbar-title-inline">{title}</h2>}
+        {/* Logo + wordmark */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+          <img
+            src={logoSvg}
+            alt="Vaulted Singles"
+            style={{ height: '32px', width: 'auto', display: 'block' }}
+          />
+          <div style={{ lineHeight: 1 }}>
+            <div style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontWeight: 700,
+              fontSize: '.88rem',
+              color: 'var(--accent-gold)',
+              letterSpacing: '.5px',
+            }}>VAULTED</div>
+            <div style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: '.6rem',
+              color: '#8b5ea4',
+              letterSpacing: '2px',
+              marginTop: '1px',
+            }}>SINGLES</div>
+          </div>
+        </div>
       </div>
-
-      {!hideTitle && <h2 className="topbar-title-center">{title}</h2>}
 
       {/* Right: actions */}
       <div className="topbar-actions">

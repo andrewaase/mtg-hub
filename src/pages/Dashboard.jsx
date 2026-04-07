@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import logoSvg from '../assets/vaulted_singles_logo.svg'
 import { calculateWinRate, calculateStreak, formatDate } from '../lib/utils'
 import { getSnapshots, getGainersLosers } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
@@ -113,6 +114,32 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
 
   return (
     <div>
+
+      {/* ── Hero welcome strip (empty collection) ── */}
+      {collection.length === 0 && matches.length === 0 && (
+        <div style={{
+          margin: '16px 16px 0',
+          background: 'linear-gradient(135deg, rgba(201,168,76,0.08) 0%, rgba(139,94,164,0.08) 100%)',
+          border: '1px solid rgba(201,168,76,0.2)',
+          borderRadius: '16px',
+          padding: '24px 20px',
+          textAlign: 'center',
+        }}>
+          <img src={logoSvg} alt="Vaulted Singles" style={{ width: '80px', height: 'auto', margin: '0 auto 12px', display: 'block' }} />
+          <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.3rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>VAULTED SINGLES</div>
+          <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.5 }}>
+            Your MTG collection vault.<br />Scan a card to get started.
+          </div>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
+            <button onClick={() => setPage?.('collection')} style={{ padding: '8px 20px', borderRadius: '99px', background: 'var(--accent-teal)', color: '#000', border: 'none', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+              + Add Cards
+            </button>
+            <button onClick={() => setPage?.('cards')} style={{ padding: '8px 20px', borderRadius: '99px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', fontSize: '.82rem', cursor: 'pointer' }}>
+              Browse Cards
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Portfolio Donut ── */}
       <div className="card" style={{ margin: '12px 16px 0', overflow: 'hidden' }}>
