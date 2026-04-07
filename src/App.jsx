@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, hasSupabase } from './lib/supabase'
-import { getMatches, getCollection } from './lib/db'
+import { getMatches, getCollection, addCard, addMatch } from './lib/db'
 import { handleEbayCallback } from './lib/ebay'
 import { takeSnapshot } from './lib/priceHistory'
 import Sidebar from './components/Sidebar'
@@ -50,6 +50,12 @@ export default function App() {
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
   }, [])
 
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [sidebarOpen])
+
   // Browser back/forward
   useEffect(() => {
     window.history.replaceState({ page: getInitialPage() }, '', `#${getInitialPage()}`)
@@ -91,6 +97,34 @@ export default function App() {
     async function load() {
       setLoading(true)
       const [m, c] = await Promise.all([getMatches(user?.id), getCollection(user?.id)])
+
+      // Auto-migrate localStorage data → Supabase on first sign-in
+      if (user && hasSupabase) {
+        const migrationKey = `vs-migrated-${user.id}`
+        if (!localStorage.getItem(migrationKey)) {
+          try {
+            const lsData = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
+            const lsCards = lsData.collection || []
+            const lsMatches = lsData.matches || []
+            if (c.length === 0 && lsCards.length > 0) {
+              await Promise.all(lsCards.map(card => addCard(card, user.id)))
+              const migrated = await getCollection(user.id)
+              setCollection(migrated)
+              setMatches(m.length === 0 && lsMatches.length > 0
+                ? await Promise.all(lsMatches.map(match => addMatch(match, user.id))).then(() => getMatches(user.id))
+                : m
+              )
+              localStorage.setItem(migrationKey, '1')
+              setLoading(false)
+              showToast(`✅ Synced ${lsCards.length} cards to your account`)
+              return
+            } else {
+              localStorage.setItem(migrationKey, '1')
+            }
+          } catch { /* ignore migration errors */ }
+        }
+      }
+
       setMatches(m)
       setCollection(c)
       setLoading(false)
@@ -149,7 +183,7 @@ export default function App() {
       </div>
       <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={() => setShowCamera(true)} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
-      {showAuth    && <AuthModal onClose={() => setShowAuth(false)} showToast={showToast} />}
+      {showAuth    && <AuthModal onClose={() => setShowAuth(false)} showToast={showToast} user={user} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
       {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}
