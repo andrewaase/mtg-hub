@@ -1,6 +1,6 @@
-import { useId } from 'react'
+import { useId, useState, useEffect } from 'react'
 import logoSvg from '../assets/vaulted_singles_logo.svg'
-import { calculateWinRate, calculateStreak, formatDate } from '../lib/utils'
+import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getSnapshots, getGainersLosers } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 
@@ -64,6 +64,91 @@ function DonutChart({ total, delta, deltaPercent, cardCount }) {
   )
 }
 
+// ── News widget ───────────────────────────────────────────────────────────────
+function NewsWidget({ setPage }) {
+  const [articles, setArticles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const sources = [
+    { id: 'mtggoldfish', label: 'MTGGoldfish' },
+    { id: 'magic.wizards.com', label: 'Wizards' },
+    { id: 'edhrec', label: 'EDHREC' },
+  ]
+  const [activeSource, setActiveSource] = useState('mtggoldfish')
+
+  useEffect(() => {
+    setLoading(true)
+    fetchNews(activeSource)
+      .then(items => setArticles((items || []).slice(0, 4)))
+      .catch(() => setArticles([]))
+      .finally(() => setLoading(false))
+  }, [activeSource])
+
+  return (
+    <div style={{ margin: '12px 16px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px' }}>
+        <div className="section-title" style={{ padding: 0 }}>MTG News</div>
+        <button onClick={() => setPage?.('news')} style={{ fontSize: '.7rem', color: 'var(--accent-teal)', background: 'none', border: 'none', cursor: 'pointer' }}>See all →</button>
+      </div>
+      {/* Source chips */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        {sources.map(s => (
+          <button
+            key={s.id}
+            onClick={() => setActiveSource(s.id)}
+            style={{
+              padding: '3px 10px', borderRadius: '99px', fontSize: '.68rem',
+              fontWeight: 600, cursor: 'pointer', border: '1px solid',
+              background: activeSource === s.id ? 'var(--accent-gold)' : 'transparent',
+              color: activeSource === s.id ? '#1a1000' : 'var(--text-muted)',
+              borderColor: activeSource === s.id ? 'var(--accent-gold)' : 'var(--border)',
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.8rem' }}>Loading…</div>
+        ) : articles.length === 0 ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.8rem' }}>No articles found</div>
+        ) : articles.map((a, i) => (
+          <a
+            key={i}
+            href={a.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', gap: '10px', padding: '10px 12px',
+              borderBottom: i < articles.length - 1 ? '1px solid var(--border)' : 'none',
+              textDecoration: 'none', color: 'inherit',
+              transition: 'background .15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            {a.image && (
+              <img
+                src={a.image} alt=""
+                style={{ width: '52px', height: '38px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                onError={e => { e.target.style.display = 'none' }}
+              />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '.8rem', fontWeight: 600, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                {a.title}
+              </div>
+              <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                {new Date(a.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Dashboard({ matches, collection, openLogMatch, setPage }) {
   const winRate = calculateWinRate(matches)
@@ -118,26 +203,21 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
       {/* ── Hero welcome strip (empty collection) ── */}
       {collection.length === 0 && matches.length === 0 && (
         <div style={{
-          margin: '16px 16px 0',
-          background: 'linear-gradient(135deg, rgba(201,168,76,0.08) 0%, rgba(139,94,164,0.08) 100%)',
-          border: '1px solid rgba(201,168,76,0.2)',
-          borderRadius: '16px',
-          padding: '24px 20px',
-          textAlign: 'center',
+          margin: '12px 16px 0',
+          background: 'linear-gradient(135deg, rgba(201,168,76,0.07) 0%, rgba(139,94,164,0.07) 100%)',
+          border: '1px solid rgba(201,168,76,0.18)',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          display: 'flex', alignItems: 'center', gap: '12px',
         }}>
-          <img src={logoSvg} alt="Vaulted Singles" style={{ width: '80px', height: 'auto', margin: '0 auto 12px', display: 'block' }} />
-          <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.3rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>VAULTED SINGLES</div>
-          <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.5 }}>
-            Your MTG collection vault.<br />Scan a card to get started.
+          <img src={logoSvg} alt="Vaulted Singles" style={{ width: '40px', height: 'auto', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '.95rem', color: 'var(--accent-gold)', letterSpacing: '.5px' }}>VAULTED SINGLES</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Scan a card to start building your vault.</div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
-            <button onClick={() => setPage?.('collection')} style={{ padding: '8px 20px', borderRadius: '99px', background: 'var(--accent-teal)', color: '#000', border: 'none', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
-              + Add Cards
-            </button>
-            <button onClick={() => setPage?.('cards')} style={{ padding: '8px 20px', borderRadius: '99px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', fontSize: '.82rem', cursor: 'pointer' }}>
-              Browse Cards
-            </button>
-          </div>
+          <button onClick={() => setPage?.('collection')} style={{ padding: '6px 14px', borderRadius: '99px', background: 'var(--accent-gold)', color: '#1a1000', border: 'none', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer', flexShrink: 0 }}>
+            + Add
+          </button>
         </div>
       )}
 
@@ -242,44 +322,8 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
         </div>
       )}
 
-      {/* ── Recent Matches ── */}
-      <div style={{ margin: '12px 16px 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px' }}>
-          <div className="section-title" style={{ padding: 0 }}>Recent Matches</div>
-          <button onClick={openLogMatch} style={{ fontSize: '.72rem', color: 'var(--accent-teal)', background: 'none', border: 'none', cursor: 'pointer' }}>+ Log</button>
-        </div>
-        <div className="card">
-          {matches.length === 0 ? (
-            <div className="empty-state" style={{ padding: '28px 20px' }}>
-              <div className="empty-icon">⚔️</div>
-              <p>No matches logged yet.</p>
-              <button className="btn btn-primary" onClick={openLogMatch} style={{ marginTop: '14px' }}>+ Log Match</button>
-            </div>
-          ) : (
-            <>
-              {matches.slice(0, 5).map(m => (
-                <div key={m.id} className="match-item">
-                  <div className={`match-result-indicator ${m.result}`}>
-                    {m.result === 'win' ? 'W' : m.result === 'loss' ? 'L' : 'D'}
-                  </div>
-                  <div className="match-info">
-                    <div className="match-deck-name">{m.myDeck || 'Unknown Deck'}</div>
-                    <div className="match-meta-row">vs {m.oppDeck || m.oppType || 'Unknown'} · <span style={{ color: 'var(--accent-teal)', fontWeight: 600 }}>{m.format}</span></div>
-                  </div>
-                  <div className="match-item-right">
-                    <div className="match-item-date">{formatDate(m.date)}</div>
-                  </div>
-                </div>
-              ))}
-              {matches.length > 5 && (
-                <div style={{ textAlign: 'center', padding: '10px 0 0', fontSize: '.75rem', color: 'var(--text-muted)' }}>
-                  {matches.length - 5} more · see Match Log
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      {/* ── MTG News ── */}
+      <NewsWidget setPage={setPage} />
 
       {/* ── Matchup Summary ── */}
       {Object.keys(matchupSummary).length > 0 && (
