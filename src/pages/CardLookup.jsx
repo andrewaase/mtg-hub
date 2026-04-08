@@ -29,7 +29,7 @@ function SortChip({ label, active, onClick }) {
 
 function SetIcon({ uri, size = 22 }) {
   if (!uri) return <div style={{ width: size, height: size, background: '#1a1a1a', borderRadius: '4px', flexShrink: 0 }} />
-  return <img src={uri} alt="" style={{ width: size, height: size, filter: 'brightness(0.7)', flexShrink: 0 }} />
+  return <img src={uri} alt="" style={{ width: size, height: size, filter: 'invert(1) opacity(0.6)', flexShrink: 0 }} />
 }
 
 // ── Wishlist helper ────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </button>
         <div style={{ flex: 1, fontWeight: 700, color: WHITE, fontSize: '.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
         {setIconUrl && (
-          <img src={setIconUrl} alt="" style={{ width: '22px', height: '22px', filter: 'brightness(0.65)', flexShrink: 0 }}
+          <img src={setIconUrl} alt="" style={{ width: '22px', height: '22px', filter: 'invert(1) opacity(0.55)', flexShrink: 0 }}
             onError={e => { e.target.style.display = 'none' }} />
         )}
       </div>
@@ -91,7 +91,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '.72rem', color: MUTED }}>
               ·
               {setIconUrl && (
-                <img src={setIconUrl} alt="" style={{ width: '13px', height: '13px', filter: 'brightness(0.55)', verticalAlign: 'middle' }}
+                <img src={setIconUrl} alt="" style={{ width: '13px', height: '13px', filter: 'invert(1) opacity(0.45)', verticalAlign: 'middle' }}
                   onError={e => { e.target.style.display = 'none' }} />
               )}
               {card.set.toUpperCase()} #{card.collector_number}
@@ -151,7 +151,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', marginTop: '3px' }}>
                   {p.set && (
-                    <img src={`https://svgs.scryfall.io/sets/${p.set}.svg`} alt="" style={{ width: '10px', height: '10px', filter: 'brightness(0.5)' }}
+                    <img src={`https://svgs.scryfall.io/sets/${p.set}.svg`} alt="" style={{ width: '10px', height: '10px', filter: 'invert(1) opacity(0.4)' }}
                       onError={e => { e.target.style.display = 'none' }} />
                   )}
                   <span style={{ fontSize: '.55rem', color: '#444' }}>{p.set?.toUpperCase()}</span>
