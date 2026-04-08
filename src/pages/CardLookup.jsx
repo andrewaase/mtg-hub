@@ -32,10 +32,34 @@ function SetIcon({ uri, size = 22 }) {
   return <img src={uri} alt="" style={{ width: size, height: size, filter: 'brightness(0.7)', flexShrink: 0 }} />
 }
 
+// ── Wishlist helper ────────────────────────────────────────────────────────────
+const LS_KEY = 'mtg-hub-v1'
+function addCardToWishlist(card, showToast) {
+  try {
+    const data  = JSON.parse(localStorage.getItem(LS_KEY) || '{}')
+    const list  = data.wishlist || []
+    if (list.find(i => i.name === card.name)) {
+      showToast(`${card.name} is already on your wishlist`)
+      return
+    }
+    list.push({
+      id: Date.now(),
+      name: card.name,
+      currentPrice: parseFloat(card.prices?.usd) || null,
+      targetPrice: null,
+      addedAt: new Date().toISOString(),
+      img: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
+    })
+    localStorage.setItem(LS_KEY, JSON.stringify({ ...data, wishlist: list }))
+    showToast(`🎯 ${card.name} added to wishlist!`)
+  } catch { showToast('Could not save to wishlist') }
+}
+
 // ── Card Detail View ───────────────────────────────────────────────────────────
-function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard }) {
-  const rc = RARITY_COLOR[card.rarity] || MUTED
+function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard, showToast }) {
+  const rc  = RARITY_COLOR[card.rarity] || MUTED
   const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal
+  const setIconUrl = card.set ? `https://svgs.scryfall.io/sets/${card.set}.svg` : null
 
   return (
     <div style={{ background: BG, minHeight: '100vh' }}>
@@ -45,8 +69,8 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
           ‹ Back
         </button>
         <div style={{ flex: 1, fontWeight: 700, color: WHITE, fontSize: '.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
-        {card.set_uri && (
-          <img src={`https://svgs.scryfall.io/sets/${card.set}.svg`} alt="" style={{ width: '22px', height: '22px', filter: 'brightness(0.6)', flexShrink: 0 }}
+        {setIconUrl && (
+          <img src={setIconUrl} alt="" style={{ width: '22px', height: '22px', filter: 'brightness(0.65)', flexShrink: 0 }}
             onError={e => { e.target.style.display = 'none' }} />
         )}
       </div>
@@ -58,12 +82,21 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </div>
       )}
 
-      {/* Core info */}
+      {/* Core info — set symbol inline with set name */}
       <div style={{ padding: '0 16px 8px' }}>
-        <div style={{ fontSize: '.8rem', color: '#888', marginBottom: '3px' }}>{card.type_line}</div>
-        <div style={{ fontSize: '.72rem', color: rc }}>
-          {RARITY_LABEL[card.rarity] || card.rarity}
-          {card.set && <span style={{ color: MUTED }}> · {card.set.toUpperCase()} #{card.collector_number}</span>}
+        <div style={{ fontSize: '.8rem', color: '#888', marginBottom: '5px' }}>{card.type_line}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '.72rem', color: rc }}>{RARITY_LABEL[card.rarity] || card.rarity}</span>
+          {card.set && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '.72rem', color: MUTED }}>
+              ·
+              {setIconUrl && (
+                <img src={setIconUrl} alt="" style={{ width: '13px', height: '13px', filter: 'brightness(0.55)', verticalAlign: 'middle' }}
+                  onError={e => { e.target.style.display = 'none' }} />
+              )}
+              {card.set.toUpperCase()} #{card.collector_number}
+            </span>
+          )}
         </div>
       </div>
 
@@ -86,14 +119,20 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </div>
       )}
 
-      {/* Add to collection */}
-      <div style={{ padding: '0 16px 20px' }}>
+      {/* Action buttons */}
+      <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <button onClick={() => openAddCard(card)} style={{
           width: '100%', padding: '13px', background: 'var(--accent-gold)', color: '#000',
           border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer',
           letterSpacing: '.3px',
         }}>
           + Add to Collection
+        </button>
+        <button onClick={() => addCardToWishlist(card, showToast)} style={{
+          width: '100%', padding: '13px', background: 'transparent', color: '#aaa',
+          border: `1px solid #2a2a2a`, borderRadius: '12px', fontWeight: 700, fontSize: '.9rem', cursor: 'pointer',
+        }}>
+          🎯 Add to Wishlist
         </button>
       </div>
 
@@ -104,13 +143,19 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
           <div style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: MUTED, marginBottom: '10px' }}>
             All Printings ({printings.length})
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
             {printings.slice(0, 16).map((p, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
                 {(p.image_uris?.small || p.card_faces?.[0]?.image_uris?.small) && (
                   <img src={p.image_uris?.small || p.card_faces?.[0]?.image_uris?.small} alt="" style={{ width: '100%', borderRadius: '4px' }} />
                 )}
-                <div style={{ fontSize: '.55rem', color: '#444', marginTop: '2px' }}>{p.set?.toUpperCase()}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', marginTop: '3px' }}>
+                  {p.set && (
+                    <img src={`https://svgs.scryfall.io/sets/${p.set}.svg`} alt="" style={{ width: '10px', height: '10px', filter: 'brightness(0.5)' }}
+                      onError={e => { e.target.style.display = 'none' }} />
+                  )}
+                  <span style={{ fontSize: '.55rem', color: '#444' }}>{p.set?.toUpperCase()}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -399,6 +444,7 @@ export default function CardLookup({ showToast, openAddCard }) {
         printingsLoading={printLoad}
         onBack={() => setView(prevView.current)}
         openAddCard={openAddCard}
+        showToast={showToast}
       />
     )
   }

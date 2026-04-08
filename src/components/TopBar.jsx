@@ -1,15 +1,18 @@
 import { hasSupabase } from '../lib/supabase'
 import logoSvg from '../assets/vaulted_singles_logo.svg'
 
-export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClick }) {
+export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClick, onLogoClick }) {
   return (
     <div id="topbar">
       <div className="topbar-left">
         <button className="btn-icon" onClick={onMenuClick} id="menu-btn" aria-label="Open menu">
           ☰
         </button>
-        {/* Logo + wordmark */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+        {/* Logo + wordmark — tapping goes to dashboard */}
+        <div
+          onClick={onLogoClick}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none', cursor: 'pointer' }}
+        >
           <img
             src={logoSvg}
             alt="Vaulted Singles"

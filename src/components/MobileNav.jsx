@@ -9,7 +9,7 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
   ]
 
   const rightItems = [
-    { id: 'stats', icon: '📊', label: 'Stats' },
+    { id: 'cards', icon: '🔍', label: 'Lookup' },
     { id: 'decks', icon: '🃏', label: 'Decks' },
   ]
 
