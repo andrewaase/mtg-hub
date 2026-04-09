@@ -166,9 +166,23 @@ function TournamentWidget({ collection }) {
   useEffect(() => {
     setLoading(true)
     setError(false)
-    fetch(`/.netlify/functions/tournament-meta?format=${format}`)
+    setCards([])
+    // Fetch top-priced nonfoil cards in the format directly from Scryfall.
+    // High price is a reliable proxy for tournament demand — staples are expensive
+    // because players need multiple copies for competitive decks.
+    fetch(
+      `https://api.scryfall.com/cards/search?q=f:${format}+is:nonfoil+lang:en+usd>1&order=usd&dir=desc&unique=cards`
+    )
       .then(r => { if (!r.ok) throw new Error('failed'); return r.json() })
-      .then(data => { setCards(data.cards || []); setLoading(false) })
+      .then(data => {
+        const items = (data.data || []).slice(0, 15).map(c => ({
+          name:  c.name,
+          price: parseFloat(c.prices?.usd) || null,
+          rarity: c.rarity,
+        }))
+        setCards(items)
+        setLoading(false)
+      })
       .catch(() => { setError(true); setLoading(false) })
   }, [format])
 
@@ -181,7 +195,7 @@ function TournamentWidget({ collection }) {
   return (
     <div style={{ margin: '12px 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px' }}>
-        <div className="section-title" style={{ padding: 0 }}>Tournament Demand</div>
+        <div className="section-title" style={{ padding: 0 }}>Format Staples</div>
       </div>
 
       {/* Format chips */}
@@ -242,22 +256,19 @@ function TournamentWidget({ collection }) {
                     </span>
                   )}
                   {card.price != null && (
-                    <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    <span style={{
+                      background: 'rgba(245,158,11,.12)', color: '#f59e0b',
+                      borderRadius: '4px', padding: '2px 7px',
+                      fontSize: '.7rem', fontWeight: 800, flexShrink: 0,
+                    }}>
                       ${card.price.toFixed(2)}
                     </span>
                   )}
-                  <span style={{
-                    background: 'rgba(245,158,11,.15)', color: '#f59e0b',
-                    borderRadius: '4px', padding: '2px 7px',
-                    fontSize: '.68rem', fontWeight: 800, flexShrink: 0,
-                  }}>
-                    {card.pct}%
-                  </span>
                 </div>
               )
             })}
             <div style={{ padding: '8px 12px', fontSize: '.62rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-              Data via MTGGoldfish · {format} metagame
+              Prices via Scryfall · Top-valued {format} singles
             </div>
           </>
         )}
