@@ -1,7 +1,7 @@
 import { useId, useState, useEffect } from 'react'
 import logoSvg from '../assets/vaulted_singles_logo.svg'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
-import { getSnapshots, getGainersLosers } from '../lib/priceHistory'
+import { getSnapshots, getGainersLosers, getVelocity } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 
 function fmt(n) {
@@ -149,6 +149,123 @@ function NewsWidget({ setPage }) {
   )
 }
 
+// ── Tournament Widget ─────────────────────────────────────────────────────────
+function TournamentWidget({ collection }) {
+  const [format,  setFormat]  = useState('standard')
+  const [cards,   setCards]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(false)
+
+  const formats = [
+    { id: 'standard', label: 'Standard' },
+    { id: 'modern',   label: 'Modern'   },
+    { id: 'pioneer',  label: 'Pioneer'  },
+    { id: 'legacy',   label: 'Legacy'   },
+  ]
+
+  useEffect(() => {
+    setLoading(true)
+    setError(false)
+    fetch(`/.netlify/functions/tournament-meta?format=${format}`)
+      .then(r => { if (!r.ok) throw new Error('failed'); return r.json() })
+      .then(data => { setCards(data.cards || []); setLoading(false) })
+      .catch(() => { setError(true); setLoading(false) })
+  }, [format])
+
+  const ownedNames = new Set(
+    (collection || []).map(c => (c.name || '').toLowerCase().trim())
+  )
+
+  const top10 = cards.slice(0, 10)
+
+  return (
+    <div style={{ margin: '12px 16px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px' }}>
+        <div className="section-title" style={{ padding: 0 }}>Tournament Demand</div>
+      </div>
+
+      {/* Format chips */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        {formats.map(f => (
+          <button
+            key={f.id}
+            onClick={() => setFormat(f.id)}
+            style={{
+              padding: '3px 12px', borderRadius: '99px', fontSize: '.68rem',
+              fontWeight: 600, cursor: 'pointer', border: '1px solid',
+              background: format === f.id ? 'var(--accent-gold)' : 'transparent',
+              color: format === f.id ? '#1a1000' : 'var(--text-muted)',
+              borderColor: format === f.id ? 'var(--accent-gold)' : 'var(--border)',
+              transition: 'all .15s',
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.8rem' }}>Loading…</div>
+        ) : error || top10.length === 0 ? (
+          <div style={{ padding: '20px 16px', color: 'var(--text-muted)', fontSize: '.8rem', textAlign: 'center' }}>
+            Could not load tournament data
+          </div>
+        ) : (
+          <>
+            {top10.map((card, i) => {
+              const owned = ownedNames.has((card.name || '').toLowerCase().trim())
+              return (
+                <div
+                  key={card.name}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '8px 12px',
+                    borderBottom: i < top10.length - 1 ? '1px solid var(--border)' : 'none',
+                    borderLeft: owned ? '3px solid var(--accent-gold)' : '3px solid transparent',
+                    background: owned ? 'rgba(201,168,76,.04)' : 'transparent',
+                  }}
+                >
+                  <span style={{ fontSize: '.68rem', color: 'var(--text-muted)', width: '16px', textAlign: 'right', flexShrink: 0 }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ flex: 1, fontSize: '.8rem', fontWeight: owned ? 700 : 400, color: 'var(--text-primary)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {card.name}
+                  </span>
+                  {owned && (
+                    <span style={{
+                      background: 'rgba(201,168,76,.18)', color: 'var(--accent-gold)',
+                      borderRadius: '4px', padding: '1px 6px',
+                      fontSize: '.6rem', fontWeight: 800, flexShrink: 0,
+                    }}>
+                      ✓ Owned
+                    </span>
+                  )}
+                  {card.price != null && (
+                    <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                      ${card.price.toFixed(2)}
+                    </span>
+                  )}
+                  <span style={{
+                    background: 'rgba(245,158,11,.15)', color: '#f59e0b',
+                    borderRadius: '4px', padding: '2px 7px',
+                    fontSize: '.68rem', fontWeight: 800, flexShrink: 0,
+                  }}>
+                    {card.pct}%
+                  </span>
+                </div>
+              )
+            })}
+            <div style={{ padding: '8px 12px', fontSize: '.62rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+              Data via MTGGoldfish · {format} metagame
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Dashboard({ matches, collection, openLogMatch, setPage }) {
   const winRate = calculateWinRate(matches)
@@ -185,6 +302,8 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
 
   const { gainers, losers } = getGainersLosers(collection)
   const hasMovers = gainers.length > 0 || losers.length > 0
+
+  const { gainers: vGainers, losers: vLosers } = getVelocity(collection)
 
   const matchupSummary = {}
   matches.forEach(m => {
@@ -281,28 +400,38 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
         </div>
       )}
 
-      {/* ── Price Movers ── */}
-      {hasMovers && (
+      {/* ── 7-Day Movers ── */}
+      {(vGainers.length > 0 || vLosers.length > 0) ? (
         <div style={{ margin: '12px 16px 0' }}>
-          <div className="section-title" style={{ padding: '0 0 8px' }}>Price Movers</div>
+          <div className="section-title" style={{ padding: '0 0 8px' }}>7-Day Movers</div>
           <div className="grid-2">
             <div className="card" style={{ padding: '12px 14px' }}>
               <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-green)', marginBottom: '10px' }}>▲ Gainers</div>
-              {gainers.length === 0
+              {vGainers.length === 0
                 ? <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>None tracked yet</div>
-                : gainers.map(g => <MoverRow key={g.name} item={g} type="gain" />)
+                : vGainers.map(g => <VelocityRow key={g.name} item={g} type="gain" />)
               }
             </div>
             <div className="card" style={{ padding: '12px 14px' }}>
               <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)', marginBottom: '10px' }}>▼ Losers</div>
-              {losers.length === 0
+              {vLosers.length === 0
                 ? <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>None tracked yet</div>
-                : losers.map(l => <MoverRow key={l.name} item={l} type="loss" />)
+                : vLosers.map(l => <VelocityRow key={l.name} item={l} type="loss" />)
               }
             </div>
           </div>
         </div>
+      ) : collection.length > 0 && (
+        <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px' }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>📈</span>
+            <span>Price tracking starts after your first daily snapshot.</span>
+          </div>
+        </div>
       )}
+
+      {/* ── Tournament Demand ── */}
+      <TournamentWidget collection={collection} />
 
       {/* ── Win Rate Strip ── */}
       {matches.length > 0 && (
@@ -368,6 +497,38 @@ function MoverRow({ item, type }) {
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         <div style={{ fontSize: '.82rem', fontWeight: 800, color }}>{isGain ? '+' : ''}{item.pctChange}%</div>
         <div style={{ fontSize: '.62rem', color, opacity: .8 }}>{item.dollarChange > 0 ? '+' : ''}${Math.abs(item.dollarChange).toFixed(2)}</div>
+      </div>
+    </div>
+  )
+}
+
+function VelocityRow({ item, type }) {
+  const isGain = type === 'gain'
+  const color  = isGain ? 'var(--accent-green)' : 'var(--accent-red)'
+  const oldPrice = Math.round((item.currentPrice - item.dollar7d / item.qty) * 100) / 100
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }} className="mover-row-last-no-border">
+      {item.img
+        ? <img src={item.img} alt={item.name} style={{ width: '28px', borderRadius: '3px', flexShrink: 0 }} />
+        : <div style={{ width: '28px', height: '40px', background: 'var(--bg-hover)', borderRadius: '3px', flexShrink: 0 }} />
+      }
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
+        <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+          ${oldPrice.toFixed(2)} → ${item.currentPrice.toFixed(2)}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{
+          fontSize: '.82rem', fontWeight: 800, color,
+          background: isGain ? 'rgba(74,222,128,.1)' : 'rgba(248,113,113,.1)',
+          borderRadius: '5px', padding: '1px 6px',
+        }}>
+          {isGain ? '+' : ''}{item.pct7d}%
+        </div>
+        <div style={{ fontSize: '.62rem', color, opacity: .8, marginTop: '2px' }}>
+          {item.dollar7d > 0 ? '+' : ''}${Math.abs(item.dollar7d).toFixed(2)}
+        </div>
       </div>
     </div>
   )
