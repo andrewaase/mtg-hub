@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { removeCard, exportData } from '../lib/db'
 import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
 import SetTracker from '../components/SetTracker'
+import { getCKPriceMap, getCKBuyPrice, getSellSignal } from '../lib/cardkingdom'
 
 const COLOR_OPTIONS = [
   { id: 'W', label: '☀️ White' },
@@ -60,6 +61,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [refreshing,   setRefreshing]   = useState(false)
   const [refreshProg,  setRefreshProg]  = useState(null)
   const [tradeSelect,  setTradeSelect]  = useState(new Set())
+  const [ckMap,        setCkMap]        = useState({})
 
   // ── Filter state ──
   const [filterColors,    setFilterColors]    = useState([])
@@ -68,6 +70,11 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [filterFoil,      setFilterFoil]      = useState(null)   // 'foil' | 'nonfoil' | null
   const [filterMinPrice,  setFilterMinPrice]  = useState('')
   const [filterMaxPrice,  setFilterMaxPrice]  = useState('')
+
+  // Load CK prices in background on mount
+  useEffect(() => {
+    getCKPriceMap().then(setCkMap).catch(() => {})
+  }, [])
 
   const ebayConnected = isEbayConnected()
 
@@ -497,47 +504,126 @@ export default function Collection({ collection, setCollection, user, openAddCar
       )}
 
       {/* ── All Cards grid ── */}
-      {view === 'all' && filtered.length > 0 && (
-        <div className="collection-grid" style={{ marginTop: '8px' }}>
-          {filtered.map(card => (
-            <div key={card.id} className={`col-card ${card.forSale ? 'for-sale' : ''}`}>
-              {card.img && <img src={card.img} alt={card.name} />}
-              <div className="col-card-info">
-                <div className="col-card-name">{card.name}</div>
-                <div className="col-card-set">{card.setName}</div>
-                {card.price != null && (
-                  <div style={{ fontSize: '.66rem', color: 'var(--accent-gold)', fontWeight: 700, marginTop: '2px' }}>
-                    ${parseFloat(card.price).toFixed(2)}
-                  </div>
-                )}
-                {card.condition && (
-                  <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                    {card.condition}{card.isFoil ? ' · ✦ Foil' : ''}
-                  </div>
-                )}
-              </div>
-              <span className="col-card-qty">×{card.qty}</span>
+      {view === 'all' && filtered.length > 0 && (() => {
+        // Compute sell signal summary
+        const ckHasData = Object.keys(ckMap).length > 0
+        let strongCount = 0
+        let goodCount   = 0
+        let totalCKCash = 0
+        if (ckHasData) {
+          filtered.forEach(card => {
+            const market = parseFloat(card.price) || 0
+            if (market < 1) return
+            const ckBuy = getCKBuyPrice(ckMap, card.name, card.isFoil)
+            const signal = getSellSignal(ckBuy, market)
+            if (!signal) return
+            if (signal === 'strong') strongCount++
+            else goodCount++
+            totalCKCash += ckBuy * (card.qty || 1)
+          })
+        }
+        const hasSignals = strongCount > 0 || goodCount > 0
 
-              <button
-                className="col-card-tag-btn"
-                title={card.forSale ? 'Remove from sell list' : 'Mark for sale'}
-                onClick={() => updateCard(card.id, { forSale: !card.forSale })}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '.9rem', padding: '2px 4px', lineHeight: 1,
-                  color: card.forSale ? 'var(--accent-gold)' : 'var(--text-muted)',
-                  opacity: card.forSale ? 1 : 0.4,
-                  transition: 'opacity .2s, color .2s',
-                  position: 'absolute', top: '6px', left: '6px',
-                }}
-              >
-                🏷️
-              </button>
-              <button className="col-card-remove" onClick={() => handleRemove(card.id)}>✕</button>
+        return (
+          <>
+            {/* Sell Signals summary bar */}
+            {ckHasData && hasSignals && (
+              <div style={{
+                margin: '8px 0 4px',
+                background: 'rgba(202,138,4,.12)',
+                border: '1px solid rgba(202,138,4,.35)',
+                borderRadius: '10px',
+                padding: '8px 14px',
+                display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+                fontSize: '.75rem', color: 'var(--accent-gold)',
+              }}>
+                <span style={{ fontWeight: 800 }}>💰 Sell Signals</span>
+                {strongCount > 0 && (
+                  <span style={{
+                    background: '#16a34a', color: '#fff',
+                    borderRadius: '4px', padding: '1px 7px',
+                    fontSize: '.68rem', fontWeight: 800,
+                  }}>
+                    🔥 {strongCount} Strong
+                  </span>
+                )}
+                {goodCount > 0 && (
+                  <span style={{
+                    background: '#ca8a04', color: '#fff',
+                    borderRadius: '4px', padding: '1px 7px',
+                    fontSize: '.68rem', fontWeight: 800,
+                  }}>
+                    💰 {goodCount} Good
+                  </span>
+                )}
+                <span style={{ marginLeft: 'auto', color: 'var(--accent-gold)', fontWeight: 700 }}>
+                  CK cash: ${totalCKCash.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            <div className="collection-grid" style={{ marginTop: '8px' }}>
+              {filtered.map(card => (
+                <div key={card.id} className={`col-card ${card.forSale ? 'for-sale' : ''}`}>
+                  {card.img && <img src={card.img} alt={card.name} />}
+                  <div className="col-card-info">
+                    <div className="col-card-name">{card.name}</div>
+                    <div className="col-card-set">{card.setName}</div>
+                    {card.price != null && (
+                      <div style={{ fontSize: '.66rem', color: 'var(--accent-gold)', fontWeight: 700, marginTop: '2px' }}>
+                        ${parseFloat(card.price).toFixed(2)}
+                      </div>
+                    )}
+                    {card.condition && (
+                      <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {card.condition}{card.isFoil ? ' · ✦ Foil' : ''}
+                      </div>
+                    )}
+                  </div>
+                  <span className="col-card-qty">×{card.qty}</span>
+
+                  <button
+                    className="col-card-tag-btn"
+                    title={card.forSale ? 'Remove from sell list' : 'Mark for sale'}
+                    onClick={() => updateCard(card.id, { forSale: !card.forSale })}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: '.9rem', padding: '2px 4px', lineHeight: 1,
+                      color: card.forSale ? 'var(--accent-gold)' : 'var(--text-muted)',
+                      opacity: card.forSale ? 1 : 0.4,
+                      transition: 'opacity .2s, color .2s',
+                      position: 'absolute', top: '6px', left: '6px',
+                    }}
+                  >
+                    🏷️
+                  </button>
+                  <button className="col-card-remove" onClick={() => handleRemove(card.id)}>✕</button>
+
+                  {(() => {
+                    const market = parseFloat(card.price) || 0
+                    if (market < 1) return null
+                    const ckBuy = getCKBuyPrice(ckMap, card.name, card.isFoil)
+                    const signal = getSellSignal(ckBuy, market)
+                    if (!signal) return null
+                    return (
+                      <div style={{
+                        position: 'absolute', bottom: '6px', left: '6px',
+                        background: signal === 'strong' ? '#16a34a' : '#ca8a04',
+                        color: '#fff', borderRadius: '4px',
+                        fontSize: '.55rem', fontWeight: 800,
+                        padding: '2px 5px', letterSpacing: '.3px',
+                        textTransform: 'uppercase',
+                      }}>
+                        {signal === 'strong' ? '🔥 Sell' : '💰 Sell?'}
+                      </div>
+                    )
+                  })()}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </>
+        )
+      })()}
 
       {/* ── Sell List ── */}
       {view === 'sell' && filtered.length > 0 && (

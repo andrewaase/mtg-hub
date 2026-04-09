@@ -106,3 +106,48 @@ export function getCardPriceHistory(cardName, collectorNum = '') {
   const key = `${cardName}__${collectorNum}`
   return (load().cardPrices || {})[key] || []
 }
+
+// Returns top movers sorted by % change over last 7 days (or all available history).
+// Each item: { name, img, qty, pct7d, dollar7d, daysTracked, currentPrice }
+export function getVelocity(collection) {
+  if (!collection || collection.length === 0) return { gainers: [], losers: [] }
+  const cardPrices = load().cardPrices || {}
+  const results = []
+
+  collection.forEach(c => {
+    const key  = `${c.name}__${c.collectorNum || ''}`
+    const hist = cardPrices[key]
+    if (!hist || hist.length < 2) return
+
+    const currentPrice = parseFloat(c.price) || 0
+    if (currentPrice <= 0) return
+
+    // Find a price ~7 days ago (or earliest available)
+    const target = new Date()
+    target.setDate(target.getDate() - 7)
+    const targetStr = target.toISOString().slice(0, 10)
+    const oldEntry = hist.find(h => h.date <= targetStr) || hist[0]
+    if (!oldEntry || oldEntry.price <= 0) return
+
+    const pct = ((currentPrice - oldEntry.price) / oldEntry.price) * 100
+    if (Math.abs(pct) < 2) return // ignore tiny moves
+
+    const dollar7d = (currentPrice - oldEntry.price) * (c.qty || 1)
+
+    results.push({
+      name:         c.name,
+      img:          c.img,
+      qty:          c.qty || 1,
+      pct7d:        Math.round(pct * 10) / 10,
+      dollar7d:     Math.round(dollar7d * 100) / 100,
+      currentPrice: Math.round(currentPrice * 100) / 100,
+      daysTracked:  hist.length,
+    })
+  })
+
+  results.sort((a, b) => Math.abs(b.dollar7d) - Math.abs(a.dollar7d))
+  return {
+    gainers: results.filter(r => r.pct7d > 0).slice(0, 5),
+    losers:  results.filter(r => r.pct7d < 0).slice(0, 5),
+  }
+}
