@@ -150,7 +150,7 @@ function NewsWidget({ setPage }) {
 }
 
 // ── Tournament Widget ─────────────────────────────────────────────────────────
-function TournamentWidget({ collection }) {
+function TournamentWidget({ collection, setPage }) {
   const [format,  setFormat]  = useState('standard')
   const [cards,   setCards]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -192,6 +192,11 @@ function TournamentWidget({ collection }) {
 
   const top10 = cards.slice(0, 10)
 
+  const handleCardClick = (cardName) => {
+    window.__lookupCardName = cardName
+    setPage?.('cards')
+  }
+
   return (
     <div style={{ margin: '12px 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px' }}>
@@ -232,13 +237,18 @@ function TournamentWidget({ collection }) {
               return (
                 <div
                   key={card.name}
+                  onClick={() => handleCardClick(card.name)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '8px 12px',
                     borderBottom: i < top10.length - 1 ? '1px solid var(--border)' : 'none',
                     borderLeft: owned ? '3px solid var(--accent-gold)' : '3px solid transparent',
                     background: owned ? 'rgba(201,168,76,.04)' : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'background .12s',
                   }}
+                  onMouseEnter={e => e.currentTarget.style.background = owned ? 'rgba(201,168,76,.09)' : 'var(--bg-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = owned ? 'rgba(201,168,76,.04)' : 'transparent'}
                 >
                   <span style={{ fontSize: '.68rem', color: 'var(--text-muted)', width: '16px', textAlign: 'right', flexShrink: 0 }}>
                     {i + 1}
@@ -264,11 +274,12 @@ function TournamentWidget({ collection }) {
                       ${card.price.toFixed(2)}
                     </span>
                   )}
+                  <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>›</span>
                 </div>
               )
             })}
             <div style={{ padding: '8px 12px', fontSize: '.62rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-              Prices via Scryfall · Top-valued {format} singles
+              Prices via Scryfall · Tap a card to look it up
             </div>
           </>
         )}
@@ -442,7 +453,7 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
       )}
 
       {/* ── Tournament Demand ── */}
-      <TournamentWidget collection={collection} />
+      <TournamentWidget collection={collection} setPage={setPage} />
 
       {/* ── Win Rate Strip ── */}
       {matches.length > 0 && (
