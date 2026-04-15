@@ -167,11 +167,11 @@ function TournamentWidget({ collection, setPage }) {
     setLoading(true)
     setError(false)
     setCards([])
-    // Fetch top-priced nonfoil cards in the format directly from Scryfall.
-    // High price is a reliable proxy for tournament demand — staples are expensive
-    // because players need multiple copies for competitive decks.
+    // Fetch top-priced nonfoil BASE-version cards in the format from Scryfall.
+    // Exclude showcase, extended-art, borderless, and promo frames so that
+    // only the regular printing price is returned (avoids alt-art inflation).
     fetch(
-      `https://api.scryfall.com/cards/search?q=f:${format}+is:nonfoil+lang:en+usd>1&order=usd&dir=desc&unique=cards`
+      `https://api.scryfall.com/cards/search?q=f:${format}+is:nonfoil+lang:en+-frame:showcase+-frame:extendedart+-border:borderless+-is:promo+usd>0.5&order=usd&dir=desc&unique=cards`
     )
       .then(r => { if (!r.ok) throw new Error('failed'); return r.json() })
       .then(data => {
@@ -279,7 +279,7 @@ function TournamentWidget({ collection, setPage }) {
               )
             })}
             <div style={{ padding: '8px 12px', fontSize: '.62rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-              Prices via Scryfall · Tap a card to look it up
+              Base print · Non-foil · Tap a card to look it up
             </div>
           </>
         )}
