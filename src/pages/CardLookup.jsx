@@ -491,12 +491,16 @@ export default function CardLookup({ showToast, openAddCard }) {
   const [printLoad, setPrintLoad]  = useState(false)
   const prevView = useRef('home')
 
-  // Random card from Dashboard
+  // Incoming card from Dashboard (random card or format staple tap)
   useEffect(() => {
     if (window.__randomCard) {
       const card = window.__randomCard
       window.__randomCard = null
       openCardDetail(card)
+    } else if (window.__lookupCardName) {
+      const name = window.__lookupCardName
+      window.__lookupCardName = null
+      openCardDetail(name) // openCardDetail already handles plain string names
     }
   }, []) // eslint-disable-line
 
