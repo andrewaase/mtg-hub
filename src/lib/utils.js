@@ -81,7 +81,12 @@ export async function getCardDetails(cardName) {
 
 export async function getAllPrintings(cardName) {
   try {
-    const res = await fetchWithTimeout(`https://api.scryfall.com/cards/search?q=!"${cardName}"&include_extras=false&order=released&dir=desc`)
+    // unique=prints returns every distinct printing including alternate art treatments
+    // (showcase, borderless, extended art, promo, retro frame, etc.)
+    // sorted by price descending so most valuable versions appear first
+    const res = await fetchWithTimeout(
+      `https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(cardName)}"&unique=prints&order=usd&dir=desc`
+    )
     const data = await res.json()
     return data.data || []
   } catch {

@@ -55,11 +55,93 @@ function addCardToWishlist(card, showToast) {
   } catch { showToast('Could not save to wishlist') }
 }
 
+// ── Printing thumbnail card (horizontal scroll) ────────────────────────────────
+function PrintingCard({ printing, isSelected, onSelect }) {
+  const img   = printing.image_uris?.small || printing.card_faces?.[0]?.image_uris?.small
+  const price = printing.prices?.usd
+  const foil  = printing.prices?.usd_foil
+  const hasPrice = price || foil
+
+  // Describe art treatment if it differs from normal frame
+  const frame = printing.frame_effects?.length
+    ? printing.frame_effects[0].replace(/_/g, ' ')
+    : printing.border_color === 'borderless' ? 'borderless'
+    : null
+
+  return (
+    <div
+      onClick={() => onSelect(printing)}
+      style={{
+        flexShrink: 0, width: 108, cursor: 'pointer',
+        borderRadius: '8px', overflow: 'hidden',
+        border: isSelected ? '2px solid var(--accent-gold)' : '2px solid transparent',
+        background: '#111',
+        transition: 'border-color .15s, opacity .15s',
+        opacity: isSelected ? 1 : 0.75,
+      }}
+      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.opacity = '1' }}
+      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.opacity = '0.75' }}
+    >
+      {/* Card image */}
+      {img
+        ? <img src={img} alt="" style={{ width: '100%', display: 'block', borderRadius: '6px 6px 0 0' }} />
+        : <div style={{ width: '100%', aspectRatio: '0.716', background: '#1a1a1a', borderRadius: '6px 6px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🃏</div>
+      }
+
+      {/* Info below image */}
+      <div style={{ padding: '7px 8px 8px' }}>
+        {/* Set row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '4px' }}>
+          <img
+            src={`https://svgs.scryfall.io/sets/${printing.set}.svg`}
+            alt=""
+            style={{ width: '11px', height: '11px', filter: 'invert(1) opacity(0.4)', flexShrink: 0 }}
+            onError={e => { e.target.style.display = 'none' }}
+          />
+          <span style={{ fontSize: '.62rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {printing.set?.toUpperCase()} #{printing.collector_number}
+          </span>
+        </div>
+
+        {/* Art treatment label */}
+        {frame && (
+          <div style={{ fontSize: '.55rem', color: '#3b82f6', textTransform: 'capitalize', marginBottom: '3px', fontWeight: 600 }}>
+            {frame}
+          </div>
+        )}
+
+        {/* Prices */}
+        {hasPrice ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {price && (
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent-gold)' }}>
+                ${price}
+              </div>
+            )}
+            {foil && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ fontSize: '.6rem' }}>✨</span>
+                <span style={{ fontSize: '.72rem', fontWeight: 600, color: '#7dd3fc' }}>${foil}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ fontSize: '.72rem', color: '#2a2a2a' }}>—</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Card Detail View ───────────────────────────────────────────────────────────
-function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard, showToast }) {
+function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard, showToast, onPrintingSelect }) {
   const rc  = RARITY_COLOR[card.rarity] || MUTED
   const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal
   const setIconUrl = card.set ? `https://svgs.scryfall.io/sets/${card.set}.svg` : null
+
+  // Alternate arts = all printings except the current one
+  const altPrintings = printings.filter(p => p.id !== card.id)
+  const showPrintings = !printingsLoading && printings.length > 1
 
   return (
     <div style={{ background: BG, minHeight: '100vh' }}>
@@ -82,7 +164,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </div>
       )}
 
-      {/* Core info — set symbol inline with set name */}
+      {/* Core info */}
       <div style={{ padding: '0 16px 8px' }}>
         <div style={{ fontSize: '.8rem', color: '#888', marginBottom: '5px' }}>{card.type_line}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -136,28 +218,51 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </button>
       </div>
 
-      {/* All Printings */}
-      {printingsLoading && <div style={{ padding: '20px', textAlign: 'center', color: MUTED, fontSize: '.8rem' }}>Loading printings…</div>}
-      {!printingsLoading && printings.length > 1 && (
-        <div style={{ padding: '0 16px 24px' }}>
-          <div style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: MUTED, marginBottom: '10px' }}>
-            All Printings ({printings.length})
+      {/* ── Other Printings / Alternate Arts ── */}
+      {printingsLoading && (
+        <div style={{ padding: '16px', textAlign: 'center', color: MUTED, fontSize: '.75rem' }}>
+          Loading alternate printings…
+        </div>
+      )}
+
+      {showPrintings && (
+        <div style={{ paddingBottom: '32px' }}>
+          {/* Section header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px 12px' }}>
+            <div style={{ flex: 1, height: '1px', background: DIVID }} />
+            <div style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#333', flexShrink: 0 }}>
+              {printings.length} printing{printings.length !== 1 ? 's' : ''} · tap to switch
+            </div>
+            <div style={{ flex: 1, height: '1px', background: DIVID }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-            {printings.slice(0, 16).map((p, i) => (
-              <div key={i} style={{ textAlign: 'center' }}>
-                {(p.image_uris?.small || p.card_faces?.[0]?.image_uris?.small) && (
-                  <img src={p.image_uris?.small || p.card_faces?.[0]?.image_uris?.small} alt="" style={{ width: '100%', borderRadius: '4px' }} />
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', marginTop: '3px' }}>
-                  {p.set && (
-                    <img src={`https://svgs.scryfall.io/sets/${p.set}.svg`} alt="" style={{ width: '10px', height: '10px', filter: 'invert(1) opacity(0.4)' }}
-                      onError={e => { e.target.style.display = 'none' }} />
-                  )}
-                  <span style={{ fontSize: '.55rem', color: '#444' }}>{p.set?.toUpperCase()}</span>
-                </div>
-              </div>
+
+          {/* Horizontal scroll row */}
+          <div style={{
+            display: 'flex', gap: '10px', overflowX: 'auto',
+            padding: '0 16px 4px',
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch',
+          }}>
+            {printings.map(p => (
+              <PrintingCard
+                key={p.id}
+                printing={p}
+                isSelected={p.id === card.id}
+                onSelect={onPrintingSelect}
+              />
             ))}
+          </div>
+
+          {/* Scryfall link */}
+          <div style={{ padding: '12px 16px 0', textAlign: 'right' }}>
+            <a
+              href={card.scryfall_uri || `https://scryfall.com/card/${card.set}/${card.collector_number}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: '.7rem', color: '#333', textDecoration: 'none' }}
+            >
+              View on Scryfall ↗
+            </a>
           </div>
         </div>
       )}
@@ -429,6 +534,11 @@ export default function CardLookup({ showToast, openAddCard }) {
       .catch(() => setPrintLoad(false))
   }
 
+  // Switch to a different printing of the same card without re-fetching the printings list
+  const switchPrinting = (printing) => {
+    setCardDetail(printing)
+  }
+
   const openSet = (set) => {
     setSelSet(set)
     prevView.current = 'home'
@@ -445,6 +555,7 @@ export default function CardLookup({ showToast, openAddCard }) {
         onBack={() => setView(prevView.current)}
         openAddCard={openAddCard}
         showToast={showToast}
+        onPrintingSelect={switchPrinting}
       />
     )
   }
