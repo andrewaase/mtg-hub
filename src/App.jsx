@@ -25,6 +25,19 @@ import Wishlist from './pages/Wishlist'
 
 const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist']
 
+const PAGE_TITLES = {
+  dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
+  log:        'Match Log | Vaulted Singles',
+  stats:      'Stats | Vaulted Singles',
+  news:       'MTG News | Vaulted Singles',
+  cards:      'Card Lookup | Vaulted Singles',
+  collection: 'My Collection | Vaulted Singles',
+  releases:   'Set Releases | Vaulted Singles',
+  friends:    'Friends & Trades | Vaulted Singles',
+  decks:      'My Decks | Vaulted Singles',
+  wishlist:   'Wishlist | Vaulted Singles',
+}
+
 function getInitialPage() {
   const hash = window.location.hash.replace('#', '')
   return VALID_PAGES.includes(hash) ? hash : 'dashboard'
@@ -48,6 +61,7 @@ export default function App() {
   const setPage = useCallback((newPage) => {
     setPageState(newPage)
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
+    document.title = PAGE_TITLES[newPage] || 'Vaulted Singles'
   }, [])
 
   // Lock body scroll when sidebar is open on mobile
