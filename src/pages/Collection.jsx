@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { removeCard, exportData } from '../lib/db'
+import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
 import SetTracker from '../components/SetTracker'
@@ -598,6 +599,22 @@ export default function Collection({ collection, setCollection, user, openAddCar
                     🏷️
                   </button>
                   <button className="col-card-remove" onClick={() => handleRemove(card.id)}>✕</button>
+                  <a
+                    href={getTCGPlayerLink(card.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Buy on TCGPlayer"
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      position: 'absolute', bottom: '6px', right: '6px',
+                      background: 'rgba(74,222,128,.15)', color: '#4ade80',
+                      borderRadius: '4px', padding: '2px 5px',
+                      fontSize: '.6rem', fontWeight: 700, textDecoration: 'none',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    🛒
+                  </a>
 
                   {(() => {
                     const market = parseFloat(card.price) || 0
@@ -664,8 +681,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
 // ── Sell List row ─────────────────────────────────────────────────────────────
 
 function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, onRemoveFromSell, onList }) {
-  const tcgUrl = card.tcgplayerUrl ||
-    `https://www.tcgplayer.com/search/magic/product?q=${encodeURIComponent(card.name)}&view=grid`
+  const tcgUrl = getTCGPlayerLink(card.name)
   const suggested = suggestPrice(parseFloat(card.price) || 0)
 
   return (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { searchScryfall, getCardDetails } from '../lib/utils'
+import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getCardPriceHistory } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 
@@ -360,6 +361,22 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
               />
             </div>
           )}
+
+          {/* Buy link */}
+          <a
+            href={getTCGPlayerLink(item.name)}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block', marginTop: '10px',
+              padding: '6px 14px',
+              background: 'rgba(74,222,128,.10)', color: '#4ade80',
+              border: '1px solid rgba(74,222,128,.25)', borderRadius: '8px',
+              fontSize: '.75rem', fontWeight: 700, textDecoration: 'none',
+            }}
+          >
+            🛒 Buy on TCGPlayer
+          </a>
         </div>
       </div>
     </div>
