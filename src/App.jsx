@@ -19,11 +19,12 @@ import News from './pages/News'
 import CardLookup from './pages/CardLookup'
 import Collection from './pages/Collection'
 import SetReleases from './pages/SetReleases'
+import AdminPanel from './pages/AdminPanel'
 import Friends from './pages/Friends'
 import Decks from './pages/Decks'
 import Wishlist from './pages/Wishlist'
 
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'admin']
 
 const PAGE_TITLES = {
   dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
@@ -36,6 +37,7 @@ const PAGE_TITLES = {
   friends:    'Friends & Trades | Vaulted Singles',
   decks:      'My Decks | Vaulted Singles',
   wishlist:   'Wishlist | Vaulted Singles',
+  admin:      'Control Center | Vaulted Singles',
 }
 
 function getInitialPage() {
@@ -191,6 +193,7 @@ export default function App() {
               {page === 'friends'    && <Friends {...pageProps} />}
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
+              {page === 'admin'     && <AdminPanel user={user} />}
             </>
           )}
         </div>

@@ -1,7 +1,11 @@
 import { hasSupabase } from '../lib/supabase'
 import logoSvg from '../assets/vaulted_singles_logo.svg'
 
+const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
+
 export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen, setSidebarOpen }) {
+  const isAdmin = user?.email === ADMIN_EMAIL
+
   const navItems = [
     { id: 'dashboard', icon: '🏠', label: 'Dashboard', section: 'Main' },
     { id: 'log', icon: '⚔️', label: 'Match Log', section: 'Main' },
@@ -13,12 +17,14 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
     { id: 'wishlist', icon: '🎯', label: 'Wishlist', section: 'Resources' },
     { id: 'releases', icon: '📅', label: 'Set Releases', section: 'Resources' },
     { id: 'friends', icon: '🤝', label: 'Friends & Trades', section: 'Social', requiresSupabase: true },
+    { id: 'admin',   icon: '🎛️', label: 'Control Center',  section: 'Admin',  requiresAdmin: true },
   ]
 
   const sections = {
-    Main: navItems.filter(i => i.section === 'Main'),
+    Main:      navItems.filter(i => i.section === 'Main'),
     Resources: navItems.filter(i => i.section === 'Resources'),
-    Social: navItems.filter(i => i.section === 'Social'),
+    Social:    navItems.filter(i => i.section === 'Social'),
+    Admin:     navItems.filter(i => i.section === 'Admin'),
   }
 
   const handleNavClick = (pageId) => {
@@ -34,9 +40,12 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
         <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '.65rem', color: '#8b5ea4', letterSpacing: '3px', marginTop: '1px' }}>SINGLES</div>
       </div>
 
-      {['Main', 'Resources', 'Social'].map(section => {
+      {['Main', 'Resources', 'Social', 'Admin'].map(section => {
         const items = sections[section]
-        const visibleItems = items.filter(i => !i.requiresSupabase || hasSupabase)
+        const visibleItems = items.filter(i =>
+          (!i.requiresSupabase || hasSupabase) &&
+          (!i.requiresAdmin || isAdmin)
+        )
         if (visibleItems.length === 0) return null
         return (
           <div key={section}>
