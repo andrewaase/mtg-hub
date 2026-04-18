@@ -364,7 +364,7 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
 
           {/* Buy link */}
           <a
-            href={getTCGPlayerLink(item.name)}
+            href={getTCGPlayerLink(item.tcgUrl || item.name)}
             target="_blank"
             rel="noopener noreferrer"
             style={{
