@@ -4,18 +4,39 @@
 const AFFILIATE_BASE = 'https://partner.tcgplayer.com/c/7200332/1780961/21018'
 
 /**
- * Returns a TCGPlayer affiliate link.
+ * Returns a TCGPlayer affiliate link wrapped with our Impact publisher ID.
  *
- * Pass a direct TCGPlayer product URL (e.g. from Scryfall's purchase_uris.tcgplayer)
- * and it will deep-link straight to that listing.
- * Pass a plain card name and it falls back to a search page.
+ * Handles three input forms:
+ *  1. Scryfall's purchase_uris.tcgplayer — already an Impact link (partner.tcgplayer.com)
+ *     but under Scryfall's publisher ID. We extract the inner `u` param (the real
+ *     tcgplayer.com product URL) and rewrap it with our ID.
+ *  2. A bare tcgplayer.com URL — used directly as the destination.
+ *  3. A plain card name — falls back to a TCGPlayer search page.
  *
- * @param {string} cardNameOrDirectUrl
+ * @param {string} cardNameOrUrl
  * @returns {string}
  */
-export function getTCGPlayerLink(cardNameOrDirectUrl) {
-  const dest = cardNameOrDirectUrl?.startsWith('https://www.tcgplayer.com/')
-    ? cardNameOrDirectUrl
-    : `https://www.tcgplayer.com/search/magic/product?q=${encodeURIComponent(cardNameOrDirectUrl)}&Language=English`
+export function getTCGPlayerLink(cardNameOrUrl) {
+  let dest
+
+  if (!cardNameOrUrl) {
+    dest = 'https://www.tcgplayer.com/search/magic/product?Language=English'
+  } else if (cardNameOrUrl.startsWith('https://partner.tcgplayer.com/')) {
+    // Scryfall wraps its TCGPlayer links in their own Impact affiliate URL.
+    // Pull the real product URL out of the `u` query param.
+    try {
+      const inner = new URL(cardNameOrUrl)
+      const uParam = inner.searchParams.get('u')
+      dest = uParam ? decodeURIComponent(uParam) : `https://www.tcgplayer.com/search/magic/product?Language=English`
+    } catch {
+      dest = `https://www.tcgplayer.com/search/magic/product?Language=English`
+    }
+  } else if (cardNameOrUrl.startsWith('https://www.tcgplayer.com/')) {
+    dest = cardNameOrUrl
+  } else {
+    // Plain card name → search
+    dest = `https://www.tcgplayer.com/search/magic/product?q=${encodeURIComponent(cardNameOrUrl)}&Language=English`
+  }
+
   return `${AFFILIATE_BASE}?u=${encodeURIComponent(dest)}`
 }
