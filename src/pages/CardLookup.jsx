@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { searchScryfall, getCardDetails, getAllPrintings } from '../lib/utils'
+import { getTCGPlayerLink } from '../lib/tcgplayer'
 
 // ── Rarity helpers ─────────────────────────────────────────────────────────────
 const RARITY_ORDER  = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, bonus: 5 }
@@ -216,6 +217,20 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         }}>
           🎯 Add to Wishlist
         </button>
+        <a
+          href={getTCGPlayerLink(card.name)}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'block', width: '100%', padding: '13px',
+            background: '#1a4e2e', color: '#4ade80',
+            border: '1px solid #2a6e42', borderRadius: '12px',
+            fontWeight: 700, fontSize: '.9rem', cursor: 'pointer',
+            textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
+          }}
+        >
+          🛒 Buy on TCGPlayer
+        </a>
       </div>
 
       {/* ── Other Printings / Alternate Arts ── */}

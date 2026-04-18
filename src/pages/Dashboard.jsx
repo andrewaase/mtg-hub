@@ -1,6 +1,7 @@
 import { useId, useState, useEffect } from 'react'
 import logoSvg from '../assets/vaulted_singles_logo.svg'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
+import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getSnapshots, getGainersLosers, getVelocity } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 
@@ -274,6 +275,21 @@ function TournamentWidget({ collection, setPage }) {
                       ${card.price.toFixed(2)}
                     </span>
                   )}
+                  <a
+                    href={getTCGPlayerLink(card.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      background: 'rgba(74,222,128,.12)', color: '#4ade80',
+                      borderRadius: '4px', padding: '2px 7px',
+                      fontSize: '.68rem', fontWeight: 700, flexShrink: 0,
+                      textDecoration: 'none', lineHeight: 1.6,
+                    }}
+                    title="Buy on TCGPlayer"
+                  >
+                    🛒
+                  </a>
                   <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>›</span>
                 </div>
               )
