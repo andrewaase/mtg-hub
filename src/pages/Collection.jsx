@@ -600,7 +600,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   </button>
                   <button className="col-card-remove" onClick={() => handleRemove(card.id)}>✕</button>
                   <a
-                    href={getTCGPlayerLink(card.name)}
+                    href={getTCGPlayerLink(card.tcgplayerUrl || card.name)}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Buy on TCGPlayer"

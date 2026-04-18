@@ -50,6 +50,7 @@ function addCardToWishlist(card, showToast) {
       targetPrice: null,
       addedAt: new Date().toISOString(),
       img: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
+      tcgUrl: card.purchase_uris?.tcgplayer || null,
     })
     localStorage.setItem(LS_KEY, JSON.stringify({ ...data, wishlist: list }))
     showToast(`🎯 ${card.name} added to wishlist!`)
@@ -218,7 +219,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
           🎯 Add to Wishlist
         </button>
         <a
-          href={getTCGPlayerLink(card.name)}
+          href={getTCGPlayerLink(card.purchase_uris?.tcgplayer || card.name)}
           target="_blank"
           rel="noopener noreferrer"
           style={{

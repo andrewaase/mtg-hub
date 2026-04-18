@@ -177,9 +177,10 @@ function TournamentWidget({ collection, setPage }) {
       .then(r => { if (!r.ok) throw new Error('failed'); return r.json() })
       .then(data => {
         const items = (data.data || []).slice(0, 15).map(c => ({
-          name:  c.name,
-          price: parseFloat(c.prices?.usd) || null,
+          name:   c.name,
+          price:  parseFloat(c.prices?.usd) || null,
           rarity: c.rarity,
+          tcgUrl: c.purchase_uris?.tcgplayer || null,
         }))
         setCards(items)
         setLoading(false)
@@ -276,7 +277,7 @@ function TournamentWidget({ collection, setPage }) {
                     </span>
                   )}
                   <a
-                    href={getTCGPlayerLink(card.name)}
+                    href={getTCGPlayerLink(card.tcgUrl || card.name)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={e => e.stopPropagation()}
