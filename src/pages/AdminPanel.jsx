@@ -629,11 +629,12 @@ const TABS = [
 ]
 
 export default function AdminPanel({ user }) {
-  const [tab,         setTab]         = useState('overview')
-  const [data,        setData]        = useState(null)
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState(null)
-  const [lastFetched, setLastFetched] = useState(null)
+  const [tab,           setTab]           = useState('overview')
+  const [data,          setData]          = useState(null)
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState(null)
+  const [lastFetched,   setLastFetched]   = useState(null)
+  const [exporting,     setExporting]     = useState(false)
 
   // Guard: only the admin can see this page
   if (!user || user.email !== ADMIN_EMAIL) {
@@ -670,6 +671,35 @@ export default function AdminPanel({ user }) {
 
   useEffect(() => { if (tab === 'overview') fetchStats() }, [tab, fetchStats])
 
+  const downloadBackup = useCallback(async () => {
+    setExporting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) throw new Error('Not signed in')
+
+      const res = await fetch('/.netlify/functions/export-data', {
+        headers: { 'Authorization': `Bearer ${jwt}` },
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error || `HTTP ${res.status}`)
+      }
+      const blob = await res.blob()
+      const date = new Date().toISOString().slice(0, 10)
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `vaulted-singles-backup-${date}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert(`Backup failed: ${e.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }, [])
+
   const { totals, users, signupsByDay } = data || {}
   const engagementRate = totals
     ? Math.round((totals.usersWithCollection / Math.max(totals.users, 1)) * 100)
@@ -690,17 +720,27 @@ export default function AdminPanel({ user }) {
           <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.15em', color: '#6366f1', textTransform: 'uppercase', marginBottom: 3 }}>Admin Only</div>
           <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.5px' }}>🎛️ Control Center</div>
         </div>
-        {tab === 'overview' && (
-          <button onClick={fetchStats} disabled={loading} style={{
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {tab === 'overview' && (
+            <button onClick={fetchStats} disabled={loading} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
+              background: loading ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.2)',
+              border: '1px solid rgba(99,102,241,0.35)', color: '#a5b4fc',
+              cursor: loading ? 'not-allowed' : 'pointer', fontSize: '0.75rem', fontWeight: 600,
+            }}>
+              <span style={{ display: 'inline-block', animation: loading ? 'spin 1s linear infinite' : 'none' }}>🔄</span>
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
+          )}
+          <button onClick={downloadBackup} disabled={exporting} title="Download a JSON backup of all store data" style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
-            background: loading ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.2)',
-            border: '1px solid rgba(99,102,241,0.35)', color: '#a5b4fc',
-            cursor: loading ? 'not-allowed' : 'pointer', fontSize: '0.75rem', fontWeight: 600,
+            background: exporting ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.15)',
+            border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7',
+            cursor: exporting ? 'not-allowed' : 'pointer', fontSize: '0.75rem', fontWeight: 600,
           }}>
-            <span style={{ display: 'inline-block', animation: loading ? 'spin 1s linear infinite' : 'none' }}>🔄</span>
-            {loading ? 'Loading…' : 'Refresh'}
+            {exporting ? '⏳' : '💾'} {exporting ? 'Exporting…' : 'Backup'}
           </button>
-        )}
+        </div>
       </div>
 
       {/* ── Tab bar ── */}
