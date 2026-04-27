@@ -1,0 +1,603 @@
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { loadStripe } from '@stripe/stripe-js'
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { supabase } from '../lib/supabase'
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
+const CART_KEY      = 'vs-cart-v1'
+const SHIPPING_COST = 4.99
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return `$${parseFloat(n || 0).toFixed(2)}`
+}
+
+function loadCart() {
+  try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]') } catch { return [] }
+}
+function saveCart(cart) {
+  try { localStorage.setItem(CART_KEY, JSON.stringify(cart)) } catch {}
+}
+
+const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
+
+// ── Listing card ──────────────────────────────────────────────────────────────
+function ListingCard({ listing, onAdd, inCart }) {
+  return (
+    <div style={{
+      background: 'var(--bg-card)', border: `1px solid ${inCart ? 'var(--accent-gold)' : 'var(--border)'}`,
+      borderRadius: '14px', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      transition: 'border-color .15s, box-shadow .15s',
+      boxShadow: inCart ? '0 0 0 1px var(--accent-gold)' : 'none',
+      position: 'relative',
+    }}>
+      {listing.img_url
+        ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: '63/88', objectFit: 'cover' }} />
+        : <div style={{ width: '100%', aspectRatio: '63/88', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🃏</div>
+      }
+
+      {listing.is_foil && (
+        <div style={{
+          position: 'absolute', top: 8, right: 8,
+          background: 'linear-gradient(135deg,#a78bfa,#c084fc)',
+          color: '#fff', borderRadius: '4px', padding: '2px 6px',
+          fontSize: '.6rem', fontWeight: 800, letterSpacing: '.3px',
+        }}>✦ FOIL</div>
+      )}
+
+      <div style={{ padding: '8px 10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--text-primary)', lineHeight: 1.25 }}>
+          {listing.name}
+        </div>
+        {listing.set_name && (
+          <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>{listing.set_name}</div>
+        )}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {listing.condition && (
+            <span style={{
+              fontSize: '.6rem', fontWeight: 600,
+              background: 'var(--bg-hover)', color: 'var(--text-secondary)',
+              borderRadius: '4px', padding: '1px 5px',
+            }}>
+              {listing.condition}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
+          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--accent-gold)' }}>
+            {fmt(listing.price)}
+          </div>
+          <button
+            onClick={() => onAdd(listing)}
+            style={{
+              padding: '5px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+              fontSize: '.72rem', fontWeight: 700,
+              background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+              color: inCart ? 'var(--accent-gold)' : '#000',
+              transition: 'all .15s',
+            }}
+          >
+            {inCart ? '✓ In Cart' : '+ Cart'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Cart drawer ───────────────────────────────────────────────────────────────
+function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout }) {
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
+  const total    = subtotal + SHIPPING_COST
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
+          zIndex: 200, backdropFilter: 'blur(2px)',
+        }}
+      />
+      {/* Drawer */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(360px, 100vw)',
+        background: 'var(--bg-primary)', borderLeft: '1px solid var(--border)',
+        zIndex: 201, display: 'flex', flexDirection: 'column',
+        boxShadow: '-8px 0 32px rgba(0,0,0,.4)',
+      }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>🛒 Cart ({cart.length})</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+          {cart.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🛒</div>
+              <div>Your cart is empty</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {cart.map(item => (
+                <div key={item.id} style={{
+                  display: 'flex', gap: 10, alignItems: 'center',
+                  background: 'var(--bg-card)', borderRadius: 10,
+                  padding: '8px 10px', border: '1px solid var(--border)',
+                }}>
+                  {item.img_url
+                    ? <img src={item.img_url} alt={item.name} style={{ width: 36, borderRadius: 4, flexShrink: 0 }} />
+                    : <div style={{ width: 36, height: 50, background: 'var(--bg-hover)', borderRadius: 4, flexShrink: 0 }} />
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '.78rem', lineHeight: 1.3 }}>{item.name}</div>
+                    <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>{item.condition}{item.is_foil ? ' · ✦' : ''}</div>
+                    <div style={{ fontWeight: 800, fontSize: '.82rem', color: 'var(--accent-gold)', marginTop: 2 }}>
+                      {fmt(item.price * item.qty)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button onClick={() => onQtyChange(item.id, item.qty - 1)} style={{ width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 4, background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                      <span style={{ fontSize: '.78rem', fontWeight: 600, minWidth: 16, textAlign: 'center' }}>{item.qty}</span>
+                      <button onClick={() => onQtyChange(item.id, item.qty + 1)} style={{ width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 4, background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    </div>
+                    <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '.65rem', cursor: 'pointer' }}>remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {cart.length > 0 && (
+          <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+              <span>Subtotal</span><span>{fmt(subtotal)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: 10 }}>
+              <span>Shipping</span><span>{fmt(SHIPPING_COST)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', marginBottom: 14 }}>
+              <span>Total</span><span style={{ color: 'var(--accent-gold)' }}>{fmt(total)}</span>
+            </div>
+            <button
+              onClick={onCheckout}
+              style={{
+                width: '100%', padding: 14, borderRadius: 12, border: 'none',
+                background: 'var(--accent-gold)', color: '#000',
+                fontWeight: 800, fontSize: '.9rem', cursor: 'pointer',
+              }}
+            >
+              Checkout →
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ── Checkout: payment form (inner — needs Stripe context) ─────────────────────
+function PaymentForm({ onSuccess, onBack, total }) {
+  const stripe    = useStripe()
+  const elements  = useElements()
+  const [paying,  setPaying]  = useState(false)
+  const [error,   setError]   = useState(null)
+
+  const handlePay = async (e) => {
+    e.preventDefault()
+    if (!stripe || !elements) return
+    setPaying(true)
+    setError(null)
+    const { error: err } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: window.location.href },
+      redirect: 'if_required',
+    })
+    if (err) {
+      setError(err.message)
+      setPaying(false)
+    } else {
+      onSuccess()
+    }
+  }
+
+  return (
+    <form onSubmit={handlePay}>
+      <PaymentElement options={{ layout: 'tabs' }} />
+      {error && (
+        <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.8rem' }}>
+          {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <button type="button" onClick={onBack} style={{
+          flex: '0 0 auto', padding: '13px 18px', borderRadius: 12,
+          border: '1px solid var(--border)', background: 'transparent',
+          color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.88rem', fontWeight: 600,
+        }}>← Back</button>
+        <button type="submit" disabled={!stripe || paying} style={{
+          flex: 1, padding: 13, borderRadius: 12, border: 'none',
+          background: paying ? 'rgba(74,222,128,.5)' : '#22c55e',
+          color: '#000', fontWeight: 800, fontSize: '.9rem',
+          cursor: paying ? 'not-allowed' : 'pointer',
+        }}>
+          {paying ? 'Processing…' : `Pay ${fmt(total)}`}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ── Checkout modal ─────────────────────────────────────────────────────────────
+function CheckoutModal({ cart, onClose, onSuccess }) {
+  const [step,         setStep]         = useState('shipping') // shipping | payment | success
+  const [clientSecret, setClientSecret] = useState(null)
+  const [orderTotal,   setOrderTotal]   = useState(0)
+  const [creatingPI,   setCreatingPI]   = useState(false)
+  const [piError,      setPiError]      = useState(null)
+  const [shipping,     setShipping]     = useState({
+    name: '', email: '', line1: '', city: '', state: '', zip: '', country: 'US',
+  })
+
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
+
+  const handleShippingSubmit = async (e) => {
+    e.preventDefault()
+    setCreatingPI(true)
+    setPiError(null)
+    try {
+      const res  = await fetch('/.netlify/functions/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items:    cart.map(i => ({ id: i.id, qty: i.qty })),
+          shipping,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setClientSecret(data.clientSecret)
+      setOrderTotal(data.total)
+      setStep('payment')
+    } catch (err) {
+      setPiError(err.message)
+    } finally {
+      setCreatingPI(false)
+    }
+  }
+
+  const field = (label, key, type = 'text', placeholder = '') => (
+    <div>
+      <label style={{ display: 'block', fontSize: '.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>
+        {label}
+      </label>
+      <input
+        type={type}
+        required
+        placeholder={placeholder}
+        value={shipping[key]}
+        onChange={e => setShipping(s => ({ ...s, [key]: e.target.value }))}
+        className="form-input"
+        style={{ width: '100%', padding: '10px 12px', fontSize: '.85rem', boxSizing: 'border-box' }}
+      />
+    </div>
+  )
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 300, backdropFilter: 'blur(3px)' }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(480px, 96vw)', maxHeight: '90vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 301, padding: '24px 24px 28px',
+        boxShadow: '0 24px 60px rgba(0,0,0,.5)',
+      }}>
+
+        {/* ── Success ── */}
+        {step === 'success' && (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ fontSize: '3rem', marginBottom: 12 }}>✅</div>
+            <div style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: 8 }}>Order Confirmed!</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '.88rem', marginBottom: 6 }}>
+              Thanks, {shipping.name.split(' ')[0]}! We'll email you a shipping update at
+            </div>
+            <div style={{ fontWeight: 600, color: 'var(--accent-gold)', marginBottom: 28 }}>{shipping.email}</div>
+            <button
+              onClick={() => { onSuccess(); onClose() }}
+              style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: 'var(--accent-gold)', color: '#000', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
+            >
+              Continue Shopping
+            </button>
+          </div>
+        )}
+
+        {/* ── Shipping form ── */}
+        {step === 'shipping' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Checkout</div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            {/* Order summary */}
+            <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: '12px 14px', marginBottom: 20, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 8 }}>Order Summary</div>
+              {cart.map(i => (
+                <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{i.name} ×{i.qty}</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(i.price * i.qty)}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', color: 'var(--text-muted)' }}>
+                <span>Shipping</span><span>{fmt(SHIPPING_COST)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '.9rem', marginTop: 4 }}>
+                <span>Total</span>
+                <span style={{ color: 'var(--accent-gold)' }}>{fmt(subtotal + SHIPPING_COST)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleShippingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {field('Full Name', 'name', 'text', 'Jane Smith')}
+              {field('Email', 'email', 'email', 'jane@example.com')}
+              {field('Street Address', 'line1', 'text', '123 Main St')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px', gap: 10 }}>
+                {field('City', 'city', 'text', 'Portland')}
+                {field('State', 'state', 'text', 'OR')}
+                {field('ZIP', 'zip', 'text', '97201')}
+              </div>
+
+              {piError && (
+                <div style={{ padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.8rem' }}>
+                  {piError}
+                </div>
+              )}
+
+              <button type="submit" disabled={creatingPI} style={{
+                padding: 14, borderRadius: 12, border: 'none', marginTop: 4,
+                background: creatingPI ? 'rgba(201,168,76,.5)' : 'var(--accent-gold)',
+                color: '#000', fontWeight: 800, fontSize: '.9rem',
+                cursor: creatingPI ? 'not-allowed' : 'pointer',
+              }}>
+                {creatingPI ? 'Preparing…' : 'Continue to Payment →'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {/* ── Payment step ── */}
+        {step === 'payment' && clientSecret && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Payment</div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+            <Elements
+              stripe={stripePromise}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: 'night',
+                  variables: {
+                    colorPrimary: '#c9a84c',
+                    colorBackground: '#111',
+                    colorText: '#e2e8f0',
+                    borderRadius: '8px',
+                  },
+                },
+              }}
+            >
+              <PaymentForm
+                total={orderTotal}
+                onBack={() => setStep('shipping')}
+                onSuccess={() => setStep('success')}
+              />
+            </Elements>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ── Main Store page ──────────────────────────────────────────────────────────
+export default function Store() {
+  const [listings,   setListings]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [search,     setSearch]     = useState('')
+  const [sortBy,     setSortBy]     = useState('name')
+  const [cart,       setCart]       = useState(loadCart)
+  const [cartOpen,   setCartOpen]   = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+
+  // Fetch active listings from Supabase (public — no auth required)
+  useEffect(() => {
+    supabase
+      .from('store_listings')
+      .select('*')
+      .eq('active', true)
+      .gt('qty_available', 0)
+      .order('name')
+      .then(({ data }) => {
+        setListings(data || [])
+        setLoading(false)
+      })
+  }, [])
+
+  // Persist cart to localStorage
+  useEffect(() => { saveCart(cart) }, [cart])
+
+  const cartIds = useMemo(() => new Set(cart.map(i => i.id)), [cart])
+
+  const filtered = useMemo(() => {
+    let list = listings.filter(l =>
+      !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.set_name?.toLowerCase().includes(search.toLowerCase())
+    )
+    if (sortBy === 'price_asc')  list = [...list].sort((a, b) => a.price - b.price)
+    if (sortBy === 'price_desc') list = [...list].sort((a, b) => b.price - a.price)
+    if (sortBy === 'name')       list = [...list].sort((a, b) => a.name.localeCompare(b.name))
+    if (sortBy === 'newest')     list = [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    return list
+  }, [listings, search, sortBy])
+
+  const addToCart = useCallback((listing) => {
+    setCart(prev => {
+      const exists = prev.find(i => i.id === listing.id)
+      if (exists) return prev // already in cart
+      return [...prev, {
+        id:        listing.id,
+        name:      listing.name,
+        price:     listing.price,
+        qty:       1,
+        img_url:   listing.img_url,
+        condition: listing.condition,
+        is_foil:   listing.is_foil,
+      }]
+    })
+  }, [])
+
+  const removeFromCart = useCallback((id) => {
+    setCart(prev => prev.filter(i => i.id !== id))
+  }, [])
+
+  const changeQty = useCallback((id, qty) => {
+    if (qty < 1) { removeFromCart(id); return }
+    setCart(prev => prev.map(i => i.id === id ? { ...i, qty } : i))
+  }, [removeFromCart])
+
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0)
+
+  return (
+    <div style={{ paddingBottom: 80 }}>
+      {/* ── Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg,#0f172a 0%,#1a1200 100%)',
+        borderRadius: 14, padding: '18px 20px', marginBottom: 20,
+        border: '1px solid rgba(201,168,76,.2)',
+        boxShadow: '0 4px 20px rgba(201,168,76,.1)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <div>
+          <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.15em', color: 'var(--accent-gold)', textTransform: 'uppercase', marginBottom: 4 }}>
+            Vaulted Singles
+          </div>
+          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-.5px' }}>
+            🏪 Card Shop
+          </div>
+          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
+            {loading ? 'Loading…' : `${listings.length} card${listings.length !== 1 ? 's' : ''} available`}
+          </div>
+        </div>
+        <button
+          onClick={() => setCartOpen(true)}
+          style={{
+            position: 'relative', padding: '10px 16px', borderRadius: 12,
+            border: '1px solid var(--accent-gold)', background: cartCount > 0 ? 'rgba(201,168,76,.15)' : 'transparent',
+            color: 'var(--accent-gold)', fontWeight: 700, fontSize: '.88rem', cursor: 'pointer',
+          }}
+        >
+          🛒 Cart
+          {cartCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -8, right: -8,
+              background: 'var(--accent-gold)', color: '#000',
+              borderRadius: '50%', width: 20, height: 20,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '.65rem', fontWeight: 900,
+            }}>{cartCount}</span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Search + Sort ── */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="Search cards…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="form-input"
+          style={{ flex: 1, minWidth: 180, padding: '9px 14px', fontSize: '.85rem' }}
+        />
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+          className="form-input"
+          style={{ padding: '9px 12px', fontSize: '.82rem', cursor: 'pointer' }}
+        >
+          <option value="name">Sort: Name</option>
+          <option value="price_asc">Sort: Price ↑</option>
+          <option value="price_desc">Sort: Price ↓</option>
+          <option value="newest">Sort: Newest</option>
+        </select>
+      </div>
+
+      {/* ── Empty / loading states ── */}
+      {loading && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 }}>
+          {[...Array(8)].map((_, i) => (
+            <div key={i} style={{ aspectRatio: '63/120', borderRadius: 14, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          ))}
+        </div>
+      )}
+
+      {!loading && listings.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-icon">🏪</div>
+          <p>No cards listed yet.<br />Check back soon!</p>
+        </div>
+      )}
+
+      {!loading && listings.length > 0 && filtered.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-icon">🔍</div>
+          <p>No cards match "{search}"</p>
+          <button className="btn btn-ghost" onClick={() => setSearch('')} style={{ marginTop: 12 }}>Clear search</button>
+        </div>
+      )}
+
+      {/* ── Card grid ── */}
+      {!loading && filtered.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 }}>
+          {filtered.map(listing => (
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              inCart={cartIds.has(listing.id)}
+              onAdd={addToCart}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Cart drawer ── */}
+      {cartOpen && (
+        <CartDrawer
+          cart={cart}
+          onClose={() => setCartOpen(false)}
+          onRemove={removeFromCart}
+          onQtyChange={changeQty}
+          onCheckout={() => { setCartOpen(false); setCheckoutOpen(true) }}
+        />
+      )}
+
+      {/* ── Checkout modal ── */}
+      {checkoutOpen && (
+        <CheckoutModal
+          cart={cart}
+          onClose={() => setCheckoutOpen(false)}
+          onSuccess={() => setCart([])}
+        />
+      )}
+
+      <style>{`
+        @keyframes pulse { 0%,100% { opacity:.4; } 50% { opacity:.8; } }
+      `}</style>
+    </div>
+  )
+}
