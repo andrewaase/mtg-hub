@@ -1,5 +1,8 @@
 import { useRef, useState, useEffect } from 'react'
 import { addCard } from '../lib/db'
+import { supabase } from '../lib/supabase'
+
+const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
 
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
@@ -180,6 +183,11 @@ export default function CameraModal({
   const [printings,      setPrintings]      = useState([])
   const [showPrintings,  setShowPrintings]  = useState(false)
 
+  // Store mode (admin only)
+  const [storeMode,        setStoreMode]        = useState(false)
+  const [listingCondition, setListingCondition] = useState('NM')
+  const [listingPrice,     setListingPrice]     = useState('')
+
   // ── Camera ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true
@@ -214,6 +222,15 @@ export default function CameraModal({
     try { await track.applyConstraints({ advanced: [{ torch: next }] }); setTorchOn(next) }
     catch (e) { console.warn('[Scanner] torch toggle failed:', e) }
   }
+
+  // ── Sync listing price when card or foil mode changes ─────────────────────
+  useEffect(() => {
+    if (!foundCard) { setListingPrice(''); return }
+    const pUsd     = foundCard.prices?.usd      ? parseFloat(foundCard.prices.usd)      : null
+    const pUsdFoil = foundCard.prices?.usd_foil ? parseFloat(foundCard.prices.usd_foil) : null
+    const p = priceMode === 'foil' && pUsdFoil != null ? pUsdFoil : pUsd
+    setListingPrice(p != null ? p.toFixed(2) : '')
+  }, [foundCard, priceMode])
 
   // ── Stability trigger ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -328,6 +345,40 @@ export default function CameraModal({
     setAdding(false)
   }
 
+  // ── Add to store inventory (admin only) ──────────────────────────────────
+  async function handleAddToStore() {
+    if (!foundCard || adding) return
+    const price = parseFloat(listingPrice)
+    if (!listingPrice || isNaN(price) || price <= 0) {
+      showToast('Enter a valid price'); return
+    }
+    const snap = foundCard
+    setAdding(true)
+    try {
+      const isFoil = priceMode === 'foil' && snap.prices?.usd_foil != null
+      const imgUrl = snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null
+      const { error } = await supabase.from('store_listings').insert({
+        name:          snap.name,
+        set_name:      snap.set_name || null,
+        condition:     listingCondition,
+        is_foil:       isFoil,
+        price,
+        qty_available: 1,
+        img_url:       imgUrl,
+        active:        true,
+      })
+      if (error) throw error
+      setAddedCards(prev => [...prev, snap.name])
+      showToast(`🏪 Listed ${snap.name}`)
+      if (navigator.vibrate) navigator.vibrate([40, 20, 80])
+      doRescan()
+    } catch (err) {
+      console.error('[Scanner] store insert failed:', err)
+      showToast('Could not list card — try again')
+    }
+    setAdding(false)
+  }
+
   function doRescan() {
     frozenRef.current = false
     stableRef.current = 0
@@ -338,6 +389,8 @@ export default function CameraModal({
     setLookupFailed(false)
     setPrintings([])
     setShowPrintings(false)
+    setListingCondition('NM')
+    setListingPrice('')
   }
 
   function handleClose() { stopTracks(); onClose() }
@@ -386,7 +439,7 @@ export default function CameraModal({
           cursor: 'pointer', fontSize: '1rem', color: '#fff', backdropFilter: 'blur(8px)',
         }}>✕</button>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {torchSupported && (
             <button onClick={toggleTorch} style={{
               background: torchOn ? 'rgba(255,220,50,0.85)' : 'rgba(0,0,0,0.5)',
@@ -395,6 +448,19 @@ export default function CameraModal({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', fontSize: '1.1rem', backdropFilter: 'blur(8px)',
             }}>{torchOn ? '🔦' : '💡'}</button>
+          )}
+          {user?.email === ADMIN_EMAIL && (
+            <button
+              onClick={() => setStoreMode(p => !p)}
+              title={storeMode ? 'Store Mode ON — tap to switch to Collection' : 'Switch to Store Mode'}
+              style={{
+                background: storeMode ? 'rgba(201,168,76,0.9)' : 'rgba(0,0,0,0.5)',
+                border: `1.5px solid ${storeMode ? '#c9a84c' : 'rgba(255,255,255,0.15)'}`,
+                borderRadius: '50%', width: '38px', height: '38px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', fontSize: '1rem', backdropFilter: 'blur(8px)',
+              }}
+            >🏪</button>
           )}
         </div>
       </div>
@@ -658,30 +724,81 @@ export default function CameraModal({
               </div>
             )}
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => handleAdd()}
-                disabled={adding}
-                style={{
-                  flex: 1, background: 'var(--accent-teal)', color: '#000', border: 'none',
-                  borderRadius: '12px', padding: '13px 8px',
-                  fontWeight: 800, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
-                  opacity: adding ? 0.7 : 1,
-                }}
-              >{adding ? '…' : '+ Add to Collection'}</button>
-              <button
-                onClick={() => handleAdd({ forSale: true })}
-                disabled={adding}
-                style={{
-                  flex: 1, background: 'rgba(245,158,11,0.12)', color: 'var(--accent-teal)',
-                  border: '1px solid rgba(245,158,11,0.3)',
-                  borderRadius: '12px', padding: '13px 8px',
-                  fontWeight: 700, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
-                  opacity: adding ? 0.7 : 1,
-                }}
-              >Add &amp; List</button>
-            </div>
+            {/* Action buttons — store mode vs collection mode */}
+            {storeMode ? (
+              <div>
+                {/* Store mode label */}
+                <div style={{
+                  fontSize: '.68rem', fontWeight: 700, color: '#c9a84c',
+                  marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px',
+                }}>
+                  <span>🏪</span> Store Mode — adds directly to shop inventory
+                </div>
+
+                {/* Condition chips */}
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                  {['NM', 'LP', 'MP', 'HP'].map(c => (
+                    <Chip key={c} active={listingCondition === c} onClick={() => setListingCondition(c)}>{c}</Chip>
+                  ))}
+                </div>
+
+                {/* Price input */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '.8rem', flexShrink: 0 }}>Price $</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={listingPrice}
+                    onChange={e => setListingPrice(e.target.value)}
+                    placeholder="0.00"
+                    style={{
+                      flex: 1, background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: '8px', padding: '8px 12px',
+                      color: '#fff', fontSize: '.95rem', fontWeight: 700,
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* Add to Store button */}
+                <button
+                  onClick={handleAddToStore}
+                  disabled={adding}
+                  style={{
+                    width: '100%', background: '#c9a84c', color: '#000', border: 'none',
+                    borderRadius: '12px', padding: '13px 8px',
+                    fontWeight: 800, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
+                    opacity: adding ? 0.7 : 1,
+                  }}
+                >{adding ? '…' : '🏪 Add to Store'}</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => handleAdd()}
+                  disabled={adding}
+                  style={{
+                    flex: 1, background: 'var(--accent-teal)', color: '#000', border: 'none',
+                    borderRadius: '12px', padding: '13px 8px',
+                    fontWeight: 800, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
+                    opacity: adding ? 0.7 : 1,
+                  }}
+                >{adding ? '…' : '+ Add to Collection'}</button>
+                <button
+                  onClick={() => handleAdd({ forSale: true })}
+                  disabled={adding}
+                  style={{
+                    flex: 1, background: 'rgba(245,158,11,0.12)', color: 'var(--accent-teal)',
+                    border: '1px solid rgba(245,158,11,0.3)',
+                    borderRadius: '12px', padding: '13px 8px',
+                    fontWeight: 700, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
+                    opacity: adding ? 0.7 : 1,
+                  }}
+                >Add &amp; List</button>
+              </div>
+            )}
           </div>
         ) : (
           /* Idle / scanning state */
