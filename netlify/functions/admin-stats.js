@@ -61,32 +61,43 @@ exports.handler = async (event) => {
       // All auth users (up to 1000)
       fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: adminHeaders }),
       // All collection rows — just user_id + qty
-      fetch(`${SUPABASE_URL}/rest/v1/collection?select=user_id,qty`, { headers: { ...adminHeaders, 'Prefer': 'return=representation' } }),
+      fetch(`${SUPABASE_URL}/rest/v1/collection?select=user_id,qty`, { headers: adminHeaders }),
       // All match rows — user_id + result + date
       fetch(`${SUPABASE_URL}/rest/v1/matches?select=user_id,result,created_at`, { headers: adminHeaders }),
     ])
 
-    const [usersJson, collectionRows, matchRows] = await Promise.all([
+    const [usersJson, collectionRaw, matchRaw] = await Promise.all([
       usersRes.json(),
       collectionRes.json(),
       matchesRes.json(),
     ])
 
-    const rawUsers = usersJson.users || []
+    // Guard: Supabase returns an error object (truthy non-array) when a query fails.
+    // Always use Array.isArray() before iterating.
+    if (!Array.isArray(collectionRaw)) {
+      console.error('[admin-stats] collection query error:', collectionRaw)
+    }
+    if (!Array.isArray(matchRaw)) {
+      console.error('[admin-stats] matches query error:', matchRaw)
+    }
+
+    const collectionRows = Array.isArray(collectionRaw) ? collectionRaw : []
+    const matchRows      = Array.isArray(matchRaw)      ? matchRaw      : []
+    const rawUsers       = usersJson.users || []
 
     // ── 3. Aggregate ─────────────────────────────────────────────────────────
 
     // Collection counts per user
     const collectionByUser = {}
     const cardQtyByUser    = {}
-    for (const row of (collectionRows || [])) {
+    for (const row of collectionRows) {
       collectionByUser[row.user_id] = (collectionByUser[row.user_id] || 0) + 1
       cardQtyByUser[row.user_id]    = (cardQtyByUser[row.user_id]    || 0) + (row.qty || 1)
     }
 
     // Match counts per user
     const matchesByUser = {}
-    for (const row of (matchRows || [])) {
+    for (const row of matchRows) {
       matchesByUser[row.user_id] = (matchesByUser[row.user_id] || 0) + 1
     }
 
@@ -127,9 +138,9 @@ exports.handler = async (event) => {
       newLast7d,
       newLast30d,
       usersWithCollection,
-      totalUniqueCards:  (collectionRows || []).length,
-      totalCards:        (collectionRows || []).reduce((s, r) => s + (r.qty || 1), 0),
-      totalMatches:      (matchRows || []).length,
+      totalUniqueCards:  collectionRows.length,
+      totalCards:        collectionRows.reduce((s, r) => s + (r.qty || 1), 0),
+      totalMatches:      matchRows.length,
     }
 
     return {
