@@ -6,6 +6,10 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Sync store listing prices with Scryfall market data every day at 8am UTC
+[functions."update-prices"]
+  schedule = "0 8 * * *"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
