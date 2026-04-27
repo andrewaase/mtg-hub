@@ -242,7 +242,7 @@ function UserTable({ users }) {
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG']
 
 function CreateListingModal({ onClose, onSaved }) {
-  const [form,     setForm]     = useState({ name: '', set_name: '', condition: 'NM', is_foil: false, price: '', qty_available: 1, img_url: '', active: true })
+  const [form,     setForm]     = useState({ name: '', set_name: '', condition: 'NM', is_foil: false, price: '', qty_available: 1, img_url: '', active: true, scryfall_id: null })
   const [query,    setQuery]    = useState('')
   const [results,  setResults]  = useState([])
   const [searching,setSearching]= useState(false)
@@ -268,10 +268,11 @@ function CreateListingModal({ onClose, onSaved }) {
   const pickCard = (card) => {
     setForm(f => ({
       ...f,
-      name:    card.name,
-      set_name: card.set_name || card.set?.toUpperCase() || '',
-      img_url:  card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || '',
-      price:    f.price || card.prices?.usd || '',
+      name:        card.name,
+      set_name:    card.set_name || card.set?.toUpperCase() || '',
+      img_url:     card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '',
+      price:       f.price || card.prices?.usd || '',
+      scryfall_id: card.id || null,
     }))
     setQuery(card.name)
     setResults([])
@@ -290,6 +291,7 @@ function CreateListingModal({ onClose, onSaved }) {
       qty_available: parseInt(form.qty_available, 10) || 1,
       img_url:       form.img_url.trim() || null,
       active:        form.active,
+      scryfall_id:   form.scryfall_id || null,
     })
     setSaving(false)
     if (error) { setErr(error.message); return }
@@ -392,6 +394,8 @@ function ListingsTab() {
   const [loading,    setLoading]    = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [search,     setSearch]     = useState('')
+  const [syncing,    setSyncing]    = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
@@ -399,6 +403,31 @@ function ListingsTab() {
     setListings(data || [])
     setLoading(false)
   }, [])
+
+  const syncPrices = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) throw new Error('Not signed in')
+
+      const res  = await fetch('/.netlify/functions/update-prices', {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${jwt}` },
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+
+      setSyncResult({ ok: true, ...json })
+      // Refresh listings to show updated prices
+      await fetchListings()
+    } catch (e) {
+      setSyncResult({ ok: false, message: e.message })
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   useEffect(() => { fetchListings() }, [fetchListings])
 
@@ -420,12 +449,20 @@ function ListingsTab() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: syncResult ? 10 : 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           placeholder="Search listings…" value={search} onChange={e => setSearch(e.target.value)}
           className="form-input"
           style={{ flex: 1, minWidth: 160, padding: '8px 12px', fontSize: '.82rem' }}
         />
+        <button
+          onClick={syncPrices}
+          disabled={syncing}
+          title="Sync all prices with current Scryfall market data"
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: syncing ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: syncing ? 0.7 : 1 }}
+        >
+          {syncing ? '⏳ Syncing…' : '🔄 Sync Prices'}
+        </button>
         <button
           onClick={() => setShowCreate(true)}
           style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#c9a84c', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer', flexShrink: 0 }}
@@ -433,6 +470,22 @@ function ListingsTab() {
           + New Listing
         </button>
       </div>
+
+      {syncResult && (
+        <div style={{
+          marginBottom: 14, padding: '10px 14px', borderRadius: 8, fontSize: '.78rem',
+          background: syncResult.ok ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+          border: `1px solid ${syncResult.ok ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)'}`,
+          color: syncResult.ok ? '#6ee7b7' : '#fca5a5',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+        }}>
+          {syncResult.ok
+            ? `✓ Synced — ${syncResult.updated} price${syncResult.updated !== 1 ? 's' : ''} updated, ${syncResult.skipped} unchanged (${syncResult.total} total)`
+            : `⚠️ Sync failed: ${syncResult.message}`
+          }
+          <button onClick={() => setSyncResult(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '.9rem', opacity: 0.6, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
 
       {loading && <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>Loading listings…</div>}
       {!loading && listings.length === 0 && (

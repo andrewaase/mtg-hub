@@ -366,6 +366,7 @@ export default function CameraModal({
         qty_available: 1,
         img_url:       imgUrl,
         active:        true,
+        scryfall_id:   snap.id || null,
       })
       if (error) throw error
       setAddedCards(prev => [...prev, snap.name])
