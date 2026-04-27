@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
 const CART_KEY      = 'vs-cart-v1'
-const SHIPPING_COST = 4.99
+const SHIPPING_COST = 0
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) {
