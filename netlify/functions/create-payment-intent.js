@@ -62,10 +62,25 @@ exports.handler = async (event) => {
 
     const total = subtotal + SHIPPING_FLAT
 
+    // Build a human-readable description for the Stripe receipt email
+    const lineItems = items.map(item => {
+      const l = listings.find(x => x.id === item.id)
+      const qty = item.qty || 1
+      return `${l.name}${l.condition ? ` (${l.condition})` : ''} ×${qty}  $${(l.price * qty).toFixed(2)}`
+    })
+    const description = [
+      'Vaulted Singles — Order',
+      '',
+      ...lineItems,
+      '',
+      `Order Total: $${total.toFixed(2)}`,
+    ].join('\n')
+
     // Create PaymentIntent — store all fulfillment data in metadata
     const paymentIntent = await stripe.paymentIntents.create({
       amount:        Math.round(total * 100), // cents
       currency:      'usd',
+      description,
       receipt_email: shipping.email,
       metadata: {
         items:            JSON.stringify(items.map(i => ({ id: i.id, qty: i.qty || 1 }))),
