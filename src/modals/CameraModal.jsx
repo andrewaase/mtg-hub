@@ -312,7 +312,9 @@ export default function CameraModal({
     try {
       const priceUsd     = snap.prices?.usd      ? parseFloat(snap.prices.usd)      : null
       const priceUsdFoil = snap.prices?.usd_foil ? parseFloat(snap.prices.usd_foil) : null
-      const isFoil = priceMode === 'foil' && priceUsdFoil != null
+      const isFoil       = priceMode === 'foil' && priceUsdFoil != null
+      const cardPrice    = isFoil ? priceUsdFoil : (priceUsd ?? priceUsdFoil)
+
       const card = {
         name:         snap.name,
         qty:          1,
@@ -320,7 +322,7 @@ export default function CameraModal({
         setName:      snap.set_name,
         img:          snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null,
         colors:       snap.color_identity || [],
-        price:        isFoil ? priceUsdFoil : (priceUsd ?? priceUsdFoil),
+        price:        cardPrice,
         isFoil,
         forSale:      options.forSale || false,
         tcgplayerUrl: snap.purchase_uris?.tcgplayer || null,
@@ -333,10 +335,29 @@ export default function CameraModal({
         }
         return [...prev, saved || { ...card, id: Date.now() }]
       })
+
+      // If "Add & List" and user is admin, also create a real store listing
+      if (options.forSale && user?.email === ADMIN_EMAIL) {
+        const imgUrl = snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null
+        const { error: listingErr } = await supabase.from('store_listings').insert({
+          name:          snap.name,
+          set_name:      snap.set_name || null,
+          condition:     'NM',
+          is_foil:       isFoil,
+          price:         cardPrice ?? 0,
+          qty_available: 1,
+          img_url:       imgUrl,
+          active:        true,
+          scryfall_id:   snap.id || null,
+        })
+        if (listingErr) console.error('[Scanner] store listing failed:', listingErr)
+        showToast(`✓ Added & listed ${snap.name}`)
+      } else {
+        showToast(`✓ Added ${snap.name}`)
+      }
+
       setAddedCards(prev => [...prev, snap.name])
-      showToast(`✓ Added ${snap.name}`)
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
-      if (options.forSale && setPage) { stopTracks(); onClose(); setPage('collection'); return }
       doRescan()
     } catch (err) {
       console.error('[Scanner] add failed:', err)
