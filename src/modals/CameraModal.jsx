@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { addCard } from '../lib/db'
+import { addCard, upsertStoreListing } from '../lib/db'
 import { supabase } from '../lib/supabase'
 
 const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
@@ -336,22 +336,18 @@ export default function CameraModal({
         return [...prev, saved || { ...card, id: Date.now() }]
       })
 
-      // If "Add & List" and user is admin, also create a real store listing
+      // If "Add & List" and user is admin, upsert a store listing
       if (options.forSale && user?.email === ADMIN_EMAIL) {
-        const imgUrl = snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null
-        const { error: listingErr } = await supabase.from('store_listings').insert({
-          name:          snap.name,
-          set_name:      snap.set_name || null,
-          condition:     'NM',
-          is_foil:       isFoil,
-          price:         cardPrice ?? 0,
-          qty_available: 1,
-          img_url:       imgUrl,
-          active:        true,
-          scryfall_id:   snap.id || null,
+        const { merged } = await upsertStoreListing({
+          name:        snap.name,
+          set_name:    snap.set_name || null,
+          condition:   'NM',
+          is_foil:     isFoil,
+          price:       cardPrice ?? 0,
+          img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
+          scryfall_id: snap.id || null,
         })
-        if (listingErr) console.error('[Scanner] store listing failed:', listingErr)
-        showToast(`✓ Added & listed ${snap.name}`)
+        showToast(merged ? `✓ Added & stocked +1 ${snap.name}` : `✓ Added & listed ${snap.name}`)
       } else {
         showToast(`✓ Added ${snap.name}`)
       }
@@ -377,21 +373,17 @@ export default function CameraModal({
     setAdding(true)
     try {
       const isFoil = priceMode === 'foil' && snap.prices?.usd_foil != null
-      const imgUrl = snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null
-      const { error } = await supabase.from('store_listings').insert({
-        name:          snap.name,
-        set_name:      snap.set_name || null,
-        condition:     listingCondition,
-        is_foil:       isFoil,
+      const { merged } = await upsertStoreListing({
+        name:        snap.name,
+        set_name:    snap.set_name || null,
+        condition:   listingCondition,
+        is_foil:     isFoil,
         price,
-        qty_available: 1,
-        img_url:       imgUrl,
-        active:        true,
-        scryfall_id:   snap.id || null,
+        img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
+        scryfall_id: snap.id || null,
       })
-      if (error) throw error
       setAddedCards(prev => [...prev, snap.name].slice(-5))
-      showToast(`🏪 Listed ${snap.name}`)
+      showToast(merged ? `🏪 +1 stock: ${snap.name}` : `🏪 Listed ${snap.name}`)
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
       doRescan()
     } catch (err) {
