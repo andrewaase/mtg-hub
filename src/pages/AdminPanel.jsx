@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { upsertStoreListing } from '../lib/db'
 
 const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
 
@@ -282,21 +283,25 @@ function CreateListingModal({ onClose, onSaved }) {
     e.preventDefault()
     if (!form.name || !form.price) { setErr('Name and price are required'); return }
     setSaving(true); setErr(null)
-    const { error } = await supabase.from('store_listings').insert({
-      name:          form.name.trim(),
-      set_name:      form.set_name.trim() || null,
-      condition:     form.condition,
-      is_foil:       form.is_foil,
-      price:         parseFloat(form.price),
-      qty_available: parseInt(form.qty_available, 10) || 1,
-      img_url:       form.img_url.trim() || null,
-      active:        form.active,
-      scryfall_id:   form.scryfall_id || null,
-    })
-    setSaving(false)
-    if (error) { setErr(error.message); return }
-    onSaved()
-    onClose()
+    try {
+      const qty = parseInt(form.qty_available, 10) || 1
+      const { merged } = await upsertStoreListing({
+        name:        form.name.trim(),
+        set_name:    form.set_name.trim() || null,
+        condition:   form.condition,
+        is_foil:     form.is_foil,
+        price:       parseFloat(form.price),
+        img_url:     form.img_url.trim() || null,
+        scryfall_id: form.scryfall_id || null,
+        qty,
+      })
+      setSaving(false)
+      onSaved(merged)
+      onClose()
+    } catch (err) {
+      setSaving(false)
+      setErr(err.message)
+    }
   }
 
   const inp = (label, key, type = 'text', extra = {}) => (
@@ -607,7 +612,7 @@ function ListingsTab() {
         </div>
       )}
 
-      {showCreate && <CreateListingModal onClose={() => setShowCreate(false)} onSaved={fetchListings} />}
+      {showCreate && <CreateListingModal onClose={() => setShowCreate(false)} onSaved={(merged) => { fetchListings(); if (merged) alert('Existing listing found — quantity updated instead of creating a duplicate.') }} />}
     </div>
   )
 }

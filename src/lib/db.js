@@ -87,6 +87,51 @@ export async function addCard(card, userId) {
   return newCard
 }
 
+// ── STORE LISTINGS ────────────────────────────────────
+// Upsert a store listing: if an active listing with the same name +
+// condition + is_foil already exists, increment qty_available instead of
+// creating a duplicate row.  Returns { merged: bool, id }.
+export async function upsertStoreListing({ name, set_name, condition, is_foil, price, img_url, scryfall_id, qty = 1 }) {
+  // Find any existing listing that matches on name + condition + foil
+  const { data: existing, error: selErr } = await supabase
+    .from('store_listings')
+    .select('id, qty_available')
+    .eq('name', name)
+    .eq('condition', condition || 'NM')
+    .eq('is_foil', is_foil || false)
+    .maybeSingle()
+
+  if (selErr) {
+    console.error('[db] upsertStoreListing select error:', selErr)
+    throw new Error(selErr.message)
+  }
+
+  if (existing) {
+    // Existing listing — just bump the quantity (and re-activate if hidden)
+    const { error: updErr } = await supabase
+      .from('store_listings')
+      .update({ qty_available: existing.qty_available + qty, active: true })
+      .eq('id', existing.id)
+    if (updErr) {
+      console.error('[db] upsertStoreListing update error:', updErr)
+      throw new Error(updErr.message)
+    }
+    return { merged: true, id: existing.id }
+  }
+
+  // No match — create a fresh listing
+  const { data, error: insErr } = await supabase
+    .from('store_listings')
+    .insert({ name, set_name, condition: condition || 'NM', is_foil: is_foil || false, price, qty_available: qty, img_url, active: true, scryfall_id })
+    .select('id')
+    .single()
+  if (insErr) {
+    console.error('[db] upsertStoreListing insert error:', insErr)
+    throw new Error(insErr.message)
+  }
+  return { merged: false, id: data.id }
+}
+
 export async function removeCard(id, userId) {
   if (hasSupabase && userId) {
     await supabase.from('collection').delete().eq('id', id).eq('user_id', userId)
