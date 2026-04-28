@@ -356,12 +356,12 @@ export default function CameraModal({
         showToast(`✓ Added ${snap.name}`)
       }
 
-      setAddedCards(prev => [...prev, snap.name])
+      setAddedCards(prev => [...prev, snap.name].slice(-5))
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
       doRescan()
     } catch (err) {
       console.error('[Scanner] add failed:', err)
-      showToast('Could not save card — try again')
+      showToast(`Could not save — ${err.message || 'try again'}`)
     }
     setAdding(false)
   }
@@ -390,7 +390,7 @@ export default function CameraModal({
         scryfall_id:   snap.id || null,
       })
       if (error) throw error
-      setAddedCards(prev => [...prev, snap.name])
+      setAddedCards(prev => [...prev, snap.name].slice(-5))
       showToast(`🏪 Listed ${snap.name}`)
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
       doRescan()
