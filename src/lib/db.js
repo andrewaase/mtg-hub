@@ -51,12 +51,28 @@ export async function getCollection(userId) {
 
 export async function addCard(card, userId) {
   if (hasSupabase && userId) {
-    const { data: existing } = await supabase.from('collection').select('*').eq('user_id', userId).eq('name', card.name).single()
+    // Check if card already exists for this user
+    const { data: existing, error: selectErr } = await supabase
+      .from('collection').select('*').eq('user_id', userId).eq('name', card.name).maybeSingle()
+    if (selectErr) {
+      console.error('[db] collection select error:', selectErr)
+      throw new Error(selectErr.message)
+    }
     if (existing) {
-      const { data } = await supabase.from('collection').update({ qty: existing.qty + card.qty }).eq('id', existing.id).select().single()
+      const { data, error: updateErr } = await supabase
+        .from('collection').update({ qty: existing.qty + card.qty }).eq('id', existing.id).select().single()
+      if (updateErr) {
+        console.error('[db] collection update error:', updateErr)
+        throw new Error(updateErr.message)
+      }
       return data
     }
-    const { data } = await supabase.from('collection').insert({ ...card, user_id: userId }).select().single()
+    const { data, error: insertErr } = await supabase
+      .from('collection').insert({ ...card, user_id: userId }).select().single()
+    if (insertErr) {
+      console.error('[db] collection insert error:', insertErr)
+      throw new Error(insertErr.message)
+    }
     return data
   }
   const collection = lsGet().collection || []

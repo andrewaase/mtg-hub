@@ -396,6 +396,8 @@ function ListingsTab() {
   const [search,     setSearch]     = useState('')
   const [syncing,    setSyncing]    = useState(false)
   const [syncResult, setSyncResult] = useState(null)
+  const [sort,       setSort]       = useState('newest')
+  const [filterActive, setFilterActive] = useState('all') // 'all' | 'live' | 'hidden'
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
@@ -442,10 +444,34 @@ function ListingsTab() {
     setListings(prev => prev.filter(l => l.id !== id))
   }
 
-  const filtered = useMemo(() =>
-    listings.filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase())),
-    [listings, search]
-  )
+  // ── Inventory stats ───────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const active = listings.filter(l => l.active && l.qty_available > 0)
+    return {
+      totalListings:  listings.length,
+      liveCount:      active.length,
+      totalUnits:     active.reduce((s, l) => s + (l.qty_available || 0), 0),
+      inventoryValue: active.reduce((s, l) => s + parseFloat(l.price || 0) * (l.qty_available || 0), 0),
+    }
+  }, [listings])
+
+  // ── Filter + sort ─────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let out = listings
+    if (search) out = out.filter(l => l.name.toLowerCase().includes(search.toLowerCase()))
+    if (filterActive === 'live')   out = out.filter(l => l.active)
+    if (filterActive === 'hidden') out = out.filter(l => !l.active)
+    switch (sort) {
+      case 'az':         out = [...out].sort((a, b) => a.name.localeCompare(b.name)); break
+      case 'za':         out = [...out].sort((a, b) => b.name.localeCompare(a.name)); break
+      case 'price-asc':  out = [...out].sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); break
+      case 'price-desc': out = [...out].sort((a, b) => parseFloat(b.price) - parseFloat(a.price)); break
+      case 'qty-desc':   out = [...out].sort((a, b) => (b.qty_available || 0) - (a.qty_available || 0)); break
+      case 'newest':
+      default:           break // already ordered by created_at desc from DB
+    }
+    return out
+  }, [listings, search, sort, filterActive])
 
   return (
     <div>
@@ -469,6 +495,63 @@ function ListingsTab() {
         >
           + New Listing
         </button>
+      </div>
+
+      {/* ── Inventory stats bar ── */}
+      {!loading && listings.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12,
+          padding: '10px 14px', borderRadius: 10,
+          background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.15)',
+        }}>
+          <div style={{ fontSize: '.72rem', color: '#94a3b8' }}>
+            <span style={{ fontWeight: 700, color: '#c9a84c', fontSize: '.88rem' }}>{stats.liveCount}</span> live listings
+          </div>
+          <div style={{ color: 'rgba(255,255,255,.15)' }}>·</div>
+          <div style={{ fontSize: '.72rem', color: '#94a3b8' }}>
+            <span style={{ fontWeight: 700, color: '#c9a84c', fontSize: '.88rem' }}>{stats.totalUnits}</span> units in stock
+          </div>
+          <div style={{ color: 'rgba(255,255,255,.15)' }}>·</div>
+          <div style={{ fontSize: '.72rem', color: '#94a3b8' }}>
+            Inventory value: <span style={{ fontWeight: 800, color: '#4ade80', fontSize: '.88rem' }}>${stats.inventoryValue.toFixed(2)}</span>
+          </div>
+          {stats.totalListings !== stats.liveCount && (
+            <>
+              <div style={{ color: 'rgba(255,255,255,.15)' }}>·</div>
+              <div style={{ fontSize: '.72rem', color: '#475569' }}>{stats.totalListings - stats.liveCount} hidden</div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Sort + filter controls ── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select
+          value={sort} onChange={e => setSort(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#cbd5e1', fontSize: '.75rem', cursor: 'pointer' }}
+        >
+          <option value="newest">Newest first</option>
+          <option value="az">A → Z</option>
+          <option value="za">Z → A</option>
+          <option value="price-desc">Price: High → Low</option>
+          <option value="price-asc">Price: Low → High</option>
+          <option value="qty-desc">Most in stock</option>
+        </select>
+        {['all','live','hidden'].map(f => (
+          <button key={f} onClick={() => setFilterActive(f)} style={{
+            padding: '5px 12px', borderRadius: 7, border: `1px solid ${filterActive === f ? 'rgba(201,168,76,.4)' : 'rgba(255,255,255,.1)'}`,
+            background: filterActive === f ? 'rgba(201,168,76,.12)' : 'transparent',
+            color: filterActive === f ? '#c9a84c' : '#64748b',
+            fontSize: '.72rem', fontWeight: filterActive === f ? 700 : 400, cursor: 'pointer',
+          }}>
+            {f === 'all' ? 'All' : f === 'live' ? '🟢 Live' : '⚫ Hidden'}
+          </button>
+        ))}
+        {(search || filterActive !== 'all') && (
+          <button onClick={() => { setSearch(''); setFilterActive('all') }} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(239,68,68,.25)', background: 'none', color: '#f87171', fontSize: '.72rem', cursor: 'pointer' }}>
+            Clear
+          </button>
+        )}
       </div>
 
       {syncResult && (

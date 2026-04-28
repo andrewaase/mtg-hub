@@ -39,13 +39,22 @@ export default function AddCardModal({ onClose, prefill, user, collection, setCo
       img: cardData?.image_uris?.small || cardData?.card_faces?.[0]?.image_uris?.small || null,
       colors: cardData?.color_identity || [],
       price: cardData?.prices?.usd ? parseFloat(cardData.prices.usd) : null,
-      // TCGPlayer product page — used for the "List on TCGPlayer" deep link in the sell list
       tcgplayerUrl: cardData?.purchase_uris?.tcgplayer || null,
     }
-    await addCard(card, user?.id)
-    setCollection([...collection, card])
-    showToast('Card added!')
-    onClose()
+    try {
+      await addCard(card, user?.id)
+      setCollection(prev => {
+        const i = prev.findIndex(c => c.name.toLowerCase() === card.name.toLowerCase())
+        if (i >= 0) {
+          const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + card.qty }; return next
+        }
+        return [...prev, card]
+      })
+      showToast('Card added!')
+      onClose()
+    } catch (err) {
+      showToast(`Save failed: ${err.message}`)
+    }
   }
 
   return (
