@@ -635,9 +635,10 @@ export default function Store() {
   }, [removeFromCart])
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
+  const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
 
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div style={{ paddingBottom: cartCount > 0 ? 100 : 80 }}>
       {/* ── Header ── */}
       <div style={{
         background: 'linear-gradient(135deg,#0f172a 0%,#1a1200 100%)',
@@ -769,6 +770,60 @@ export default function Store() {
           inCart={cartIds.has(selectedListing.id)}
         />
       )}
+
+      {/* ── Floating cart bar ── */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 150,
+        transform: cartCount > 0 ? 'translateY(0)' : 'translateY(110%)',
+        transition: 'transform .3s cubic-bezier(.34,1.56,.64,1)',
+        pointerEvents: cartCount > 0 ? 'auto' : 'none',
+      }}>
+        {/* inner bar — centered, max-width matches page content */}
+        <div style={{
+          maxWidth: 860, margin: '0 auto 12px',
+          padding: '0 12px',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'rgba(15,12,5,.92)', backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(201,168,76,.45)',
+            borderRadius: 16, padding: '12px 16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(201,168,76,.15)',
+          }}>
+            {/* Left: count + total */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                background: 'var(--accent-gold)', color: '#000',
+                borderRadius: '50%', width: 28, height: 28,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '.72rem', fontWeight: 900, flexShrink: 0,
+              }}>{cartCount}</div>
+              <div>
+                <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', lineHeight: 1 }}>
+                  {cartCount === 1 ? '1 item' : `${cartCount} items`}
+                </div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--accent-gold)', lineHeight: 1.3 }}>
+                  {fmt(cartTotal)}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: CTA */}
+            <button
+              onClick={() => setCartOpen(true)}
+              style={{
+                padding: '10px 22px', borderRadius: 12, border: 'none',
+                background: 'var(--accent-gold)', color: '#000',
+                fontWeight: 800, fontSize: '.88rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 12px rgba(201,168,76,.35)',
+              }}
+            >
+              🛒 View Cart →
+            </button>
+          </div>
+        </div>
+      </div>
 
       <style>{`
         @keyframes pulse { 0%,100% { opacity:.4; } 50% { opacity:.8; } }
