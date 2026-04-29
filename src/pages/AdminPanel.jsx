@@ -395,21 +395,73 @@ function CreateListingModal({ onClose, onSaved }) {
 }
 
 function ListingsTab() {
-  const [listings,   setListings]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [search,     setSearch]     = useState('')
-  const [syncing,    setSyncing]    = useState(false)
-  const [syncResult, setSyncResult] = useState(null)
-  const [sort,       setSort]       = useState('newest')
-  const [filterActive, setFilterActive] = useState('all') // 'all' | 'live' | 'hidden'
+  const [listings,     setListings]     = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [showCreate,   setShowCreate]   = useState(false)
+  const [search,       setSearch]       = useState('')
+  const [syncing,      setSyncing]      = useState(false)
+  const [syncResult,   setSyncResult]   = useState(null)
+  const [sort,         setSort]         = useState('newest')
+  const [filterActive, setFilterActive] = useState('all')
+  const [merging,      setMerging]      = useState(false)
+  const [mergeResult,  setMergeResult]  = useState(null)
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('store_listings').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('store_listings').select('*').order('created_at', { ascending: true })
     setListings(data || [])
     setLoading(false)
   }, [])
+
+  const mergeDuplicates = async () => {
+    if (!window.confirm('This will merge all listings with the same name + condition + foil into one row, summing their quantities. Continue?')) return
+    setMerging(true)
+    setMergeResult(null)
+    try {
+      // Fetch all in created_at order (oldest first = keeper)
+      const { data: all, error } = await supabase.from('store_listings').select('*').order('created_at', { ascending: true })
+      if (error) throw error
+
+      // Group by name + condition + is_foil
+      const groups = {}
+      for (const l of all) {
+        const key = `${l.name}|||${l.condition || 'NM'}|||${!!l.is_foil}`
+        if (!groups[key]) groups[key] = []
+        groups[key].push(l)
+      }
+
+      let mergedCount = 0
+      for (const group of Object.values(groups)) {
+        if (group.length <= 1) continue
+
+        const keeper   = group[0]
+        const totalQty = group.reduce((s, l) => s + (l.qty_available || 0), 0)
+        // Keep lowest price so the listing stays competitive
+        const minPrice = Math.min(...group.map(l => parseFloat(l.price || 0)))
+
+        // Update the keeper row
+        const { error: updErr } = await supabase
+          .from('store_listings')
+          .update({ qty_available: totalQty, price: minPrice, active: true })
+          .eq('id', keeper.id)
+        if (updErr) throw updErr
+
+        // Delete the duplicate rows
+        const dupeIds = group.slice(1).map(l => l.id)
+        const { error: delErr } = await supabase.from('store_listings').delete().in('id', dupeIds)
+        if (delErr) throw delErr
+
+        mergedCount += group.length - 1
+      }
+
+      await fetchListings()
+      setMergeResult({ ok: true, count: mergedCount })
+    } catch (err) {
+      setMergeResult({ ok: false, message: err.message })
+    } finally {
+      setMerging(false)
+    }
+  }
 
   const syncPrices = async () => {
     setSyncing(true)
@@ -487,6 +539,14 @@ function ListingsTab() {
           style={{ flex: 1, minWidth: 160, padding: '8px 12px', fontSize: '.82rem' }}
         />
         <button
+          onClick={mergeDuplicates}
+          disabled={merging}
+          title="Merge listings with the same name + condition + foil into one row"
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(139,92,246,.3)', background: 'rgba(139,92,246,.1)', color: '#c4b5fd', fontWeight: 700, fontSize: '.82rem', cursor: merging ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: merging ? 0.7 : 1 }}
+        >
+          {merging ? '⏳ Merging…' : '🔀 Merge Dupes'}
+        </button>
+        <button
           onClick={syncPrices}
           disabled={syncing}
           title="Sync all prices with current Scryfall market data"
@@ -559,6 +619,23 @@ function ListingsTab() {
         )}
       </div>
 
+      {mergeResult && (
+        <div style={{
+          marginBottom: 14, padding: '10px 14px', borderRadius: 8, fontSize: '.78rem',
+          background: mergeResult.ok ? 'rgba(139,92,246,.08)' : 'rgba(239,68,68,.08)',
+          border: `1px solid ${mergeResult.ok ? 'rgba(139,92,246,.25)' : 'rgba(239,68,68,.25)'}`,
+          color: mergeResult.ok ? '#c4b5fd' : '#fca5a5',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+        }}>
+          {mergeResult.ok
+            ? mergeResult.count === 0
+              ? '✓ No duplicates found — all listings are already unique'
+              : `✓ Merged ${mergeResult.count} duplicate row${mergeResult.count !== 1 ? 's' : ''}`
+            : `⚠️ Merge failed: ${mergeResult.message}`
+          }
+          <button onClick={() => setMergeResult(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '.9rem', opacity: 0.6, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
       {syncResult && (
         <div style={{
           marginBottom: 14, padding: '10px 14px', borderRadius: 8, fontSize: '.78rem',
