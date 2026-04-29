@@ -21,8 +21,138 @@ function saveCart(cart) {
 
 const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
 
+// ── Card detail modal ────────────────────────────────────────────────────────
+function CardDetailModal({ listing, onClose, onAdd, inCart }) {
+  const [cardData, setCardData] = useState(null)
+  const [loadingCard, setLoadingCard] = useState(true)
+
+  useEffect(() => {
+    const url = listing.scryfall_id
+      ? `https://api.scryfall.com/cards/${listing.scryfall_id}`
+      : `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(listing.name)}`
+    fetch(url)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { setCardData(data); setLoadingCard(false) })
+      .catch(() => setLoadingCard(false))
+  }, [listing.scryfall_id, listing.name])
+
+  // Double-faced cards store text in card_faces[0]
+  const face      = cardData?.card_faces?.[0] || cardData
+  const oracle    = face?.oracle_text    || ''
+  const typeLine  = face?.type_line      || cardData?.type_line || ''
+  const manaCost  = face?.mana_cost      || cardData?.mana_cost || ''
+  const flavor    = face?.flavor_text    || ''
+  const power     = cardData?.power, toughness = cardData?.toughness
+  const loyalty   = cardData?.loyalty
+
+  const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(560px, 96vw)', maxHeight: '92vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 401, padding: '20px',
+        boxShadow: '0 24px 60px rgba(0,0,0,.65)',
+      }}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 14, right: 14,
+          background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%',
+          width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
+
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          {/* Card image */}
+          <div style={{ flexShrink: 0 }}>
+            {listing.img_url
+              ? <img src={listing.img_url} alt={listing.name} style={{ width: 'min(200px, 42vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
+              : <div style={{ width: 'min(200px, 42vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+            }
+          </div>
+
+          {/* Details */}
+          <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', lineHeight: 1.25, paddingRight: 32 }}>{listing.name}</div>
+              {!loadingCard && typeLine && (
+                <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>{typeLine}</div>
+              )}
+              {!loadingCard && manaCost && (
+                <div style={{ fontSize: '.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{manaCost}</div>
+              )}
+            </div>
+
+            {loadingCard && (
+              <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Loading card text…</div>
+            )}
+
+            {!loadingCard && oracle && (
+              <div style={{
+                fontSize: '.76rem', lineHeight: 1.65, color: 'var(--text-secondary)',
+                whiteSpace: 'pre-wrap', padding: '9px 11px',
+                background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)',
+              }}>{oracle}</div>
+            )}
+
+            {!loadingCard && (power != null || loyalty != null) && (
+              <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                {power != null ? `${power}/${toughness}` : `Loyalty: ${loyalty}`}
+              </div>
+            )}
+
+            {!loadingCard && flavor && (
+              <div style={{ fontSize: '.68rem', fontStyle: 'italic', color: 'var(--text-muted)', borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>
+                {flavor}
+              </div>
+            )}
+
+            {/* Badges */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {listing.condition && (
+                <span style={{ fontSize: '.62rem', fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 7px' }}>
+                  {CONDITION_LABELS[listing.condition] || listing.condition}
+                </span>
+              )}
+              {listing.is_foil && (
+                <span style={{ fontSize: '.62rem', fontWeight: 700, background: 'linear-gradient(135deg,#a78bfa,#c084fc)', color: '#fff', borderRadius: 4, padding: '2px 7px' }}>✦ FOIL</span>
+              )}
+              {listing.set_name && (
+                <span style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>{listing.set_name}</span>
+              )}
+            </div>
+
+            <div style={{ fontSize: '.7rem', fontWeight: 600, color: stockColor }}>
+              {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+            </div>
+
+            {/* Price + CTA */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
+              <button
+                onClick={() => { if (!inCart) onAdd(listing); onClose() }}
+                style={{
+                  padding: '9px 22px', borderRadius: 10, border: 'none',
+                  cursor: inCart ? 'default' : 'pointer',
+                  background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                  color: inCart ? 'var(--accent-gold)' : '#000',
+                  fontWeight: 800, fontSize: '.88rem', transition: 'all .15s',
+                }}
+              >{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Listing card ──────────────────────────────────────────────────────────────
-function ListingCard({ listing, onAdd, inCart }) {
+function ListingCard({ listing, onAdd, inCart, onView }) {
+  const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
+
   return (
     <div style={{
       background: 'var(--bg-card)', border: `1px solid ${inCart ? 'var(--accent-gold)' : 'var(--border)'}`,
@@ -31,22 +161,38 @@ function ListingCard({ listing, onAdd, inCart }) {
       boxShadow: inCart ? '0 0 0 1px var(--accent-gold)' : 'none',
       position: 'relative',
     }}>
-      {listing.img_url
-        ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: '63/88', objectFit: 'cover' }} />
-        : <div style={{ width: '100%', aspectRatio: '63/88', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🃏</div>
-      }
-
-      {listing.is_foil && (
+      {/* Clickable image area */}
+      <div onClick={() => onView(listing)} style={{ cursor: 'pointer', position: 'relative' }}>
+        {listing.img_url
+          ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: '63/88', objectFit: 'cover' }} />
+          : <div style={{ width: '100%', aspectRatio: '63/88', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🃏</div>
+        }
+        {listing.is_foil && (
+          <div style={{
+            position: 'absolute', top: 8, right: 8,
+            background: 'linear-gradient(135deg,#a78bfa,#c084fc)',
+            color: '#fff', borderRadius: '4px', padding: '2px 6px',
+            fontSize: '.6rem', fontWeight: 800, letterSpacing: '.3px',
+          }}>✦ FOIL</div>
+        )}
+        {/* "tap to read" hint overlay */}
         <div style={{
-          position: 'absolute', top: 8, right: 8,
-          background: 'linear-gradient(135deg,#a78bfa,#c084fc)',
-          color: '#fff', borderRadius: '4px', padding: '2px 6px',
-          fontSize: '.6rem', fontWeight: 800, letterSpacing: '.3px',
-        }}>✦ FOIL</div>
-      )}
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          paddingBottom: 6, opacity: 0, transition: 'opacity .15s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.opacity = 1}
+          onMouseLeave={e => e.currentTarget.style.opacity = 0}
+        >
+          <span style={{ fontSize: '.58rem', background: 'rgba(0,0,0,.7)', color: '#fff', borderRadius: 4, padding: '2px 6px' }}>tap to read</span>
+        </div>
+      </div>
 
-      <div style={{ padding: '8px 10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--text-primary)', lineHeight: 1.25 }}>
+      <div style={{ padding: '8px 10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div
+          onClick={() => onView(listing)}
+          style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--text-primary)', lineHeight: 1.25, cursor: 'pointer' }}
+        >
           {listing.name}
         </div>
         {listing.set_name && (
@@ -54,14 +200,13 @@ function ListingCard({ listing, onAdd, inCart }) {
         )}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {listing.condition && (
-            <span style={{
-              fontSize: '.6rem', fontWeight: 600,
-              background: 'var(--bg-hover)', color: 'var(--text-secondary)',
-              borderRadius: '4px', padding: '1px 5px',
-            }}>
+            <span style={{ fontSize: '.6rem', fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: '4px', padding: '1px 5px' }}>
               {listing.condition}
             </span>
           )}
+          <span style={{ fontSize: '.6rem', fontWeight: 600, color: stockColor }}>
+            {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+          </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
@@ -142,8 +287,21 @@ function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <button onClick={() => onQtyChange(item.id, item.qty - 1)} style={{ width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 4, background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                       <span style={{ fontSize: '.78rem', fontWeight: 600, minWidth: 16, textAlign: 'center' }}>{item.qty}</span>
-                      <button onClick={() => onQtyChange(item.id, item.qty + 1)} style={{ width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 4, background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                      <button
+                        onClick={() => onQtyChange(item.id, item.qty + 1)}
+                        disabled={item.qty >= (item.maxQty || 99)}
+                        style={{
+                          width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 4,
+                          background: 'none', fontSize: '.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: item.qty >= (item.maxQty || 99) ? 'var(--text-muted)' : 'var(--text-secondary)',
+                          cursor: item.qty >= (item.maxQty || 99) ? 'not-allowed' : 'pointer',
+                          opacity: item.qty >= (item.maxQty || 99) ? 0.4 : 1,
+                        }}
+                      >+</button>
                     </div>
+                    {item.qty >= (item.maxQty || 99) && (
+                      <span style={{ fontSize: '.55rem', color: '#f87171', fontWeight: 700, letterSpacing: '.3px' }}>MAX</span>
+                    )}
                     <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '.65rem', cursor: 'pointer' }}>remove</button>
                   </div>
                 </div>
@@ -407,13 +565,14 @@ function CheckoutModal({ cart, onClose, onSuccess }) {
 
 // ── Main Store page ──────────────────────────────────────────────────────────
 export default function Store() {
-  const [listings,   setListings]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [search,     setSearch]     = useState('')
-  const [sortBy,     setSortBy]     = useState('name')
-  const [cart,       setCart]       = useState(loadCart)
-  const [cartOpen,   setCartOpen]   = useState(false)
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [listings,        setListings]        = useState([])
+  const [loading,         setLoading]         = useState(true)
+  const [search,          setSearch]          = useState('')
+  const [sortBy,          setSortBy]          = useState('name')
+  const [cart,            setCart]            = useState(loadCart)
+  const [cartOpen,        setCartOpen]        = useState(false)
+  const [checkoutOpen,    setCheckoutOpen]    = useState(false)
+  const [selectedListing, setSelectedListing] = useState(null)
 
   // Fetch active listings from Supabase (public — no auth required)
   useEffect(() => {
@@ -454,6 +613,7 @@ export default function Store() {
         name:      listing.name,
         price:     listing.price,
         qty:       1,
+        maxQty:    listing.qty_available,
         img_url:   listing.img_url,
         condition: listing.condition,
         is_foil:   listing.is_foil,
@@ -467,7 +627,11 @@ export default function Store() {
 
   const changeQty = useCallback((id, qty) => {
     if (qty < 1) { removeFromCart(id); return }
-    setCart(prev => prev.map(i => i.id === id ? { ...i, qty } : i))
+    setCart(prev => prev.map(i => {
+      if (i.id !== id) return i
+      const max = i.maxQty || 99
+      return { ...i, qty: Math.min(qty, max) }
+    }))
   }, [removeFromCart])
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
@@ -570,6 +734,7 @@ export default function Store() {
               listing={listing}
               inCart={cartIds.has(listing.id)}
               onAdd={addToCart}
+              onView={setSelectedListing}
             />
           ))}
         </div>
@@ -592,6 +757,16 @@ export default function Store() {
           cart={cart}
           onClose={() => setCheckoutOpen(false)}
           onSuccess={() => setCart([])}
+        />
+      )}
+
+      {/* ── Card detail modal ── */}
+      {selectedListing && (
+        <CardDetailModal
+          listing={selectedListing}
+          onClose={() => setSelectedListing(null)}
+          onAdd={addToCart}
+          inCart={cartIds.has(selectedListing.id)}
         />
       )}
 
