@@ -21,6 +21,154 @@ function saveCart(cart) {
 
 const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
 
+// ── Price history chart (pure SVG, no external deps) ────────────────────────
+function PriceChart({ scryfallId, isFoil, currentPrice }) {
+  const [history, setHistory] = useState(null) // null = loading
+
+  useEffect(() => {
+    if (!scryfallId) { setHistory([]); return }
+    supabase
+      .from('price_history')
+      .select('price, recorded_at')
+      .eq('scryfall_id', scryfallId)
+      .eq('is_foil', isFoil || false)
+      .order('recorded_at', { ascending: true })
+      .limit(90)
+      .then(({ data }) => setHistory(data || []))
+  }, [scryfallId, isFoil])
+
+  if (history === null) {
+    return <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>Loading price history…</div>
+  }
+
+  if (history.length < 2) {
+    return (
+      <div style={{ textAlign: 'center', padding: '14px 0', color: 'var(--text-muted)', fontSize: '.72rem' }}>
+        <div style={{ fontSize: '1.4rem', marginBottom: 5 }}>📈</div>
+        Price tracking begins today — check back after the next daily sync!
+      </div>
+    )
+  }
+
+  // ── Layout constants ──────────────────────────────────────────────────────
+  const W = 500, H = 140
+  const PAD = { top: 14, right: 12, bottom: 28, left: 44 }
+  const cW  = W - PAD.left - PAD.right
+  const cH  = H - PAD.top  - PAD.bottom
+
+  // ── Scale helpers ─────────────────────────────────────────────────────────
+  const prices = history.map(d => parseFloat(d.price))
+  const times  = history.map(d => new Date(d.recorded_at + 'T12:00:00Z').getTime())
+
+  const minP = Math.min(...prices), maxP = Math.max(...prices)
+  const minT = Math.min(...times),  maxT = Math.max(...times)
+
+  const pSpan = (maxP - minP) || minP * 0.2 || 1
+  const pMin  = minP - pSpan * 0.1
+  const pMax  = maxP + pSpan * 0.1
+  const pFull = pMax - pMin
+  const tSpan = maxT - minT || 1
+
+  const sx = t => PAD.left + ((t - minT) / tSpan) * cW
+  const sy = p => PAD.top  + (1 - (p - pMin) / pFull) * cH
+
+  const pts = history.map(d => ({
+    x:     sx(new Date(d.recorded_at + 'T12:00:00Z').getTime()),
+    y:     sy(parseFloat(d.price)),
+    price: parseFloat(d.price),
+    date:  d.recorded_at,
+  }))
+
+  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const areaPath = `${linePath} L${pts[pts.length-1].x.toFixed(1)},${(PAD.top+cH+1).toFixed(1)} L${pts[0].x.toFixed(1)},${(PAD.top+cH+1).toFixed(1)} Z`
+
+  // ── Grid lines (4 horizontal) ─────────────────────────────────────────────
+  const gridLines = [0, 0.33, 0.67, 1].map(f => ({
+    y:     PAD.top + (1 - f) * cH,
+    label: `$${(pMin + f * pFull).toFixed(2)}`,
+  }))
+
+  // ── X-axis: up to 5 evenly-spaced date labels ─────────────────────────────
+  const xIdxs = history.length <= 5
+    ? history.map((_, i) => i)
+    : [0, ...Array.from({ length: 3 }, (_, k) => Math.round((k + 1) * (history.length - 1) / 4)), history.length - 1]
+  const xLabels = [...new Set(xIdxs)].map(i => ({
+    x:     pts[i].x,
+    label: new Date(history[i].recorded_at + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }))
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const week7ago = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const weekBase = history.filter(d => new Date(d.recorded_at + 'T12:00:00Z').getTime() <= week7ago)
+  const weekChange = weekBase.length > 0
+    ? currentPrice - parseFloat(weekBase[weekBase.length - 1].price)
+    : null
+
+  const stats = [
+    { label: 'Current', value: `$${currentPrice.toFixed(2)}`, color: 'var(--text-primary)' },
+    {
+      label: '7d Change',
+      value: weekChange != null ? `${weekChange >= 0 ? '+' : ''}$${Math.abs(weekChange).toFixed(2)}` : '—',
+      color: weekChange == null ? 'var(--text-muted)' : weekChange >= 0 ? '#4ade80' : '#f87171',
+    },
+    { label: 'High', value: `$${maxP.toFixed(2)}`, color: '#4ade80' },
+    { label: 'Low',  value: `$${minP.toFixed(2)}`, color: '#f87171' },
+  ]
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+        <defs>
+          <linearGradient id="phGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#3b82f6" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* Horizontal grid lines + Y labels */}
+        {gridLines.map((g, i) => (
+          <g key={i}>
+            <line x1={PAD.left} y1={g.y} x2={PAD.left + cW} y2={g.y}
+              stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+            <text x={PAD.left - 5} y={g.y + 3.5} textAnchor="end"
+              fontSize="9" fill="rgba(255,255,255,0.38)">{g.label}</text>
+          </g>
+        ))}
+
+        {/* X-axis date labels */}
+        {xLabels.map((l, i) => (
+          <text key={i} x={l.x} y={H - 5} textAnchor="middle"
+            fontSize="9" fill="rgba(255,255,255,0.38)">{l.label}</text>
+        ))}
+
+        {/* Gradient area fill */}
+        <path d={areaPath} fill="url(#phGrad)" />
+
+        {/* Price line */}
+        <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="1.8"
+          strokeLinejoin="round" strokeLinecap="round" />
+
+        {/* Latest price dot */}
+        <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y}
+          r="3.5" fill="#3b82f6" stroke="var(--bg-card)" strokeWidth="1.5" />
+      </svg>
+
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5, marginTop: 8 }}>
+        {stats.map(s => (
+          <div key={s.label} style={{
+            textAlign: 'center', background: 'rgba(255,255,255,0.04)',
+            borderRadius: 6, padding: '5px 4px', border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{ fontSize: '.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>{s.label}</div>
+            <div style={{ fontSize: '.78rem', fontWeight: 700, color: s.color, marginTop: 2 }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Card detail modal ────────────────────────────────────────────────────────
 function CardDetailModal({ listing, onClose, onAdd, inCart }) {
   const [cardData, setCardData] = useState(null)
@@ -68,8 +216,8 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
           {/* Card image */}
           <div style={{ flexShrink: 0 }}>
             {listing.img_url
-              ? <img src={listing.img_url} alt={listing.name} style={{ width: 'min(200px, 42vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
-              : <div style={{ width: 'min(200px, 42vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+              ? <img src={listing.img_url} alt={listing.name} style={{ width: 'min(180px, 38vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
+              : <div style={{ width: 'min(180px, 38vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
             }
           </div>
 
@@ -144,6 +292,25 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
             </div>
           </div>
         </div>
+
+        {/* ── Price History chart ── */}
+        {listing.scryfall_id && (
+          <div style={{
+            marginTop: 18, padding: '12px 14px',
+            background: 'var(--bg-card)', borderRadius: 12,
+            border: '1px solid var(--border)',
+          }}>
+            <div style={{
+              fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 10,
+            }}>📈 Price History</div>
+            <PriceChart
+              scryfallId={listing.scryfall_id}
+              isFoil={listing.is_foil}
+              currentPrice={parseFloat(listing.price) || 0}
+            />
+          </div>
+        )}
       </div>
     </>
   )
