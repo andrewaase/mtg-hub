@@ -145,11 +145,62 @@ exports.handler = async (event) => {
     }
   }
 
+  // ── Log daily price history snapshot ────────────────────────────────────────
+  // One row per (scryfall_id, is_foil) per day. Duplicates are silently ignored
+  // so re-running the sync multiple times on the same day is safe.
+  const today = new Date().toISOString().slice(0, 10)
+  const seen  = new Set()
+  const historyRows = []
+
+  for (const listing of listings) {
+    const key    = `${listing.scryfall_id}:${!!listing.is_foil}`
+    if (seen.has(key)) continue
+    const prices = priceMap[listing.scryfall_id]
+    if (!prices) continue
+    const price  = listing.is_foil ? prices.usd_foil : prices.usd
+    if (price == null) continue
+    seen.add(key)
+    historyRows.push({
+      scryfall_id: listing.scryfall_id,
+      is_foil:     !!listing.is_foil,
+      price,
+      recorded_at: today,
+    })
+  }
+
+  let historyLogged = 0
+  if (historyRows.length > 0) {
+    try {
+      // PostgREST max body is large but batch in 500s to be safe
+      for (let i = 0; i < historyRows.length; i += 500) {
+        const batch   = historyRows.slice(i, i + 500)
+        const histRes = await fetch(`${SUPABASE_URL}/rest/v1/price_history`, {
+          method:  'POST',
+          headers: {
+            ...adminHeaders,
+            'Prefer': 'resolution=ignore-duplicates,return=minimal',
+          },
+          body: JSON.stringify(batch),
+        })
+        if (!histRes.ok) {
+          console.error('[update-prices] price_history insert error:', await histRes.text())
+        } else {
+          historyLogged += batch.length
+        }
+      }
+      console.log(`[update-prices] logged ${historyLogged} price history records for ${today}`)
+    } catch (err) {
+      // Don't let history logging failures break the main sync result
+      console.error('[update-prices] price_history error:', err)
+    }
+  }
+
   const summary = {
     updated,
     skipped,
-    total:      listings.length,
-    synced_at:  new Date().toISOString(),
+    total:          listings.length,
+    history_logged: historyLogged,
+    synced_at:      new Date().toISOString(),
     ...(scryfallErrors.length && { scryfall_errors: scryfallErrors }),
     ...(updateErrors.length   && { update_errors:   updateErrors   }),
   }
