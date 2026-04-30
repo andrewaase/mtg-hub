@@ -17,6 +17,7 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
     { id: 'wishlist', icon: '🎯', label: 'Wishlist',     section: 'Resources' },
     { id: 'store',    icon: '🏪', label: 'Card Shop',    section: 'Resources' },
     { id: 'releases', icon: '📅', label: 'Set Releases', section: 'Resources' },
+    { id: 'about',    icon: '💬', label: 'About',        section: 'Resources' },
     { id: 'friends', icon: '🤝', label: 'Friends & Trades', section: 'Social', requiresSupabase: true },
     { id: 'admin',   icon: '🎛️', label: 'Control Center',  section: 'Admin',  requiresAdmin: true },
   ]

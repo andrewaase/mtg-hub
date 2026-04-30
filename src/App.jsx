@@ -24,8 +24,9 @@ import Friends from './pages/Friends'
 import Decks from './pages/Decks'
 import Wishlist from './pages/Wishlist'
 import Store from './pages/Store'
+import About from './pages/About'
 
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'admin']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'about', 'admin']
 
 const PAGE_TITLES = {
   dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
@@ -38,8 +39,21 @@ const PAGE_TITLES = {
   friends:    'Friends & Trades | Vaulted Singles',
   decks:      'My Decks | Vaulted Singles',
   wishlist:   'Wishlist | Vaulted Singles',
-  store:      'Card Shop | Vaulted Singles',
+  store:      'Buy MTG Singles | Vaulted Singles Card Shop',
+  about:      'About | Vaulted Singles',
   admin:      'Control Center | Vaulted Singles',
+}
+
+const PAGE_DESCRIPTIONS = {
+  dashboard:  'Track your Magic: The Gathering collection value, scan cards, and monitor format staples.',
+  store:      'Buy Magic: The Gathering singles at fair, daily-updated prices. Near Mint and graded MTG cards ready to ship.',
+  collection: 'Manage your MTG collection, track card values, and scan new cards with your phone camera.',
+  cards:      'Look up any Magic: The Gathering card — prices, rulings, set info, and format legality.',
+  decks:      'Build and manage your MTG decks with format-staple suggestions and card lookups.',
+  wishlist:   'Track cards you want and set price alerts for your MTG wishlist.',
+  about:      'Learn about Vaulted Singles — an MTG singles store and collection tracker built by a Magic player, for Magic players.',
+  log:        'Log your Magic: The Gathering matches and track your win rates by deck and format.',
+  stats:      'Detailed stats and charts for your Magic: The Gathering match history.',
 }
 
 function getInitialPage() {
@@ -66,6 +80,18 @@ export default function App() {
     setPageState(newPage)
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
     document.title = PAGE_TITLES[newPage] || 'Vaulted Singles'
+    // Update meta description for social sharing
+    const desc = PAGE_DESCRIPTIONS[newPage]
+    if (desc) {
+      document.querySelector('meta[name="description"]')?.setAttribute('content', desc)
+      document.querySelector('meta[property="og:description"]')?.setAttribute('content', desc)
+      document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', desc)
+    }
+    const title = PAGE_TITLES[newPage]
+    if (title) {
+      document.querySelector('meta[property="og:title"]')?.setAttribute('content', title)
+      document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', title)
+    }
   }, [])
 
   // Lock body scroll when sidebar is open on mobile
@@ -196,6 +222,7 @@ export default function App() {
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
               {page === 'store'     && <Store />}
+              {page === 'about'     && <About />}
               {page === 'admin'     && <AdminPanel user={user} />}
             </>
           )}
