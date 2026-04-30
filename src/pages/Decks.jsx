@@ -1,11 +1,36 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { getDecks, saveDeck, deleteDeck } from '../lib/db'
-import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS, deckToText } from '../lib/deckUtils'
+import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
 import { getDeckValueSync, fetchUnknownDeckPrices } from '../lib/pricing'
 import ImportDeckModal from '../modals/ImportDeckModal'
 
 const FORMAT_ALL = 'All'
 
+// ── Card type grouping ────────────────────────────────────────────────────────
+const TYPE_ORDER = [
+  { key: 'Creature',     label: '🦎 Creatures',    test: t => /\bCreature\b/.test(t) },
+  { key: 'Planeswalker', label: '✨ Planeswalkers', test: t => /\bPlaneswalker\b/.test(t) },
+  { key: 'Battle',       label: '⚔️ Battles',       test: t => /\bBattle\b/.test(t) },
+  { key: 'Instant',      label: '⚡ Instants',      test: t => /\bInstant\b/.test(t) },
+  { key: 'Sorcery',      label: '🌊 Sorceries',     test: t => /\bSorcery\b/.test(t) },
+  { key: 'Enchantment',  label: '🔮 Enchantments',  test: t => /\bEnchantment\b/.test(t) && !/\bCreature\b/.test(t) },
+  { key: 'Artifact',     label: '⚙️ Artifacts',     test: t => /\bArtifact\b/.test(t) && !/\bCreature\b/.test(t) },
+  { key: 'Land',         label: '🌍 Lands',         test: t => /\bLand\b/.test(t) },
+  { key: 'Other',        label: '❓ Other',          test: () => true },
+]
+
+function getTypeBucket(typeLine) {
+  for (const g of TYPE_ORDER) {
+    if (g.test(typeLine || '')) return g.key
+  }
+  return 'Other'
+}
+
+// Module-level card image cache (survives re-renders)
+const IMG_CACHE = new Map()
+
+// ── Main Decks page ───────────────────────────────────────────────────────────
 export default function Decks({ user, collection, showToast }) {
   const [decks, setDecks]           = useState([])
   const [loading, setLoading]       = useState(true)
@@ -13,7 +38,7 @@ export default function Decks({ user, collection, showToast }) {
   const [showImport, setShowImport] = useState(false)
   const [editDeck, setEditDeck]     = useState(null)
   const [formatFilter, setFormatFilter] = useState(FORMAT_ALL)
-  const [activeTab, setActiveTab]   = useState('my')   // 'my' | 'explore'
+  const [activeTab, setActiveTab]   = useState('my')
   const [copied, setCopied]         = useState(false)
 
   useEffect(() => {
@@ -21,24 +46,32 @@ export default function Decks({ user, collection, showToast }) {
   }, [user])
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
-
   const handleSave = async (deckData) => {
-    const saved = await saveDeck(deckData, user?.id)
-    if (deckData.id) {
-      setDecks(decks.map(d => d.id === deckData.id ? saved : d))
-      if (selected?.id === deckData.id) setSelected(saved)
-    } else {
-      setDecks([saved, ...decks])
+    try {
+      const saved = await saveDeck(deckData, user?.id)
+      if (deckData.id) {
+        setDecks(prev => prev.map(d => d.id === deckData.id ? saved : d))
+        if (selected?.id === deckData.id) setSelected(saved)
+      } else {
+        setDecks(prev => [saved, ...prev])
+      }
+      setShowImport(false)
+      setEditDeck(null)
+      showToast(deckData.id ? 'Deck updated ✓' : 'Deck saved ✓')
+    } catch (err) {
+      console.error('[Decks] save error:', err)
+      if (!user) {
+        showToast('Sign in to save decks to your profile')
+      } else {
+        showToast(`Save failed: ${err.message}`)
+      }
     }
-    setShowImport(false)
-    setEditDeck(null)
-    showToast(deckData.id ? 'Deck updated ✓' : 'Deck imported ✓')
   }
 
   const handleDelete = async (deck) => {
     if (!window.confirm(`Delete "${deck.name}"? This can't be undone.`)) return
     await deleteDeck(deck.id, user?.id)
-    setDecks(decks.filter(d => d.id !== deck.id))
+    setDecks(prev => prev.filter(d => d.id !== deck.id))
     if (selected?.id === deck.id) setSelected(null)
     showToast('Deck deleted')
   }
@@ -56,12 +89,10 @@ export default function Decks({ user, collection, showToast }) {
   }
 
   // ── Filtering ─────────────────────────────────────────────────────────────
-
-  const formats = [FORMAT_ALL, ...Array.from(new Set(decks.map(d => d.format))).sort()]
+  const formats  = [FORMAT_ALL, ...Array.from(new Set(decks.map(d => d.format))).sort()]
   const filtered = formatFilter === FORMAT_ALL ? decks : decks.filter(d => d.format === formatFilter)
 
-  // ── Views ─────────────────────────────────────────────────────────────────
-
+  // ── Detail view ───────────────────────────────────────────────────────────
   if (selected) {
     return (
       <DeckDetail
@@ -80,7 +111,7 @@ export default function Decks({ user, collection, showToast }) {
     )
   }
 
-  // Group decks by a tag/group field (or ungrouped)
+  // ── Group decks ────────────────────────────────────────────────────────────
   const grouped = {}
   filtered.forEach(deck => {
     const group = deck.group || 'My Decks'
@@ -90,7 +121,7 @@ export default function Decks({ user, collection, showToast }) {
 
   return (
     <div>
-      {/* Tabs: My Decks | Explore */}
+      {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
         {[['my', '🃏 Decks'], ['explore', '🔍 Explore']].map(([key, label]) => (
           <button key={key} onClick={() => setActiveTab(key)} style={{
@@ -115,7 +146,6 @@ export default function Decks({ user, collection, showToast }) {
         </div>
       ) : (
         <>
-          {/* Format filter */}
           {decks.length > 0 && (
             <div className="tabs" style={{ marginBottom: '16px' }}>
               {formats.map(f => (
@@ -124,7 +154,6 @@ export default function Decks({ user, collection, showToast }) {
             </div>
           )}
 
-          {/* Empty state */}
           {!loading && decks.length === 0 && (
             <div className="empty-state" style={{ padding: '60px 20px' }}>
               <div className="empty-icon">🃏</div>
@@ -135,7 +164,12 @@ export default function Decks({ user, collection, showToast }) {
             </div>
           )}
 
-          {/* Card-art deck grid grouped */}
+          {!user && decks.length > 0 && (
+            <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#fbbf24' }}>
+              ⚠️ Sign in to save decks to your profile — decks stored locally will be lost on refresh.
+            </div>
+          )}
+
           {Object.entries(grouped).map(([group, groupDecks]) => (
             <div key={group} style={{ padding: '0 16px' }}>
               {Object.keys(grouped).length > 1 && (
@@ -168,8 +202,7 @@ export default function Decks({ user, collection, showToast }) {
   )
 }
 
-// ── Deck art tile ────────────────────────────────────────────────────────────
-
+// ── Deck art tile ─────────────────────────────────────────────────────────────
 function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
   const [artUrl, setArtUrl] = useState(null)
   const fetchedRef = useRef(false)
@@ -189,7 +222,7 @@ function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
   }, [deck])
 
   const { main } = countCards(deck)
-  const isCmdr   = isCommanderFormat(deck.format)
+  const isCmdr = isCommanderFormat(deck.format)
 
   return (
     <div className="deck-art-tile" onClick={onClick}>
@@ -204,34 +237,136 @@ function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
           {deck.format}{isCmdr && deck.commander ? ` · ${deck.commander}` : ''} · {main} cards
         </div>
       </div>
-      {/* Action buttons */}
       <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}
            onClick={e => e.stopPropagation()}>
-        <button onClick={onEdit} style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#fff', cursor: 'pointer' }}>✏️</button>
+        <button onClick={onEdit}   style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#fff', cursor: 'pointer' }}>✏️</button>
         <button onClick={onDelete} style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#f87171', cursor: 'pointer' }}>🗑</button>
       </div>
     </div>
   )
 }
 
-// ── Deck detail view ──────────────────────────────────────────────────────
+// ── Card row with hover preview ───────────────────────────────────────────────
+function CardRow({ card, cardValues, isLast }) {
+  const [previewImg, setPreviewImg] = useState(null)
+  const [hoverPos,   setHoverPos]   = useState(null)
+  const price = cardValues?.[card.name]
 
+  const handleMouseEnter = useCallback((e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const PW = 210, PH = 295   // preview dimensions (approximate)
+    const x = rect.right + 14 + PW < W ? rect.right + 14 : rect.left - PW - 14
+    const y = Math.max(8, Math.min(rect.top - 20, H - PH - 8))
+    setHoverPos({ x, y })
+
+    if (IMG_CACHE.has(card.name)) {
+      setPreviewImg(IMG_CACHE.get(card.name))
+      return
+    }
+    fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(card.name)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const url = data?.image_uris?.normal || data?.card_faces?.[0]?.image_uris?.normal || null
+        IMG_CACHE.set(card.name, url)
+        setPreviewImg(url)
+      })
+      .catch(() => IMG_CACHE.set(card.name, null))
+  }, [card.name])
+
+  const handleMouseLeave = useCallback(() => {
+    setPreviewImg(null)
+    setHoverPos(null)
+  }, [])
+
+  const scryfallHref = `https://scryfall.com/search?q=!%22${encodeURIComponent(card.name)}%22&order=released&dir=asc`
+
+  return (
+    <>
+      <div
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          padding: '3px 0',
+          borderBottom: isLast ? 'none' : '1px solid var(--bg-secondary)',
+        }}
+      >
+        <a
+          href={scryfallHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{ fontSize: '.83rem', color: 'var(--text-primary)', flex: 1, minWidth: 0, textDecoration: 'none', transition: 'color .1s' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-teal)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
+        >
+          {card.name}
+        </a>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexShrink: 0, marginLeft: '8px' }}>
+          {price != null && (
+            <span style={{ fontSize: '.68rem', color: 'var(--accent-gold)' }}>
+              ${(price * card.qty).toFixed(2)}
+            </span>
+          )}
+          <span style={{ fontSize: '.76rem', fontWeight: 700, color: card.qty > 1 ? 'var(--accent-gold)' : 'var(--text-muted)' }}>
+            ×{card.qty}
+          </span>
+        </div>
+      </div>
+
+      {hoverPos && previewImg && createPortal(
+        <div style={{
+          position: 'fixed', left: hoverPos.x, top: hoverPos.y,
+          zIndex: 9999, pointerEvents: 'none',
+          filter: 'drop-shadow(0 8px 32px rgba(0,0,0,.85))',
+          transition: 'opacity .1s',
+        }}>
+          <img src={previewImg} alt={card.name} style={{ width: 200, borderRadius: 12, display: 'block' }} />
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
+// ── Deck section ──────────────────────────────────────────────────────────────
+function DeckSection({ title, cards, highlight, cardValues }) {
+  return (
+    <div style={{
+      background: 'var(--bg-card)',
+      border: `1px solid ${highlight ? 'var(--accent-gold)' : 'var(--border)'}`,
+      borderRadius: 'var(--radius)', padding: '14px 16px',
+    }}>
+      <div style={{
+        fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
+        color: highlight ? 'var(--accent-gold)' : 'var(--text-muted)', marginBottom: '10px',
+      }}>
+        {title}
+      </div>
+      {cards.map((card, i) => (
+        <CardRow key={`${card.name}-${i}`} card={card} cardValues={cardValues} isLast={i === cards.length - 1} />
+      ))}
+    </div>
+  )
+}
+
+// ── Deck detail view ──────────────────────────────────────────────────────────
 function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck }) {
   const { main, side } = countCards(deck)
-  const isCmdr = isCommanderFormat(deck.format)
-  const fmt = FORMAT_COLORS[deck.format] || { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' }
-
+  const isCmdr   = isCommanderFormat(deck.format)
+  const fmt      = FORMAT_COLORS[deck.format] || { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' }
   const mainboard = deck.mainboard || []
   const sideboard = deck.sideboard || []
 
-  // Budget tracker
+  // ── Budget tracker ────────────────────────────────────────────────────────
   const [deckValue,   setDeckValue]   = useState(null)
   const [fetchingAll, setFetchingAll] = useState(false)
   const [fetchProg,   setFetchProg]   = useState(null)
 
   useEffect(() => {
-    const v = getDeckValueSync(deck, collection || [])
-    setDeckValue(v)
+    setDeckValue(getDeckValueSync(deck, collection || []))
   }, [deck, collection])
 
   async function handleFetchAllPrices() {
@@ -256,39 +391,87 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
     setFetchProg(null)
   }
 
+  // ── Card type grouping ────────────────────────────────────────────────────
+  const [cardTypes,    setCardTypes]    = useState({})
+  const [typesLoading, setTypesLoading] = useState(true)
+
+  useEffect(() => {
+    const allNames = [
+      ...mainboard.map(c => c.name),
+      ...(deck.commander ? [deck.commander] : []),
+    ]
+    if (allNames.length === 0) { setTypesLoading(false); return }
+
+    const uniqueNames = [...new Set(allNames)]
+    const BATCH = 75
+    const promises = []
+
+    for (let i = 0; i < uniqueNames.length; i += BATCH) {
+      const batch = uniqueNames.slice(i, i + BATCH)
+      promises.push(
+        fetch('https://api.scryfall.com/cards/collection', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ identifiers: batch.map(n => ({ name: n })) }),
+        })
+        .then(r => r.ok ? r.json() : { data: [] })
+        .then(({ data = [] }) => {
+          const types = {}
+          for (const card of data) types[card.name] = card.type_line || ''
+          return types
+        })
+        .catch(() => ({}))
+      )
+    }
+
+    Promise.all(promises).then(results => {
+      setCardTypes(Object.assign({}, ...results))
+      setTypesLoading(false)
+    })
+  }, [deck.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Build typed groups for mainboard once types are loaded
+  const typeGroups = useMemo(() => {
+    if (typesLoading || Object.keys(cardTypes).length === 0) return null
+    const buckets = {}
+    for (const card of mainboard) {
+      const bucket = getTypeBucket(cardTypes[card.name] || '')
+      if (!buckets[bucket]) buckets[bucket] = []
+      buckets[bucket].push(card)
+    }
+    return TYPE_ORDER
+      .map(t => ({
+        ...t,
+        cards: buckets[t.key] || [],
+        count: (buckets[t.key] || []).reduce((s, c) => s + c.qty, 0),
+      }))
+      .filter(t => t.cards.length > 0)
+  }, [mainboard, cardTypes, typesLoading])
+
   return (
     <div>
-      {/* Back button + header */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ flexShrink: 0 }}>
-          ← Back
-        </button>
+        <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ flexShrink: 0 }}>← Back</button>
         <div style={{ flex: 1 }}>
           <div style={{
             display: 'inline-block', fontSize: '.65rem', fontWeight: 700,
             padding: '2px 8px', borderRadius: '4px', marginBottom: '6px',
-            background: fmt.bg, color: fmt.color, textTransform: 'uppercase', letterSpacing: '.5px'
+            background: fmt.bg, color: fmt.color, textTransform: 'uppercase', letterSpacing: '.5px',
           }}>
             {deck.format}
           </div>
           <h2 style={{ margin: 0, fontSize: '1.3rem' }}>{deck.name}</h2>
           {isCmdr && deck.commander && (
-            <div style={{ fontSize: '.82rem', color: 'var(--accent-gold)', marginTop: '4px' }}>
-              Commander: {deck.commander}
-            </div>
+            <div style={{ fontSize: '.82rem', color: 'var(--accent-gold)', marginTop: '4px' }}>Commander: {deck.commander}</div>
           )}
           <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             {main} cards{side > 0 ? ` · ${side} sideboard` : ''}
           </div>
         </div>
 
-        {/* Action buttons */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <button
-            className={`btn btn-sm ${copied ? 'btn-ghost' : 'btn-primary'}`}
-            onClick={onCopyArena}
-            style={{ fontWeight: 700 }}
-          >
+          <button className={`btn btn-sm ${copied ? 'btn-ghost' : 'btn-primary'}`} onClick={onCopyArena} style={{ fontWeight: 700 }}>
             {copied ? '✓ Copied!' : '📋 Copy for Arena'}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={onEdit}>✏️ Edit</button>
@@ -304,60 +487,61 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
           display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap',
         }}>
           <div>
-            <div style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-              Deck Value
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
-              ${deckValue.cachedValue.toFixed(2)}
-            </div>
+            <div style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px' }}>Deck Value</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-gold)' }}>${deckValue.cachedValue.toFixed(2)}</div>
           </div>
           {deckValue.ownedValue > 0 && deckValue.ownedValue !== deckValue.cachedValue && (
             <div>
-              <div style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                You Own
-              </div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-teal)' }}>
-                ${deckValue.ownedValue.toFixed(2)}
-              </div>
+              <div style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px' }}>You Own</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-teal)' }}>${deckValue.ownedValue.toFixed(2)}</div>
             </div>
           )}
           {deckValue.unknownCards.length > 0 && (
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
-                {deckValue.unknownCards.length} cards without prices
-              </span>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={handleFetchAllPrices}
-                disabled={fetchingAll}
-                style={{ fontSize: '.7rem' }}
-              >
-                {fetchingAll
-                  ? `Fetching ${fetchProg?.done || 0}/${fetchProg?.total || '?'}…`
-                  : '🔄 Fetch Market Prices'
-                }
+              <span style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{deckValue.unknownCards.length} cards without prices</span>
+              <button className="btn btn-ghost btn-sm" onClick={handleFetchAllPrices} disabled={fetchingAll} style={{ fontSize: '.7rem' }}>
+                {fetchingAll ? `Fetching ${fetchProg?.done || 0}/${fetchProg?.total || '?'}…` : '🔄 Fetch Market Prices'}
               </button>
             </div>
           )}
         </div>
       )}
 
-      {/* Card list */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+      {/* Card grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
 
         {/* Commander */}
         {isCmdr && deck.commander && (
-          <DeckSection title="Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} />
+          <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} />
         )}
 
-        {/* Main deck */}
+        {/* Mainboard — typed groups or fallback while loading */}
         {mainboard.length > 0 && (
-          <DeckSection title={isCmdr ? `Deck (${main - 1})` : `Main Deck (${main})`} cards={mainboard} cardValues={deckValue?.cardValues} />
+          typeGroups
+            ? typeGroups.map(group => (
+                <DeckSection
+                  key={group.key}
+                  title={`${group.label} (${group.count})`}
+                  cards={group.cards}
+                  cardValues={deckValue?.cardValues}
+                />
+              ))
+            : (
+              <DeckSection
+                title={
+                  typesLoading
+                    ? `${isCmdr ? 'Deck' : 'Main Deck'} (${isCmdr ? main - 1 : main}) · grouping…`
+                    : `${isCmdr ? 'Deck' : 'Main Deck'} (${isCmdr ? main - 1 : main})`
+                }
+                cards={mainboard}
+                cardValues={deckValue?.cardValues}
+              />
+            )
         )}
 
         {/* Sideboard */}
         {sideboard.length > 0 && (
-          <DeckSection title={`Sideboard (${side})`} cards={sideboard} cardValues={deckValue?.cardValues} />
+          <DeckSection title={`🔄 Sideboard (${side})`} cards={sideboard} cardValues={deckValue?.cardValues} />
         )}
       </div>
 
@@ -368,48 +552,6 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
           onSave={onModalSave}
         />
       )}
-    </div>
-  )
-}
-
-// ── Card section ──────────────────────────────────────────────────────────
-
-function DeckSection({ title, cards, highlight, cardValues }) {
-  return (
-    <div style={{
-      background: 'var(--bg-card)', border: `1px solid ${highlight ? 'var(--accent-gold)' : 'var(--border)'}`,
-      borderRadius: 'var(--radius)', padding: '14px 16px'
-    }}>
-      <div style={{
-        fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
-        color: highlight ? 'var(--accent-gold)' : 'var(--text-muted)', marginBottom: '10px'
-      }}>
-        {title}
-      </div>
-      {cards.map((card, i) => {
-        const price = cardValues?.[card.name]
-        return (
-          <div key={i} style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-            padding: '3px 0', borderBottom: i < cards.length - 1 ? '1px solid var(--bg-secondary)' : 'none'
-          }}>
-            <span style={{ fontSize: '.83rem', color: 'var(--text-primary)', flex: 1, minWidth: 0 }}>{card.name}</span>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexShrink: 0, marginLeft: '8px' }}>
-              {price != null && (
-                <span style={{ fontSize: '.68rem', color: 'var(--accent-gold)' }}>
-                  ${(price * card.qty).toFixed(2)}
-                </span>
-              )}
-              <span style={{
-                fontSize: '.76rem', fontWeight: 700,
-                color: card.qty > 1 ? 'var(--accent-gold)' : 'var(--text-muted)'
-              }}>
-                ×{card.qty}
-              </span>
-            </div>
-          </div>
-        )
-      })}
     </div>
   )
 }

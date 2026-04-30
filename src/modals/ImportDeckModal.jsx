@@ -67,8 +67,12 @@ export default function ImportDeckModal({ onClose, onSave, existingDeck }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '16px' }}>
-      <div className="modal-box" style={{ maxWidth: '560px', width: '100%' }}>
+    <div
+      onMouseDown={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '16px' }}
+    >
+      <div className="modal-box" style={{ maxWidth: '560px', width: '100%', position: 'relative', transform: 'none', top: 'auto', left: 'auto', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3>{isEditing ? '✏️ Edit Deck' : '📥 Import Deck'}</h3>
 
         {/* Name + Format row */}
