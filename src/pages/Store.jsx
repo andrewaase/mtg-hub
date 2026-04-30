@@ -1136,7 +1136,7 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
 
       {/* ── Empty / loading states ── */}
       {loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(185px,1fr))', gap: 12 }}>
           {[...Array(8)].map((_, i) => (
             <div key={i} style={{ aspectRatio: '63/120', borderRadius: 14, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
           ))}
@@ -1167,8 +1167,8 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
         <div style={{
           display: 'grid',
           gridTemplateColumns: category === 'single'
-            ? 'repeat(auto-fill,minmax(140px,1fr))'
-            : 'repeat(auto-fill,minmax(200px,1fr))',
+            ? 'repeat(auto-fill,minmax(185px,1fr))'
+            : 'repeat(auto-fill,minmax(220px,1fr))',
           gap: 12,
         }}>
           {filtered.map(listing =>
