@@ -211,12 +211,15 @@ export async function saveDeck(deck, userId) {
   const now = new Date().toISOString()
   if (hasSupabase && userId) {
     if (deck.id) {
-      const { data } = await supabase.from('decks').update({ ...deck, updated_at: now }).eq('id', deck.id).eq('user_id', userId).select().single()
+      const { data, error } = await supabase.from('decks').update({ ...deck, updated_at: now }).eq('id', deck.id).eq('user_id', userId).select().single()
+      if (error) { console.error('[db] saveDeck update error:', error); throw new Error(error.message) }
       return data || deck
     }
-    const { data } = await supabase.from('decks').insert({ ...deck, user_id: userId, created_at: now, updated_at: now }).select().single()
+    const { data, error } = await supabase.from('decks').insert({ ...deck, user_id: userId, created_at: now, updated_at: now }).select().single()
+    if (error) { console.error('[db] saveDeck insert error:', error); throw new Error(error.message) }
     return data || deck
   }
+  // Not signed in — localStorage only (won't persist across sessions)
   const decks = lsGet().decks || []
   if (deck.id) {
     const updated = decks.map(d => d.id === deck.id ? { ...deck, updatedAt: now } : d)
