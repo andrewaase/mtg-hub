@@ -2,17 +2,32 @@ const FEATURES = [
   {
     icon: '🏪',
     title: 'Card Shop',
-    desc: 'Buy MTG singles at fair, daily-updated prices. Every listing inspected and graded honestly.',
+    desc: 'Browse singles, sealed product, and curated resealed packs — all in one store. Filter by price range, condition, or foil status. Share any listing with a direct link.',
+  },
+  {
+    icon: '🎴',
+    title: 'Sealed & Resealed Products',
+    desc: 'Pick up booster boxes, collector packs, and our exclusive resealed packs like Vaulted Rarities and Relics Awakened — hand-curated surprises at every price point.',
+  },
+  {
+    icon: '💳',
+    title: 'Secure Checkout',
+    desc: 'Stripe-powered payments with flat-rate shipping. Inventory auto-decrements on purchase and a full itemized confirmation email goes out the moment your order is placed.',
+  },
+  {
+    icon: '🔔',
+    title: 'Restock Waitlist',
+    desc: 'Sold out on something you want? Hit "Notify Me" and we\'ll email you the second it\'s back in stock — no account required.',
   },
   {
     icon: '📦',
     title: 'Collection Tracker',
-    desc: 'Add cards by search or camera scan. Your collection value updates automatically.',
+    desc: 'Add cards by search or camera scan. Tap any card for full oracle text, type line, mana cost, flavor text, and live market value — all in one view.',
   },
   {
     icon: '📈',
     title: 'Price History',
-    desc: 'See how your portfolio value changes over time with daily snapshots and trend charts.',
+    desc: 'Every card in the store shows a 90-day price chart with 7-day change, all-time high, and all-time low. Your collection value is always up to date.',
   },
   {
     icon: '🃏',
@@ -26,13 +41,13 @@ const FEATURES = [
   },
   {
     icon: '🎯',
-    title: 'Wishlist & Price Alerts',
-    desc: 'Set a target price on any card and get alerted the moment it drops to your number.',
+    title: 'Wishlist & Previews',
+    desc: 'Save cards you\'re hunting. Click any thumbnail for a full-size card preview with live market price — great for quick buy decisions.',
   },
   {
     icon: '🔍',
     title: 'Card Lookup',
-    desc: 'Search any card for rulings, format legality, set printings, and live prices from multiple markets.',
+    desc: 'Search any card for rulings, format legality, set printings, and live prices. One click sends it straight to the shop to buy from us.',
   },
   {
     icon: '📸',
@@ -196,7 +211,10 @@ export default function About() {
         <ul style={{ color: 'var(--text-secondary)', fontSize: '.88rem', lineHeight: 1.9, paddingLeft: 20, margin: 0 }}>
           <li>Prices updated daily using live Scryfall market data</li>
           <li>Every card inspected and graded honestly — NM means NM</li>
-          <li>Fast shipping, carefully packaged in sleeves and toploaders</li>
+          <li>Flat-rate $4.99 shipping, carefully packaged in sleeves and toploaders</li>
+          <li>Order confirmation email sent the moment your payment clears</li>
+          <li>Singles, sealed product, and exclusive resealed packs all in one place</li>
+          <li>Out-of-stock? Join the waitlist and we'll notify you when it's back</li>
           <li>Real collector behind every listing — not a faceless warehouse</li>
           <li>Questions? You'll get a real reply, fast</li>
         </ul>
