@@ -41,10 +41,25 @@ export async function deleteMatch(id, userId) {
 }
 
 // ── COLLECTION ────────────────────────────────────────
+// DB columns are snake_case; JS objects use camelCase — map both ways.
+function collectionRowToCard(row) {
+  return {
+    id:           row.id,
+    name:         row.name,
+    qty:          row.qty,
+    condition:    row.condition,
+    setName:      row.set_name   ?? row.setName   ?? null,
+    img:          row.img        ?? null,
+    colors:       row.colors     ?? [],
+    price:        row.price      ?? null,
+    tcgplayerUrl: row.tcgplayer_url ?? row.tcgplayerUrl ?? null,
+  }
+}
+
 export async function getCollection(userId) {
   if (hasSupabase && userId) {
     const { data } = await supabase.from('collection').select('*').eq('user_id', userId)
-    return data || []
+    return (data || []).map(collectionRowToCard)
   }
   return lsGet().collection || []
 }
@@ -65,15 +80,26 @@ export async function addCard(card, userId) {
         console.error('[db] collection update error:', updateErr)
         throw new Error(updateErr.message)
       }
-      return data
+      return collectionRowToCard(data)
     }
+    // Explicit column mapping — avoids camelCase/snake_case mismatches
     const { data, error: insertErr } = await supabase
-      .from('collection').insert({ ...card, user_id: userId }).select().single()
+      .from('collection').insert({
+        user_id:       userId,
+        name:          card.name,
+        qty:           card.qty,
+        condition:     card.condition   ?? 'NM',
+        set_name:      card.setName     ?? null,
+        img:           card.img         ?? null,
+        colors:        card.colors      ?? [],
+        price:         card.price       ?? null,
+        tcgplayer_url: card.tcgplayerUrl ?? null,
+      }).select().single()
     if (insertErr) {
       console.error('[db] collection insert error:', insertErr)
       throw new Error(insertErr.message)
     }
-    return data
+    return collectionRowToCard(data)
   }
   const collection = lsGet().collection || []
   const existing = collection.find(c => c.name.toLowerCase() === card.name.toLowerCase())
