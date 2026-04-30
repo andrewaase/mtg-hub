@@ -6,10 +6,11 @@ const COMMANDER_FORMATS = ['Commander', 'Brawl', 'Historic Brawl', 'Oathbreaker'
 // ── Parser ─────────────────────────────────────────────────────────────────
 // Handles these common formats:
 //   "4 Lightning Bolt"
-//   "4 Lightning Bolt (M11) 149"
+//   "4 Lightning Bolt (M11) 149"         ← Arena / Moxfield with set+collector
 //   "4x Lightning Bolt"
 //   "Commander\n1 Raffine...\n\nDeck\n1 Arcane Signet..."
 //   "// comment lines"
+//   Blank-line separator (no explicit Sideboard header) — Arena export style
 
 export function parseDeckText(text, format = 'Standard') {
   const lines = text.split('\n').map(l => l.trim())
@@ -17,21 +18,37 @@ export function parseDeckText(text, format = 'Standard') {
   const sideboard = []
   let commander = null
   let section = 'main'
+  // Tracks a blank line after mainboard cards so we can switch to sideboard
+  // even when there's no explicit "Sideboard" header (Arena blank-line format)
+  let blankAfterMain = false
 
   for (const raw of lines) {
-    const line = raw.replace(/^\uFEFF/, '') // strip BOM
+    const line = raw.replace(/^﻿/, '') // strip BOM
 
-    // Skip blanks and comments
-    if (!line || line.startsWith('//') || line.startsWith('#')) continue
+    // Blank line — flag a possible section break after mainboard
+    if (!line) {
+      if (section === 'main' && mainboard.length > 0) blankAfterMain = true
+      continue
+    }
+
+    // Skip comments
+    if (line.startsWith('//') || line.startsWith('#')) continue
 
     // Section headers
-    if (/^commander$/i.test(line))            { section = 'commander'; continue }
-    if (/^(deck|main(board)?)$/i.test(line))  { section = 'main';      continue }
-    if (/^(sideboard|side|sb)$/i.test(line))  { section = 'side';      continue }
+    if (/^commander$/i.test(line))            { section = 'commander'; blankAfterMain = false; continue }
+    if (/^(deck|main(board)?)$/i.test(line))  { section = 'main';      blankAfterMain = false; continue }
+    if (/^(sideboard|side|sb)$/i.test(line))  { section = 'side';      blankAfterMain = false; continue }
 
     // Card line: "4 Name (SET) 123 *F*" — strip set code and collector number
     const match = line.match(/^(\d+)x?\s+(.+?)(?:\s+\([A-Z0-9-]+\)\s*\d*)?(?:\s+\*[A-Z]\*)*$/)
     if (!match) continue
+
+    // If a blank line followed mainboard cards and no explicit header appeared,
+    // treat the remainder as the sideboard (Arena blank-line separator format)
+    if (blankAfterMain && section === 'main') {
+      section = 'side'
+      blankAfterMain = false
+    }
 
     const qty  = parseInt(match[1], 10)
     const name = match[2].trim()
