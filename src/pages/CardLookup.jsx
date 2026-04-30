@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { searchScryfall, getCardDetails, getAllPrintings } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
+import { supabase, hasSupabase } from '../lib/supabase'
+import { addWishlistItem } from '../lib/db'
 
 // ── Rarity helpers ─────────────────────────────────────────────────────────────
 const RARITY_ORDER  = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, bonus: 5 }
@@ -34,27 +36,24 @@ function SetIcon({ uri, size = 22 }) {
 }
 
 // ── Wishlist helper ────────────────────────────────────────────────────────────
-const LS_KEY = 'mtg-hub-v1'
-function addCardToWishlist(card, showToast) {
+async function addCardToWishlist(card, showToast, user) {
   try {
-    const data  = JSON.parse(localStorage.getItem(LS_KEY) || '{}')
-    const list  = data.wishlist || []
-    if (list.find(i => i.name === card.name)) {
-      showToast(`${card.name} is already on your wishlist`)
-      return
-    }
-    list.push({
-      id: Date.now(),
-      name: card.name,
+    await addWishlistItem({
+      name:         card.name,
       currentPrice: parseFloat(card.prices?.usd) || null,
-      targetPrice: null,
-      addedAt: new Date().toISOString(),
-      img: card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
-      tcgUrl: card.purchase_uris?.tcgplayer || null,
-    })
-    localStorage.setItem(LS_KEY, JSON.stringify({ ...data, wishlist: list }))
+      targetPrice:  null,
+      addedAt:      new Date().toISOString(),
+      img:          card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
+      setName:      card.set_name || null,
+    }, user?.id)
     showToast(`🎯 ${card.name} added to wishlist!`)
-  } catch { showToast('Could not save to wishlist') }
+  } catch (err) {
+    if (err.message?.toLowerCase().includes('duplicate') || err.message?.toLowerCase().includes('unique')) {
+      showToast(`${card.name} is already on your wishlist`)
+    } else {
+      showToast('Could not save to wishlist')
+    }
+  }
 }
 
 // ── Printing thumbnail card (horizontal scroll) ────────────────────────────────
@@ -136,10 +135,26 @@ function PrintingCard({ printing, isSelected, onSelect }) {
 }
 
 // ── Card Detail View ───────────────────────────────────────────────────────────
-function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard, showToast, onPrintingSelect }) {
+function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard, showToast, onPrintingSelect, user, onStoreSearch }) {
   const rc  = RARITY_COLOR[card.rarity] || MUTED
   const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal
   const setIconUrl = card.set ? `https://svgs.scryfall.io/sets/${card.set}.svg` : null
+
+  // Check if this card is available in the Vaulted Singles store
+  const [storeListing, setStoreListing] = useState(null)
+  useEffect(() => {
+    if (!hasSupabase) return
+    setStoreListing(null)
+    supabase.from('store_listings')
+      .select('id, price, qty_available, condition, is_foil')
+      .eq('name', card.name)
+      .eq('active', true)
+      .gt('qty_available', 0)
+      .order('price', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setStoreListing(data || null))
+  }, [card.name])
 
   // Alternate arts = all printings except the current one
   const altPrintings = printings.filter(p => p.id !== card.id)
@@ -205,6 +220,24 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
 
       {/* Action buttons */}
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+        {/* Buy from Vaulted Singles — only shown when in stock */}
+        {storeListing && (
+          <button
+            onClick={() => onStoreSearch?.(card.name)}
+            style={{
+              width: '100%', padding: '13px',
+              background: 'linear-gradient(135deg, #c9a84c, #f0c060)',
+              color: '#000', border: 'none', borderRadius: '12px',
+              fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', letterSpacing: '.3px',
+            }}
+          >
+            🏪 Buy from Vaulted Singles — ${storeListing.price?.toFixed(2)}
+            {storeListing.is_foil ? ' ✨' : ''}
+            {storeListing.condition && storeListing.condition !== 'NM' ? ` (${storeListing.condition})` : ''}
+          </button>
+        )}
+
         <button onClick={() => openAddCard(card)} style={{
           width: '100%', padding: '13px', background: 'var(--accent-gold)', color: '#000',
           border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer',
@@ -212,7 +245,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         }}>
           + Add to Collection
         </button>
-        <button onClick={() => addCardToWishlist(card, showToast)} style={{
+        <button onClick={() => addCardToWishlist(card, showToast, user)} style={{
           width: '100%', padding: '13px', background: 'transparent', color: '#aaa',
           border: `1px solid #2a2a2a`, borderRadius: '12px', fontWeight: 700, fontSize: '.9rem', cursor: 'pointer',
         }}>
@@ -220,8 +253,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </button>
         <a
           href={getTCGPlayerLink(card.purchase_uris?.tcgplayer || card.name)}
-          target="_blank"
-          rel="noopener noreferrer"
+          target="_blank" rel="noopener noreferrer"
           style={{
             display: 'block', width: '100%', padding: '13px',
             background: '#1a4e2e', color: '#4ade80',
@@ -497,7 +529,7 @@ function SearchView({ onBack, onCardSelect }) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed }) {
+export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch }) {
   const [view, setView]           = useState('home') // 'home' | 'search' | 'set' | 'card'
   const [sets, setSets]           = useState([])
   const [setsLoading, setSetsLoad] = useState(true)
@@ -584,6 +616,8 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
         openAddCard={openAddCard}
         showToast={showToast}
         onPrintingSelect={switchPrinting}
+        user={user}
+        onStoreSearch={openStoreSearch}
       />
     )
   }

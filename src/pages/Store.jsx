@@ -731,10 +731,15 @@ function CheckoutModal({ cart, onClose, onSuccess }) {
 }
 
 // ── Main Store page ──────────────────────────────────────────────────────────
-export default function Store() {
+export default function Store({ initialSearch = '', onSearchUsed }) {
   const [listings,        setListings]        = useState([])
   const [loading,         setLoading]         = useState(true)
-  const [search,          setSearch]          = useState('')
+  const [search,          setSearch]          = useState(initialSearch)
+
+  // Pre-populate search when navigated from Card Lookup's "Buy from Vaulted Singles"
+  useEffect(() => {
+    if (initialSearch) { setSearch(initialSearch); onSearchUsed?.() }
+  }, [initialSearch]) // eslint-disable-line react-hooks/exhaustive-deps
   const [sortBy,          setSortBy]          = useState('name')
   const [cart,            setCart]            = useState(loadCart)
   const [cartOpen,        setCartOpen]        = useState(false)

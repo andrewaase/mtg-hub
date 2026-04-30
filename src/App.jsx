@@ -80,6 +80,8 @@ export default function App() {
   const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
   // Card lookup pre-search: set by clicking a card name in the deck builder
   const [cardSearch, setCardSearch] = useState('')
+  // Store pre-search: set by clicking "Buy from Vaulted Singles" in Card Lookup
+  const [storeSearch, setStoreSearch] = useState('')
 
   const setPage = useCallback((newPage) => {
     // Silently block navigation while the deck import/edit modal is open
@@ -208,6 +210,13 @@ export default function App() {
     document.title = PAGE_TITLES['cards']
   }, [])
 
+  const openStoreSearch = useCallback((cardName) => {
+    setStoreSearch(cardName)
+    setPageState('store')
+    window.history.pushState({ page: 'store' }, '', '#store')
+    document.title = PAGE_TITLES['store']
+  }, [])
+
   const pageProps = {
     user, matches, setMatches, collection, setCollection, showToast, setPage,
     openLogMatch: () => setShowLogMatch(true),
@@ -216,6 +225,7 @@ export default function App() {
     openDecklist: (deck) => setDecklistDeck(deck),
     setDeckModalOpen,
     openCardSearch,
+    openStoreSearch,
   }
 
   return (
@@ -237,7 +247,7 @@ export default function App() {
               {page === 'friends'    && <Friends {...pageProps} />}
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
-              {page === 'store'     && <Store />}
+              {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} />}
               {page === 'about'     && <About />}
               {page === 'admin'     && <AdminPanel user={user} />}
             </>
