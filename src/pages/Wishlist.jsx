@@ -243,9 +243,10 @@ export default function Wishlist({ user, showToast, openStoreSearch }) {
 // ── Single wishlist item ───────────────────────────────────────────────────────
 
 function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
-  const [editTarget, setEditTarget] = useState(false)
-  const [targetVal,  setTargetVal]  = useState(item.targetPrice?.toFixed(2) || '')
+  const [editTarget,   setEditTarget]   = useState(false)
+  const [targetVal,    setTargetVal]    = useState(item.targetPrice?.toFixed(2) || '')
   const [storeListing, setStoreListing] = useState(null)
+  const [showPreview,  setShowPreview]  = useState(false)
 
   // Check if this card is available in the Vaulted Singles store
   useEffect(() => {
@@ -278,10 +279,19 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
       borderRadius: '14px', padding: '14px 16px', transition: 'border-color .2s',
     }}>
       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-        {item.img
-          ? <img src={item.img} alt={item.name} style={{ width: '48px', borderRadius: '6px', flexShrink: 0 }} />
-          : <div style={{ width: '48px', height: '68px', background: 'var(--bg-hover)', borderRadius: '6px', flexShrink: 0 }} />
-        }
+        <div
+          onClick={() => setShowPreview(true)}
+          style={{ flexShrink: 0, cursor: 'pointer' }}
+          title="Click to preview"
+        >
+          {item.img
+            ? <img src={item.img} alt={item.name} style={{ width: '72px', borderRadius: '8px', display: 'block', boxShadow: '0 4px 12px rgba(0,0,0,.4)', transition: 'transform .15s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              />
+            : <div style={{ width: '72px', height: '100px', background: 'var(--bg-hover)', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🃏</div>
+          }
+        </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
@@ -390,5 +400,31 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
         </div>
       </div>
     </div>
+
+    {/* ── Card preview modal ── */}
+    {showPreview && (
+      <>
+        <div onClick={() => setShowPreview(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          zIndex: 401, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+        }}>
+          {item.img
+            ? <img src={item.img} alt={item.name} style={{ width: 'min(320px,80vw)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,.8)', display: 'block' }} />
+            : <div style={{ width: 'min(320px,80vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>🃏</div>
+          }
+          <div style={{ display: 'flex', gap: 8 }}>
+            {item.currentPrice != null && (
+              <div style={{ background: 'rgba(201,168,76,.15)', border: '1px solid rgba(201,168,76,.3)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent-gold)', fontWeight: 800, fontSize: '.9rem' }}>
+                Market {fmt(item.currentPrice)}
+              </div>
+            )}
+            <button onClick={() => setShowPreview(false)} style={{ padding: '6px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontSize: '.85rem' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      </>
+    )}
   )
 }

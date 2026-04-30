@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { removeCard, exportData } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
@@ -54,6 +54,120 @@ function ChipRow({ options, value, onChange, multi = false, labelFn }) {
   )
 }
 
+const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
+
+function CollectionCardModal({ card, onClose, onRemove }) {
+  const [scryfallData, setScryfallData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const url = card.scryfallId
+      ? `https://api.scryfall.com/cards/${card.scryfallId}`
+      : `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}`
+    fetch(url)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setScryfallData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [card.name, card.scryfallId])
+
+  const face     = scryfallData?.card_faces?.[0] || scryfallData
+  const oracle   = face?.oracle_text || ''
+  const typeLine = face?.type_line || scryfallData?.type_line || ''
+  const manaCost = face?.mana_cost || scryfallData?.mana_cost || ''
+  const flavor   = face?.flavor_text || ''
+  const power    = scryfallData?.power
+  const tough    = scryfallData?.toughness
+  const loyalty  = scryfallData?.loyalty
+  // prefer hi-res Scryfall image, fall back to stored thumbnail
+  const img = scryfallData
+    ? (scryfallData.image_uris?.normal || scryfallData.card_faces?.[0]?.image_uris?.normal)
+    : card.img
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(560px,96vw)', maxHeight: '92vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 401, padding: 20,
+        boxShadow: '0 24px 60px rgba(0,0,0,.65)',
+      }}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 14, right: 14,
+          background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%',
+          width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
+
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          {/* Card image */}
+          <div style={{ flexShrink: 0 }}>
+            {img
+              ? <img src={img} alt={card.name} style={{ width: 'min(200px,40vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
+              : <div style={{ width: 'min(200px,40vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+            }
+          </div>
+
+          {/* Details */}
+          <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1.1rem', lineHeight: 1.25, paddingRight: 32 }}>{card.name}</div>
+              {!loading && typeLine && <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>{typeLine}</div>}
+              {!loading && manaCost && <div style={{ fontSize: '.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{manaCost}</div>}
+            </div>
+
+            {loading && <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Loading card text…</div>}
+
+            {!loading && oracle && (
+              <div style={{ fontSize: '.78rem', lineHeight: 1.65, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', padding: '9px 11px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                {oracle}
+              </div>
+            )}
+
+            {!loading && (power != null || loyalty != null) && (
+              <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                {power != null ? `${power}/${tough}` : `Loyalty: ${loyalty}`}
+              </div>
+            )}
+
+            {!loading && flavor && (
+              <div style={{ fontSize: '.68rem', fontStyle: 'italic', color: 'var(--text-muted)', borderLeft: '2px solid var(--border)', paddingLeft: 8 }}>{flavor}</div>
+            )}
+
+            {/* Collection metadata */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+              <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 8px' }}>
+                ×{card.qty}
+              </span>
+              {card.condition && (
+                <span style={{ fontSize: '.65rem', fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 8px' }}>
+                  {CONDITION_LABELS[card.condition] || card.condition}
+                </span>
+              )}
+              {card.isFoil && (
+                <span style={{ fontSize: '.62rem', fontWeight: 700, background: 'linear-gradient(135deg,#a78bfa,#c084fc)', color: '#fff', borderRadius: 4, padding: '2px 7px' }}>✦ FOIL</span>
+              )}
+              {card.setName && <span style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>{card.setName}</span>}
+            </div>
+
+            {card.price != null && (
+              <div style={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--accent-gold)' }}>${parseFloat(card.price).toFixed(2)}</div>
+            )}
+
+            <button
+              onClick={() => { onRemove(card.id); onClose() }}
+              style={{ marginTop: 'auto', padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#f87171', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer', alignSelf: 'flex-start' }}
+            >
+              Remove from collection
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast }) {
   const [view,         setView]         = useState('all')
   const [search,       setSearch]       = useState('')
@@ -63,6 +177,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [refreshProg,  setRefreshProg]  = useState(null)
   const [tradeSelect,  setTradeSelect]  = useState(new Set())
   const [ckMap,        setCkMap]        = useState({})
+  const [selectedCard, setSelectedCard] = useState(null)
 
   // ── Filter state ──
   const [filterColors,    setFilterColors]    = useState([])
@@ -565,7 +680,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
 
             <div className="collection-grid" style={{ marginTop: '8px' }}>
               {filtered.map(card => (
-                <div key={card.id} className={`col-card ${card.forSale ? 'for-sale' : ''}`}>
+                <div key={card.id} className={`col-card ${card.forSale ? 'for-sale' : ''}`} onClick={() => setSelectedCard(card)} style={{ cursor: 'pointer' }}>
                   {card.img && <img src={card.img} alt={card.name} />}
                   <div className="col-card-info">
                     <div className="col-card-name">{card.name}</div>
@@ -586,7 +701,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   <button
                     className="col-card-tag-btn"
                     title={card.forSale ? 'Remove from sell list' : 'Mark for sale'}
-                    onClick={() => updateCard(card.id, { forSale: !card.forSale })}
+                    onClick={(e) => { e.stopPropagation(); updateCard(card.id, { forSale: !card.forSale }) }}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       fontSize: '.9rem', padding: '2px 4px', lineHeight: 1,
@@ -598,7 +713,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   >
                     🏷️
                   </button>
-                  <button className="col-card-remove" onClick={() => handleRemove(card.id)}>✕</button>
+                  <button className="col-card-remove" onClick={(e) => { e.stopPropagation(); handleRemove(card.id) }}>✕</button>
                   <a
                     href={getTCGPlayerLink(card.tcgplayerUrl || card.name)}
                     target="_blank"
@@ -673,6 +788,13 @@ export default function Collection({ collection, setCollection, user, openAddCar
             />
           ))}
         </div>
+      )}
+      {selectedCard && (
+        <CollectionCardModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+          onRemove={(id) => { handleRemove(id); setSelectedCard(null) }}
+        />
       )}
     </div>
   )

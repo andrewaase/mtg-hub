@@ -7,24 +7,24 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
   const isAdmin = user?.email === ADMIN_EMAIL
 
   const navItems = [
-    { id: 'dashboard', icon: '🏠', label: 'Dashboard', section: 'Main' },
-    { id: 'log', icon: '⚔️', label: 'Match Log', section: 'Main' },
-    { id: 'stats', icon: '📊', label: 'Stats', section: 'Main' },
-    { id: 'news', icon: '📰', label: 'MTG News', section: 'Resources' },
-    { id: 'cards', icon: '🔍', label: 'Card Lookup', section: 'Resources' },
-    { id: 'collection', icon: '📦', label: 'My Collection', section: 'Resources' },
-    { id: 'decks', icon: '🃏', label: 'My Decks', section: 'Resources' },
-    { id: 'wishlist', icon: '🎯', label: 'Wishlist',     section: 'Resources' },
-    { id: 'store',    icon: '🏪', label: 'Card Shop',    section: 'Resources' },
-    { id: 'releases', icon: '📅', label: 'Set Releases', section: 'Resources' },
-    { id: 'about',    icon: '💬', label: 'About',        section: 'Resources' },
-    { id: 'friends', icon: '🤝', label: 'Friends & Trades', section: 'Social', requiresSupabase: true },
-    { id: 'admin',   icon: '🎛️', label: 'Control Center',  section: 'Admin',  requiresAdmin: true },
+    { id: 'dashboard',  icon: '🏠', label: 'Dashboard',        section: 'Main'      },
+    { id: 'store',      icon: '🏪', label: 'Store',             section: 'Main'      },
+    { id: 'cards',      icon: '🔍', label: 'Card Lookup',       section: 'Resources' },
+    { id: 'news',       icon: '📰', label: 'MTG News',          section: 'Resources' },
+    { id: 'releases',   icon: '📅', label: 'Set Releases',      section: 'Resources' },
+    { id: 'collection', icon: '📦', label: 'My Collection',     section: 'Tools',    requiresSupabase: true },
+    { id: 'decks',      icon: '🃏', label: 'My Decks',          section: 'Tools',    requiresSupabase: true },
+    { id: 'wishlist',   icon: '🎯', label: 'Wishlist',          section: 'Tools',    requiresSupabase: true },
+    { id: 'log',        icon: '⚔️', label: 'Match Log',         section: 'Tools',    requiresSupabase: true },
+    { id: 'stats',      icon: '📊', label: 'Stats',             section: 'Tools',    requiresSupabase: true },
+    { id: 'friends',    icon: '🤝', label: 'Friends & Trades',  section: 'Social',   requiresSupabase: true },
+    { id: 'admin',      icon: '🎛️', label: 'Control Center',   section: 'Admin',    requiresAdmin: true },
   ]
 
   const sections = {
     Main:      navItems.filter(i => i.section === 'Main'),
     Resources: navItems.filter(i => i.section === 'Resources'),
+    Tools:     navItems.filter(i => i.section === 'Tools'),
     Social:    navItems.filter(i => i.section === 'Social'),
     Admin:     navItems.filter(i => i.section === 'Admin'),
   }
@@ -42,7 +42,7 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
         <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '.65rem', color: '#8b5ea4', letterSpacing: '3px', marginTop: '1px' }}>SINGLES</div>
       </div>
 
-      {['Main', 'Resources', 'Social', 'Admin'].map(section => {
+      {['Main', 'Resources', 'Tools', 'Social', 'Admin'].map(section => {
         const items = sections[section]
         const visibleItems = items.filter(i =>
           (!i.requiresSupabase || hasSupabase) &&

@@ -73,7 +73,7 @@ function PrintingCard({ printing, isSelected, onSelect }) {
     <div
       onClick={() => onSelect(printing)}
       style={{
-        flexShrink: 0, width: 108, cursor: 'pointer',
+        flexShrink: 0, width: 136, cursor: 'pointer',
         borderRadius: '8px', overflow: 'hidden',
         border: isSelected ? '2px solid var(--accent-gold)' : '2px solid transparent',
         background: '#111',

@@ -551,10 +551,345 @@ function CreateListingModal({ onClose, onSaved }) {
   )
 }
 
+// ── Edit listing modal ─────────────────────────────────────────────────────────
+function EditListingModal({ listing, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name:           listing.name || '',
+    set_name:       listing.set_name || '',
+    condition:      listing.condition || 'NM',
+    is_foil:        listing.is_foil || false,
+    price:          listing.price || '',
+    qty_available:  listing.qty_available ?? 1,
+    img_url:        listing.img_url || '',
+    active:         listing.active ?? true,
+    product_format: listing.product_format || '',
+    description:    listing.description || '',
+    product_type:   listing.product_type || 'single',
+  })
+  const [saving,        setSaving]        = useState(false)
+  const [err,           setErr]           = useState(null)
+  const [imageUploading,setImageUploading]= useState(false)
+
+  const handleImageUpload = async (file) => {
+    if (!file) return
+    const MAX_MB = 5
+    if (file.size > MAX_MB * 1024 * 1024) { setErr(`Image must be under ${MAX_MB}MB`); return }
+    setImageUploading(true); setErr(null)
+    try {
+      const ext  = file.name.split('.').pop().toLowerCase()
+      const path = `listings/${Date.now()}.${ext}`
+      const { data, error: upErr } = await supabase.storage
+        .from('product-images')
+        .upload(path, file, { cacheControl: '3600', upsert: false })
+      if (upErr) throw new Error(upErr.message)
+      const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(data.path)
+      setForm(f => ({ ...f, img_url: publicUrl }))
+    } catch (e) { setErr(`Upload failed: ${e.message}`) }
+    finally { setImageUploading(false) }
+  }
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    if (!form.name || !form.price) { setErr('Name and price are required'); return }
+    setSaving(true); setErr(null)
+    try {
+      const { error: updErr } = await supabase.from('store_listings').update({
+        name:           form.name.trim(),
+        set_name:       form.set_name.trim() || null,
+        condition:      form.product_type === 'single' ? form.condition : null,
+        is_foil:        form.product_type === 'single' ? form.is_foil : false,
+        price:          parseFloat(form.price),
+        qty_available:  parseInt(form.qty_available, 10) || 0,
+        img_url:        form.img_url.trim() || null,
+        active:         form.active,
+        product_format: form.product_type === 'sealed' ? (form.product_format || null) : null,
+        description:    form.product_type === 'resealed' ? (form.description.trim() || null) : null,
+      }).eq('id', listing.id)
+      if (updErr) throw new Error(updErr.message)
+      onSaved()
+      onClose()
+    } catch (err) {
+      setSaving(false)
+      setErr(err.message)
+    }
+  }
+
+  const inp = (label, key, type = 'text', extra = {}) => (
+    <div>
+      <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>{label}</label>
+      <input type={type} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+        className="form-input" style={{ width: '100%', padding: '9px 12px', fontSize: '.85rem', boxSizing: 'border-box', ...extra.style }} {...extra} />
+    </div>
+  )
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(460px,96vw)', maxHeight: '90vh', overflowY: 'auto', background: '#0f172a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, zIndex: 401, padding: '22px 22px 26px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f1f5f9' }}>Edit Listing</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Product type badge (read-only) */}
+        <div style={{ marginBottom: 14, fontSize: '.72rem', color: '#64748b' }}>
+          Type: <span style={{ fontWeight: 700, color: '#c9a84c' }}>{form.product_type}</span>
+        </div>
+
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {inp(form.product_type === 'single' ? 'Card Name' : 'Product Name', 'name', 'text', { required: true })}
+          {form.product_type !== 'resealed' && inp('Set Name', 'set_name')}
+
+          {form.product_type === 'single' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Condition</label>
+                  <select value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} className="form-input" style={{ width: '100%', padding: '9px 10px', fontSize: '.85rem' }}>
+                    {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01' })}
+                {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
+              </div>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
+                <input type="checkbox" checked={form.is_foil} onChange={e => setForm(f => ({ ...f, is_foil: e.target.checked }))} />
+                ✦ Foil
+              </label>
+            </>
+          )}
+
+          {form.product_type === 'sealed' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Format</label>
+                <select value={form.product_format} onChange={e => setForm(f => ({ ...f, product_format: e.target.value }))} className="form-input" style={{ width: '100%', padding: '9px 10px', fontSize: '.85rem' }}>
+                  <option value="">— Select —</option>
+                  {PRODUCT_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01' })}
+              {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
+            </div>
+          )}
+
+          {form.product_type === 'resealed' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10 }}>
+                {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01' })}
+                {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Pack Description</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  className="form-input" style={{ width: '100%', padding: '9px 12px', fontSize: '.82rem', boxSizing: 'border-box', minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+            </>
+          )}
+
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
+            <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
+            Active (visible in store)
+          </label>
+
+          {/* Image */}
+          {form.product_type === 'single' ? (
+            <>
+              {form.img_url && <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <img src={form.img_url} style={{ width: 44, borderRadius: 4 }} alt="" />
+                <div style={{ fontSize: '.7rem', color: '#64748b', flex: 1, wordBreak: 'break-all' }}>{form.img_url}</div>
+              </div>}
+              {inp('Image URL', 'img_url', 'text', { placeholder: 'https://…' })}
+            </>
+          ) : (
+            <div>
+              <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Product Image</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                {form.img_url && (
+                  <div style={{ flexShrink: 0, position: 'relative' }}>
+                    <img src={form.img_url} style={{ width: 56, height: 74, objectFit: 'cover', borderRadius: 6 }} alt="" />
+                    <button type="button" onClick={() => setForm(f => ({ ...f, img_url: '' }))}
+                      style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', border: 'none', background: '#f87171', color: '#fff', fontSize: '.6rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>✕</button>
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <input type="file" id="edit-img-upload" accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={e => handleImageUpload(e.target.files[0])} style={{ display: 'none' }} />
+                  <label htmlFor="edit-img-upload" style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8,
+                    cursor: imageUploading ? 'not-allowed' : 'pointer', border: '1px dashed rgba(255,255,255,.2)',
+                    background: imageUploading ? 'rgba(255,255,255,.02)' : 'rgba(255,255,255,.04)',
+                    color: imageUploading ? '#475569' : '#94a3b8', fontSize: '.82rem',
+                  }}>
+                    <span style={{ fontSize: '1rem' }}>{imageUploading ? '⏳' : '📷'}</span>
+                    {imageUploading ? 'Uploading…' : form.img_url ? 'Replace Image' : 'Upload Image'}
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {err && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>{err}</div>}
+
+          <button type="submit" disabled={saving} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer', marginTop: 4 }}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
+    </>
+  )
+}
+
+// ── Bulk CSV import modal ──────────────────────────────────────────────────────
+function BulkImportModal({ onClose, onSaved }) {
+  const [csv,     setCsv]     = useState('')
+  const [rows,    setRows]    = useState(null)  // parsed preview rows
+  const [parseErr,setParseErr]= useState(null)
+  const [saving,  setSaving]  = useState(false)
+  const [result,  setResult]  = useState(null)
+
+  const TEMPLATE = `name,set_name,condition,price,qty_available,is_foil
+Lightning Bolt,Magic 2011,NM,2.49,3,false
+Black Lotus,Alpha,NM,9999.00,1,false
+Mox Pearl,Beta,LP,1250.00,1,false`
+
+  const parseCSV = (text) => {
+    setParseErr(null); setRows(null)
+    if (!text.trim()) return
+    const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length < 2) { setParseErr('Need at least a header row and one data row'); return }
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const required = ['name', 'price']
+    for (const r of required) {
+      if (!headers.includes(r)) { setParseErr(`Missing required column: "${r}"`); return }
+    }
+    const parsed = []
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim())
+      const row = {}
+      headers.forEach((h, idx) => { row[h] = cols[idx] ?? '' })
+      if (!row.name || !row.price) { setParseErr(`Row ${i + 1}: name and price are required`); return }
+      if (isNaN(parseFloat(row.price))) { setParseErr(`Row ${i + 1}: invalid price "${row.price}"`); return }
+      parsed.push({
+        product_type:  'single',
+        name:          row.name,
+        set_name:      row.set_name || null,
+        condition:     row.condition || 'NM',
+        price:         parseFloat(row.price),
+        qty_available: parseInt(row.qty_available, 10) || 1,
+        is_foil:       row.is_foil === 'true' || row.is_foil === '1',
+        active:        true,
+      })
+    }
+    setRows(parsed)
+  }
+
+  useEffect(() => { parseCSV(csv) }, [csv]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleImport = async () => {
+    if (!rows || rows.length === 0) return
+    setSaving(true); setResult(null)
+    try {
+      const { error: insErr } = await supabase.from('store_listings').insert(rows)
+      if (insErr) throw new Error(insErr.message)
+      setResult({ ok: true, count: rows.length })
+      onSaved()
+    } catch (e) {
+      setResult({ ok: false, message: e.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(640px,96vw)', maxHeight: '90vh', overflowY: 'auto', background: '#0f172a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, zIndex: 401, padding: '22px 22px 26px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f1f5f9' }}>📋 Bulk Import (CSV)</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ fontSize: '.72rem', color: '#64748b', marginBottom: 14 }}>
+          Paste a CSV with columns: <code style={{ color: '#94a3b8' }}>name</code>, <code style={{ color: '#94a3b8' }}>set_name</code>, <code style={{ color: '#94a3b8' }}>condition</code>, <code style={{ color: '#94a3b8' }}>price</code>, <code style={{ color: '#94a3b8' }}>qty_available</code>, <code style={{ color: '#94a3b8' }}>is_foil</code>. Only <code style={{ color: '#c9a84c' }}>name</code> and <code style={{ color: '#c9a84c' }}>price</code> are required.
+        </div>
+
+        <button onClick={() => setCsv(TEMPLATE)} style={{ fontSize: '.7rem', padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#94a3b8', cursor: 'pointer', marginBottom: 8 }}>
+          Load example
+        </button>
+
+        <textarea
+          value={csv}
+          onChange={e => setCsv(e.target.value)}
+          placeholder={`name,set_name,condition,price,qty_available,is_foil\nLightning Bolt,Magic 2011,NM,2.49,3,false`}
+          style={{ width: '100%', minHeight: 140, padding: '10px 12px', fontSize: '.78rem', fontFamily: 'monospace', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, color: '#e2e8f0', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }}
+        />
+
+        {parseErr && (
+          <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>⚠️ {parseErr}</div>
+        )}
+
+        {/* Preview table */}
+        {rows && rows.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: '.7rem', color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>
+              Preview — {rows.length} row{rows.length !== 1 ? 's' : ''} ready to import
+            </div>
+            <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.72rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,.05)' }}>
+                    {['Name','Set','Cond','Price','Qty','Foil'].map(h => (
+                      <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 10).map((r, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
+                      <td style={{ padding: '6px 10px', color: '#e2e8f0', fontWeight: 600 }}>{r.name}</td>
+                      <td style={{ padding: '6px 10px', color: '#64748b' }}>{r.set_name || '—'}</td>
+                      <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{r.condition}</td>
+                      <td style={{ padding: '6px 10px', color: '#c9a84c', fontWeight: 700 }}>${r.price.toFixed(2)}</td>
+                      <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{r.qty_available}</td>
+                      <td style={{ padding: '6px 10px', color: r.is_foil ? '#c084fc' : '#334155' }}>{r.is_foil ? '✦' : '—'}</td>
+                    </tr>
+                  ))}
+                  {rows.length > 10 && (
+                    <tr><td colSpan={6} style={{ padding: '6px 10px', color: '#475569', fontStyle: 'italic' }}>…and {rows.length - 10} more</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: '.78rem', background: result.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${result.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: result.ok ? '#4ade80' : '#fca5a5' }}>
+            {result.ok ? `✓ Imported ${result.count} listing${result.count !== 1 ? 's' : ''} successfully!` : `⚠️ Import failed: ${result.message}`}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={onClose} style={{ flex: '0 0 auto', padding: '11px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '.85rem' }}>Cancel</button>
+          <button
+            onClick={handleImport}
+            disabled={!rows || rows.length === 0 || saving}
+            style={{ flex: 1, padding: 11, borderRadius: 10, border: 'none', background: (!rows || rows.length === 0) ? 'rgba(201,168,76,.3)' : '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: (!rows || rows.length === 0 || saving) ? 'not-allowed' : 'pointer' }}
+          >
+            {saving ? 'Importing…' : rows && rows.length > 0 ? `Import ${rows.length} listing${rows.length !== 1 ? 's' : ''}` : 'Paste CSV above'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function ListingsTab() {
   const [listings,     setListings]     = useState([])
   const [loading,      setLoading]      = useState(true)
   const [showCreate,   setShowCreate]   = useState(false)
+  const [showBulk,     setShowBulk]     = useState(false)
+  const [editListing,  setEditListing]  = useState(null)
   const [search,       setSearch]       = useState('')
   const [syncing,      setSyncing]      = useState(false)
   const [syncResult,   setSyncResult]   = useState(null)
@@ -712,6 +1047,12 @@ function ListingsTab() {
           {syncing ? '⏳ Syncing…' : '🔄 Sync Prices'}
         </button>
         <button
+          onClick={() => setShowBulk(true)}
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.1)', color: '#93c5fd', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer', flexShrink: 0 }}
+        >
+          📋 Bulk Import
+        </button>
+        <button
           onClick={() => setShowCreate(true)}
           style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#c9a84c', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer', flexShrink: 0 }}
         >
@@ -834,6 +1175,9 @@ function ListingsTab() {
                 {l.active ? 'Live' : 'Hidden'}
               </span>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button onClick={() => setEditListing(l)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'none', color: '#c9a84c', cursor: 'pointer', fontSize: '.7rem', fontWeight: 600 }}>
+                  Edit
+                </button>
                 <button onClick={() => toggleActive(l.id, l.active)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '.7rem', fontWeight: 600 }}>
                   {l.active ? 'Hide' : 'Show'}
                 </button>
@@ -847,6 +1191,8 @@ function ListingsTab() {
       )}
 
       {showCreate && <CreateListingModal onClose={() => setShowCreate(false)} onSaved={(merged) => { fetchListings(); if (merged) alert('Existing listing found — quantity updated instead of creating a duplicate.') }} />}
+      {showBulk && <BulkImportModal onClose={() => setShowBulk(false)} onSaved={() => { fetchListings() }} />}
+      {editListing && <EditListingModal listing={editListing} onClose={() => setEditListing(null)} onSaved={() => { fetchListings(); setEditListing(null) }} />}
     </div>
   )
 }
