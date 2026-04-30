@@ -3,30 +3,25 @@ import { searchScryfall, getCardDetails } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getCardPriceHistory } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
-
-const LS_KEY = 'mtg-hub-v1'
-
-function loadWishlist() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}').wishlist || [] } catch { return [] }
-}
-
-function saveWishlist(list) {
-  try {
-    const data = JSON.parse(localStorage.getItem(LS_KEY) || '{}')
-    localStorage.setItem(LS_KEY, JSON.stringify({ ...data, wishlist: list }))
-  } catch { /* storage full */ }
-}
+import { getWishlist, addWishlistItem, updateWishlistItem, removeWishlistItem } from '../lib/db'
 
 function fmt(n) { return n != null ? `$${parseFloat(n).toFixed(2)}` : '—' }
 
-export default function Wishlist({ showToast }) {
-  const [items,      setItems]      = useState(loadWishlist)
+export default function Wishlist({ user, showToast }) {
+  const [items,      setItems]      = useState([])
+  const [loading,    setLoading]    = useState(true)
   const [cardName,   setCardName]   = useState('')
   const [target,     setTarget]     = useState('')
   const [suggestions, setSugg]      = useState([])
   const [showDrop,   setShowDrop]   = useState(false)
   const [cardData,   setCardData]   = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Load from Supabase (or localStorage for guests)
+  useEffect(() => {
+    setLoading(true)
+    getWishlist(user?.id).then(data => { setItems(data); setLoading(false) })
+  }, [user])
 
   // Autocomplete
   useEffect(() => {
@@ -39,31 +34,23 @@ export default function Wishlist({ showToast }) {
     return () => clearTimeout(t)
   }, [cardName])
 
-  // Persist on change
-  useEffect(() => { saveWishlist(items) }, [items])
-
   async function selectCard(name) {
     setCardName(name)
     setSugg([])
     setShowDrop(false)
     const data = await getCardDetails(name)
     setCardData(data)
-    // Pre-fill target with a rounded-down price if available
     if (data?.prices?.usd) {
       setTarget(Math.floor(parseFloat(data.prices.usd)).toString())
     }
   }
 
-  function handleAdd(e) {
+  async function handleAdd(e) {
     e.preventDefault()
     if (!cardName.trim()) return
     const existing = items.find(i => i.name.toLowerCase() === cardName.toLowerCase())
-    if (existing) {
-      showToast(`${cardName} is already on your watchlist`)
-      return
-    }
+    if (existing) { showToast(`${cardName} is already on your watchlist`); return }
     const item = {
-      id:           Date.now(),
       name:         cardName.trim(),
       targetPrice:  target ? parseFloat(target) : null,
       currentPrice: cardData?.prices?.usd ? parseFloat(cardData.prices.usd) : null,
@@ -71,19 +58,28 @@ export default function Wishlist({ showToast }) {
       setName:      cardData?.set_name || null,
       addedAt:      new Date().toISOString(),
     }
-    setItems(prev => [item, ...prev])
-    showToast(`Added ${cardName} to watchlist`)
-    setCardName('')
-    setTarget('')
-    setCardData(null)
+    try {
+      const saved = await addWishlistItem(item, user?.id)
+      setItems(prev => [saved, ...prev])
+      showToast(`Added ${cardName} to watchlist`)
+      setCardName(''); setTarget(''); setCardData(null)
+    } catch (err) {
+      showToast('Could not save to wishlist')
+      console.error('[Wishlist] add error:', err)
+    }
   }
 
-  function handleRemove(id) {
-    setItems(prev => prev.filter(i => i.id !== id))
+  async function handleRemove(id) {
+    setItems(prev => prev.filter(i => i.id !== id)) // optimistic
+    try { await removeWishlistItem(id, user?.id) }
+    catch (err) { console.error('[Wishlist] remove error:', err) }
   }
 
-  function handleSetTarget(id, val) {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, targetPrice: val ? parseFloat(val) : null } : i))
+  async function handleSetTarget(id, val) {
+    const targetPrice = val ? parseFloat(val) : null
+    setItems(prev => prev.map(i => i.id === id ? { ...i, targetPrice } : i)) // optimistic
+    try { await updateWishlistItem(id, { targetPrice }, user?.id) }
+    catch (err) { console.error('[Wishlist] update error:', err) }
   }
 
   // Refresh current prices from Scryfall
@@ -96,7 +92,9 @@ export default function Wishlist({ showToast }) {
       try {
         const data = await getCardDetails(updated[i].name)
         if (data?.prices?.usd) {
-          updated[i] = { ...updated[i], currentPrice: parseFloat(data.prices.usd) }
+          const currentPrice = parseFloat(data.prices.usd)
+          updated[i] = { ...updated[i], currentPrice }
+          await updateWishlistItem(updated[i].id, { currentPrice }, user?.id)
         }
       } catch { /* skip */ }
       await new Promise(r => setTimeout(r, 110))
@@ -129,9 +127,16 @@ export default function Wishlist({ showToast }) {
         </div>
       )}
 
+      {/* Sign-in nudge for guests */}
+      {!user && (
+        <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#fbbf24' }}>
+          ⚠️ Sign in to sync your watchlist across devices — items added as a guest won't carry over.
+        </div>
+      )}
+
       {/* Add card form */}
       <div className="card mb-20">
-        <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '.8px', fontSize: '.68rem' }}>
+        <div style={{ fontWeight: 700, fontSize: '.68rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '.8px' }}>
           Add to Watchlist
         </div>
         <form onSubmit={handleAdd}>
@@ -164,12 +169,8 @@ export default function Wishlist({ showToast }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>$</span>
                 <input
-                  type="number"
-                  className="form-input"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  value={target}
+                  type="number" className="form-input" placeholder="0.00"
+                  min="0" step="0.01" value={target}
                   onChange={e => setTarget(e.target.value)}
                   style={{ paddingLeft: '6px' }}
                 />
@@ -220,14 +221,18 @@ export default function Wishlist({ showToast }) {
       )}
 
       {/* Watchlist */}
-      {items.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading…</div>
+      ) : items.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🎯</div>
           <p>No cards on your watchlist yet.<br />Add cards you want to buy at a target price.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {items.map(item => <WishlistItem key={item.id} item={item} onRemove={handleRemove} onSetTarget={handleSetTarget} />)}
+          {items.map(item => (
+            <WishlistItem key={item.id} item={item} onRemove={handleRemove} onSetTarget={handleSetTarget} />
+          ))}
         </div>
       )}
     </div>
@@ -246,27 +251,22 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
     ? ((item.currentPrice - item.targetPrice) / item.targetPrice) * 100
     : null
 
-  // Per-card price sparkline from stored history
-  const priceHist = getCardPriceHistory(item.name)
-  const sparkData = priceHist.map(e => e.price)
-  const sparkLabels = priceHist.map(e => e.date.slice(5)) // MM-DD
+  const priceHist  = getCardPriceHistory(item.name)
+  const sparkData  = priceHist.map(e => e.price)
+  const sparkLabels = priceHist.map(e => e.date.slice(5))
 
   return (
     <div style={{
       background: atTarget ? 'rgba(62,207,178,.06)' : 'var(--bg-card)',
       border: `1px solid ${atTarget ? 'rgba(62,207,178,.4)' : 'var(--border)'}`,
-      borderRadius: '14px',
-      padding: '14px 16px',
-      transition: 'border-color .2s',
+      borderRadius: '14px', padding: '14px 16px', transition: 'border-color .2s',
     }}>
       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-        {/* Card image */}
         {item.img
           ? <img src={item.img} alt={item.name} style={{ width: '48px', borderRadius: '6px', flexShrink: 0 }} />
           : <div style={{ width: '48px', height: '68px', background: 'var(--bg-hover)', borderRadius: '6px', flexShrink: 0 }} />
         }
 
-        {/* Main info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
             <div>
@@ -291,23 +291,15 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
             )}
 
             <div>
-              <div style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Target
-              </div>
+              <div style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px' }}>Target</div>
               {editTarget ? (
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <span style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>$</span>
                   <input
-                    type="number"
-                    className="form-input"
-                    value={targetVal}
-                    autoFocus
-                    min="0" step="0.01"
+                    type="number" className="form-input" value={targetVal}
+                    autoFocus min="0" step="0.01"
                     onChange={e => setTargetVal(e.target.value)}
-                    onBlur={() => {
-                      onSetTarget(item.id, targetVal)
-                      setEditTarget(false)
-                    }}
+                    onBlur={() => { onSetTarget(item.id, targetVal); setEditTarget(false) }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') { onSetTarget(item.id, targetVal); setEditTarget(false) }
                       if (e.key === 'Escape') setEditTarget(false)
@@ -319,11 +311,9 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
                 <div
                   onClick={() => setEditTarget(true)}
                   style={{
-                    fontWeight: 700, fontSize: '1rem',
+                    fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
                     color: atTarget ? 'var(--accent-teal)' : item.targetPrice ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    borderBottom: '1px dashed var(--border)',
-                    display: 'inline-block',
+                    borderBottom: '1px dashed var(--border)', display: 'inline-block',
                   }}
                 >
                   {item.targetPrice != null ? fmt(item.targetPrice) : 'Set target'}
@@ -336,9 +326,7 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
                 display: 'flex', alignItems: 'center', gap: '4px',
                 background: 'rgba(62,207,178,.15)', borderRadius: '99px',
                 padding: '3px 10px', fontSize: '.7rem', fontWeight: 700, color: 'var(--accent-teal)',
-              }}>
-                🎯 At target!
-              </div>
+              }}>🎯 At target!</div>
             )}
 
             {!atTarget && delta != null && (
@@ -348,28 +336,17 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
             )}
           </div>
 
-          {/* Sparkline (only if we have ≥2 data points) */}
           {sparkData.length >= 2 && (
             <div style={{ marginTop: '10px', height: '40px' }}>
-              <SparklineChart
-                data={sparkData}
-                labels={sparkLabels}
-                height={40}
-                color={atTarget ? '#3ecfb2' : '#c9a84c'}
-                showArea
-                showDot
-              />
+              <SparklineChart data={sparkData} labels={sparkLabels} height={40} color={atTarget ? '#3ecfb2' : '#c9a84c'} showArea showDot />
             </div>
           )}
 
-          {/* Buy link */}
           <a
             href={getTCGPlayerLink(item.tcgUrl || item.name)}
-            target="_blank"
-            rel="noopener noreferrer"
+            target="_blank" rel="noopener noreferrer"
             style={{
-              display: 'inline-block', marginTop: '10px',
-              padding: '6px 14px',
+              display: 'inline-block', marginTop: '10px', padding: '6px 14px',
               background: 'rgba(74,222,128,.10)', color: '#4ade80',
               border: '1px solid rgba(74,222,128,.25)', borderRadius: '8px',
               fontSize: '.75rem', fontWeight: 700, textDecoration: 'none',

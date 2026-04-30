@@ -198,6 +198,70 @@ export async function removeWant(cardName, userId) {
   await supabase.from('trade_wants').delete().eq('user_id', userId).eq('card_name', cardName)
 }
 
+// ── WISHLIST ──────────────────────────────────────────
+// Row shape in Supabase: id, user_id, name, target_price, current_price, img, set_name, added_at
+// JS shape uses camelCase: targetPrice, currentPrice, setName, addedAt
+
+function rowToItem(row) {
+  return {
+    id:           row.id,
+    name:         row.name,
+    targetPrice:  row.target_price  ?? null,
+    currentPrice: row.current_price ?? null,
+    img:          row.img           ?? null,
+    setName:      row.set_name      ?? null,
+    addedAt:      row.added_at,
+  }
+}
+
+export async function getWishlist(userId) {
+  if (hasSupabase && userId) {
+    const { data } = await supabase.from('wishlist').select('*').eq('user_id', userId).order('added_at', { ascending: false })
+    return (data || []).map(rowToItem)
+  }
+  return lsGet().wishlist || []
+}
+
+export async function addWishlistItem(item, userId) {
+  if (hasSupabase && userId) {
+    const { data, error } = await supabase.from('wishlist').insert({
+      user_id:       userId,
+      name:          item.name,
+      target_price:  item.targetPrice  ?? null,
+      current_price: item.currentPrice ?? null,
+      img:           item.img          ?? null,
+      set_name:      item.setName      ?? null,
+    }).select().single()
+    if (error) { console.error('[db] addWishlistItem error:', error); throw new Error(error.message) }
+    return rowToItem(data)
+  }
+  const wishlist = lsGet().wishlist || []
+  const newItem = { ...item, id: Date.now() }
+  lsSet({ wishlist: [newItem, ...wishlist] })
+  return newItem
+}
+
+export async function updateWishlistItem(id, updates, userId) {
+  const dbUpdates = {}
+  if ('targetPrice'  in updates) dbUpdates.target_price  = updates.targetPrice
+  if ('currentPrice' in updates) dbUpdates.current_price = updates.currentPrice
+  if (hasSupabase && userId) {
+    await supabase.from('wishlist').update(dbUpdates).eq('id', id).eq('user_id', userId)
+    return
+  }
+  const wishlist = (lsGet().wishlist || []).map(i => i.id === id ? { ...i, ...updates } : i)
+  lsSet({ wishlist })
+}
+
+export async function removeWishlistItem(id, userId) {
+  if (hasSupabase && userId) {
+    await supabase.from('wishlist').delete().eq('id', id).eq('user_id', userId)
+    return
+  }
+  const wishlist = (lsGet().wishlist || []).filter(i => i.id !== id)
+  lsSet({ wishlist })
+}
+
 // ── DECKS ─────────────────────────────────────────────
 export async function getDecks(userId) {
   if (hasSupabase && userId) {
