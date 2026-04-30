@@ -731,18 +731,10 @@ function CheckoutModal({ cart, onClose, onSuccess }) {
 }
 
 // ── Main Store page ──────────────────────────────────────────────────────────
-export default function Store({ initialSearch = '', onSearchUsed }) {
+export default function Store() {
   const [listings,        setListings]        = useState([])
   const [loading,         setLoading]         = useState(true)
-  const [search,          setSearch]          = useState(initialSearch)
-
-  // When a card is clicked from the deck builder, pre-populate the search
-  useEffect(() => {
-    if (initialSearch) {
-      setSearch(initialSearch)
-      onSearchUsed?.()
-    }
-  }, [initialSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [search,          setSearch]          = useState('')
   const [sortBy,          setSortBy]          = useState('name')
   const [cart,            setCart]            = useState(loadCart)
   const [cartOpen,        setCartOpen]        = useState(false)

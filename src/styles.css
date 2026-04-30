@@ -1681,6 +1681,12 @@ body {
   gap: 10px;
   margin-bottom: 16px;
 }
+@media (min-width: 900px) {
+  .deck-art-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1200px) {
+  .deck-art-grid { grid-template-columns: repeat(4, 1fr); }
+}
 .deck-art-tile {
   position: relative;
   border-radius: var(--radius);

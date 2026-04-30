@@ -31,7 +31,7 @@ function getTypeBucket(typeLine) {
 const IMG_CACHE = new Map()
 
 // ── Main Decks page ───────────────────────────────────────────────────────────
-export default function Decks({ user, collection, showToast, setDeckModalOpen, openStoreSearch }) {
+export default function Decks({ user, collection, showToast, setDeckModalOpen, openCardSearch }) {
   const [decks, setDecks]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [selected, setSelected]     = useState(null)
@@ -113,7 +113,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
         onModalClose={() => { setShowImport(false); setEditDeck(null) }}
         onModalSave={handleSave}
         editDeck={editDeck}
-        openStoreSearch={openStoreSearch}
+        openCardSearch={openCardSearch}
       />
     )
   }
@@ -254,7 +254,7 @@ function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
 }
 
 // ── Card row with hover preview ───────────────────────────────────────────────
-function CardRow({ card, cardValues, isLast, openStoreSearch }) {
+function CardRow({ card, cardValues, isLast, openCardSearch }) {
   const [previewImg, setPreviewImg] = useState(null)
   const [hoverPos,   setHoverPos]   = useState(null)
   const price = cardValues?.[card.name]
@@ -301,8 +301,8 @@ function CardRow({ card, cardValues, isLast, openStoreSearch }) {
         <span
           role="button"
           tabIndex={0}
-          onClick={() => openStoreSearch?.(card.name)}
-          onKeyDown={e => e.key === 'Enter' && openStoreSearch?.(card.name)}
+          onClick={() => openCardSearch?.(card.name)}
+          onKeyDown={e => e.key === 'Enter' && openCardSearch?.(card.name)}
           style={{ fontSize: '.83rem', color: 'var(--text-primary)', flex: 1, minWidth: 0, cursor: 'pointer', transition: 'color .1s' }}
           onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-teal)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
@@ -337,7 +337,7 @@ function CardRow({ card, cardValues, isLast, openStoreSearch }) {
 }
 
 // ── Deck section ──────────────────────────────────────────────────────────────
-function DeckSection({ title, cards, highlight, cardValues, openStoreSearch }) {
+function DeckSection({ title, cards, highlight, cardValues, openCardSearch }) {
   return (
     <div style={{
       background: 'var(--bg-card)',
@@ -351,14 +351,14 @@ function DeckSection({ title, cards, highlight, cardValues, openStoreSearch }) {
         {title}
       </div>
       {cards.map((card, i) => (
-        <CardRow key={`${card.name}-${i}`} card={card} cardValues={cardValues} isLast={i === cards.length - 1} openStoreSearch={openStoreSearch} />
+        <CardRow key={`${card.name}-${i}`} card={card} cardValues={cardValues} isLast={i === cards.length - 1} openCardSearch={openCardSearch} />
       ))}
     </div>
   )
 }
 
 // ── Deck detail view ──────────────────────────────────────────────────────────
-function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck, openStoreSearch }) {
+function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck, openCardSearch }) {
   const { main, side } = countCards(deck)
   const isCmdr   = isCommanderFormat(deck.format)
   const fmt      = FORMAT_COLORS[deck.format] || { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' }
@@ -527,7 +527,7 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
 
         {/* Commander */}
         {isCmdr && deck.commander && (
-          <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} openStoreSearch={openStoreSearch} />
+          <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} openCardSearch={openCardSearch} />
         )}
 
         {/* Mainboard — typed groups or fallback while loading */}
@@ -539,7 +539,7 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
                   title={`${group.label} (${group.count})`}
                   cards={group.cards}
                   cardValues={deckValue?.cardValues}
-                  openStoreSearch={openStoreSearch}
+                  openCardSearch={openCardSearch}
                 />
               ))
             : (
@@ -551,14 +551,14 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
                 }
                 cards={mainboard}
                 cardValues={deckValue?.cardValues}
-                openStoreSearch={openStoreSearch}
+                openCardSearch={openCardSearch}
               />
             )
         )}
 
         {/* Sideboard */}
         {sideboard.length > 0 && (
-          <DeckSection title={`🔄 Sideboard (${side})`} cards={sideboard} cardValues={deckValue?.cardValues} openStoreSearch={openStoreSearch} />
+          <DeckSection title={`🔄 Sideboard (${side})`} cards={sideboard} cardValues={deckValue?.cardValues} openCardSearch={openCardSearch} />
         )}
       </div>
 

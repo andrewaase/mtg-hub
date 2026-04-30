@@ -78,8 +78,8 @@ export default function App() {
   // Deck modal nav-block: prevents accidental navigation while deck editor is open
   const deckModalOpenRef = useRef(false)
   const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
-  // Store pre-search: set by clicking a card name in the deck builder
-  const [storeSearch, setStoreSearch] = useState('')
+  // Card lookup pre-search: set by clicking a card name in the deck builder
+  const [cardSearch, setCardSearch] = useState('')
 
   const setPage = useCallback((newPage) => {
     // Silently block navigation while the deck import/edit modal is open
@@ -201,11 +201,11 @@ export default function App() {
     load()
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openStoreSearch = useCallback((cardName) => {
-    setStoreSearch(cardName)
-    setPageState('store')
-    window.history.pushState({ page: 'store' }, '', '#store')
-    document.title = PAGE_TITLES['store']
+  const openCardSearch = useCallback((cardName) => {
+    setCardSearch(cardName)
+    setPageState('cards')
+    window.history.pushState({ page: 'cards' }, '', '#cards')
+    document.title = PAGE_TITLES['cards']
   }, [])
 
   const pageProps = {
@@ -215,7 +215,7 @@ export default function App() {
     openCamera: () => setShowCamera(true),
     openDecklist: (deck) => setDecklistDeck(deck),
     setDeckModalOpen,
-    openStoreSearch,
+    openCardSearch,
   }
 
   return (
@@ -231,13 +231,13 @@ export default function App() {
               {page === 'log'        && <MatchLog {...pageProps} />}
               {page === 'stats'      && <Stats {...pageProps} />}
               {page === 'news'       && <News {...pageProps} />}
-              {page === 'cards'      && <CardLookup {...pageProps} />}
+              {page === 'cards'      && <CardLookup {...pageProps} initialSearch={cardSearch} onSearchUsed={() => setCardSearch('')} />}
               {page === 'collection' && <Collection {...pageProps} />}
               {page === 'releases'   && <SetReleases />}
               {page === 'friends'    && <Friends {...pageProps} />}
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
-              {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} />}
+              {page === 'store'     && <Store />}
               {page === 'about'     && <About />}
               {page === 'admin'     && <AdminPanel user={user} />}
             </>
