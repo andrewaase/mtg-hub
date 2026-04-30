@@ -249,8 +249,9 @@ function CreateListingModal({ onClose, onSaved }) {
   const [query,    setQuery]    = useState('')
   const [results,  setResults]  = useState([])
   const [searching,setSearching]= useState(false)
-  const [saving,   setSaving]   = useState(false)
-  const [err,      setErr]      = useState(null)
+  const [saving,        setSaving]        = useState(false)
+  const [err,           setErr]           = useState(null)
+  const [imageUploading,setImageUploading]= useState(false)
 
   const searchScryfall = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
@@ -267,6 +268,29 @@ function CreateListingModal({ onClose, onSaved }) {
     const t = setTimeout(() => searchScryfall(query), 400)
     return () => clearTimeout(t)
   }, [query, searchScryfall])
+
+  const handleImageUpload = async (file) => {
+    if (!file) return
+    const MAX_MB = 5
+    if (file.size > MAX_MB * 1024 * 1024) { setErr(`Image must be under ${MAX_MB}MB`); return }
+    setImageUploading(true); setErr(null)
+    try {
+      const ext  = file.name.split('.').pop().toLowerCase()
+      const path = `listings/${Date.now()}.${ext}`
+      const { data, error: upErr } = await supabase.storage
+        .from('product-images')
+        .upload(path, file, { cacheControl: '3600', upsert: false })
+      if (upErr) throw new Error(upErr.message)
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(data.path)
+      setForm(f => ({ ...f, img_url: publicUrl }))
+    } catch (e) {
+      setErr(`Upload failed: ${e.message}`)
+    } finally {
+      setImageUploading(false)
+    }
+  }
 
   const pickCard = (card) => {
     setForm(f => ({
@@ -388,7 +412,7 @@ function CreateListingModal({ onClose, onSaved }) {
 
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {inp(form.product_type === 'single' ? 'Card Name' : 'Product Name', 'name', 'text', { required: true, placeholder: form.product_type === 'single' ? 'Lightning Bolt' : form.product_type === 'sealed' ? 'Duskmourn: House of Horror Booster Box' : 'Vaulted Rarities — Vol. 1' })}
-          {inp('Set Name', 'set_name', 'text', { placeholder: form.product_type === 'single' ? 'e.g. Magic 2011' : 'e.g. Duskmourn' })}
+          {form.product_type !== 'resealed' && inp('Set Name', 'set_name', 'text', { placeholder: form.product_type === 'single' ? 'e.g. Magic 2011' : 'e.g. Duskmourn' })}
 
           {/* Singles: condition + foil */}
           {form.product_type === 'single' && (
@@ -461,13 +485,60 @@ function CreateListingModal({ onClose, onSaved }) {
             </>
           )}
 
-          {form.img_url && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <img src={form.img_url} style={{ width: 44, borderRadius: 4 }} alt="" />
-              <div style={{ fontSize: '.7rem', color: '#64748b', flex: 1, wordBreak: 'break-all' }}>{form.img_url}</div>
+          {/* Singles: URL display (auto-filled from Scryfall) */}
+          {form.product_type === 'single' && (
+            <>
+              {form.img_url && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <img src={form.img_url} style={{ width: 44, borderRadius: 4 }} alt="" />
+                  <div style={{ fontSize: '.7rem', color: '#64748b', flex: 1, wordBreak: 'break-all' }}>{form.img_url}</div>
+                </div>
+              )}
+              {inp('Image URL (auto-filled from search)', 'img_url', 'text', { placeholder: 'https://…' })}
+            </>
+          )}
+
+          {/* Sealed / Resealed: upload button */}
+          {form.product_type !== 'single' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
+                Product Image
+              </label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                {form.img_url && (
+                  <div style={{ flexShrink: 0, position: 'relative' }}>
+                    <img src={form.img_url} style={{ width: 56, height: 74, objectFit: 'cover', borderRadius: 6, display: 'block' }} alt="" />
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, img_url: '' }))}
+                      style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', border: 'none', background: '#f87171', color: '#fff', fontSize: '.6rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}
+                    >✕</button>
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="file"
+                    id="img-upload"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={e => handleImageUpload(e.target.files[0])}
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="img-upload" style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 14px', borderRadius: 8, cursor: imageUploading ? 'not-allowed' : 'pointer',
+                    border: '1px dashed rgba(255,255,255,.2)',
+                    background: imageUploading ? 'rgba(255,255,255,.02)' : 'rgba(255,255,255,.04)',
+                    color: imageUploading ? '#475569' : '#94a3b8', fontSize: '.82rem',
+                    transition: 'all .15s',
+                  }}>
+                    <span style={{ fontSize: '1rem' }}>{imageUploading ? '⏳' : '📷'}</span>
+                    {imageUploading ? 'Uploading…' : form.img_url ? 'Replace Image' : 'Upload Image'}
+                  </label>
+                  <div style={{ fontSize: '.62rem', color: '#334155', marginTop: 4 }}>JPG, PNG, WebP · max 5 MB</div>
+                </div>
+              </div>
             </div>
           )}
-          {inp('Image URL (optional)', 'img_url', 'text', { placeholder: 'https://…' })}
 
           {err && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>{err}</div>}
 
