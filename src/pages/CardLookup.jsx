@@ -497,7 +497,7 @@ function SearchView({ onBack, onCardSelect }) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function CardLookup({ showToast, openAddCard }) {
+export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed }) {
   const [view, setView]           = useState('home') // 'home' | 'search' | 'set' | 'card'
   const [sets, setSets]           = useState([])
   const [setsLoading, setSetsLoad] = useState(true)
@@ -519,6 +519,14 @@ export default function CardLookup({ showToast, openAddCard }) {
       openCardDetail(name) // openCardDetail already handles plain string names
     }
   }, []) // eslint-disable-line
+
+  // Incoming card from deck builder — jump straight to card detail
+  useEffect(() => {
+    if (initialSearch) {
+      onSearchUsed?.()
+      openCardDetail(initialSearch)
+    }
+  }, [initialSearch]) // eslint-disable-line
 
   // Load MTG paper sets
   useEffect(() => {
