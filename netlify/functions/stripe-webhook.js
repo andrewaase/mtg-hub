@@ -182,7 +182,7 @@ exports.handler = async (event) => {
         shipping_zip:    meta.shipping_zip    || '',
         shipping_country: meta.shipping_country || 'US',
         subtotal:        parseFloat(meta.subtotal)      || 0,
-        shipping_cost:   parseFloat(meta.shipping_cost) || 4.99,
+        shipping_cost:   parseFloat(meta.shipping_cost ?? 4.99),
         total:           pi.amount / 100,
         status:          'paid',
       }),
@@ -258,6 +258,26 @@ exports.handler = async (event) => {
       } catch (emailErr) {
         // Log but don't fail — the order is already created
         console.error('[stripe-webhook] Email send failed:', emailErr.message)
+      }
+    }
+
+    // ── 6. Send admin notification ────────────────────────────────────────────
+    const RESEND_KEY_ADMIN = process.env.RESEND_API_KEY
+    if (RESEND_KEY_ADMIN) {
+      try {
+        const adminItemList = orderItems.map(i => `• ${i.name} ×${i.qty}  $${(i.price * i.qty).toFixed(2)}`).join('\n')
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_KEY_ADMIN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from:    'Vaulted Singles <orders@vaultedsingles.com>',
+            to:      ['mtgvaultedsingles@gmail.com'],
+            subject: `🛒 New Order — $${(pi.amount / 100).toFixed(2)} from ${meta.customer_name || meta.customer_email}`,
+            text:    `New order received!\n\nCustomer: ${meta.customer_name} <${meta.customer_email}>\nShip to: ${meta.shipping_line1}, ${meta.shipping_city}, ${meta.shipping_state} ${meta.shipping_zip}\n\nItems:\n${adminItemList}\n\nTotal: $${(pi.amount / 100).toFixed(2)}\nOrder ID: ${order.id}`,
+          }),
+        })
+      } catch (adminEmailErr) {
+        console.error('[stripe-webhook] Admin notification failed:', adminEmailErr.message)
       }
     }
 

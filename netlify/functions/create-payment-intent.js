@@ -2,7 +2,7 @@
 // Creates a Stripe PaymentIntent after validating cart prices server-side.
 // Never trusts client-supplied prices.
 
-const SHIPPING_FLAT = 0
+const SHIPPING_FLAT = 4.99
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {

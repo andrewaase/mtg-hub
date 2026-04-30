@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
 const CART_KEY      = 'vs-cart-v1'
-const SHIPPING_COST = 0
+const SHIPPING_COST = 4.99
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) {
@@ -967,8 +967,67 @@ function CheckoutModal({ cart, onClose, onSuccess }) {
   )
 }
 
+// ── Waitlist modal ────────────────────────────────────────────────────────────
+function WaitlistModal({ listing, user, onClose }) {
+  const [email,   setEmail]   = useState(user?.email || '')
+  const [saving,  setSaving]  = useState(false)
+  const [done,    setDone]    = useState(false)
+  const [err,     setErr]     = useState(null)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!email.trim()) return
+    setSaving(true); setErr(null)
+    try {
+      const { error: insErr } = await supabase.from('waitlist').upsert(
+        { listing_id: listing.id, email: email.trim().toLowerCase() },
+        { onConflict: 'listing_id,email', ignoreDuplicates: true }
+      )
+      if (insErr) throw new Error(insErr.message)
+      setDone(true)
+    } catch (e) { setErr(e.message) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 410, backdropFilter: 'blur(4px)' }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px,92vw)', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 411, padding: '24px 22px 28px', boxShadow: '0 24px 60px rgba(0,0,0,.65)' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: '#fff', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: '2rem', marginBottom: 10 }}>🔔</div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', marginBottom: 6 }}>You're on the list!</div>
+            <div style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>We'll email <strong>{email}</strong> when <em>{listing.name}</em> is back in stock.</div>
+            <button onClick={onClose} style={{ marginTop: 18, padding: '10px 24px', borderRadius: 10, border: 'none', background: 'var(--accent-gold)', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}>Done</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 4 }}>🔔 Notify Me</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+              Get an email when <strong style={{ color: 'var(--text-primary)' }}>{listing.name}</strong> is back in stock.
+            </div>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                type="email" required placeholder="your@email.com"
+                value={email} onChange={e => setEmail(e.target.value)}
+                className="form-input"
+                style={{ padding: '10px 14px', fontSize: '.88rem' }}
+              />
+              {err && <div style={{ fontSize: '.75rem', color: '#fca5a5' }}>⚠️ {err}</div>}
+              <button type="submit" disabled={saving} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'var(--accent-gold)', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                {saving ? 'Saving…' : 'Notify Me When Available'}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
 // ── Main Store page ──────────────────────────────────────────────────────────
-export default function Store({ initialSearch = '', onSearchUsed }) {
+export default function Store({ initialSearch = '', onSearchUsed, user }) {
   const [listings,        setListings]        = useState([])
   const [loading,         setLoading]         = useState(true)
   const [search,          setSearch]          = useState(initialSearch)
@@ -982,15 +1041,21 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
   const [cartOpen,        setCartOpen]        = useState(false)
   const [checkoutOpen,    setCheckoutOpen]    = useState(false)
   const [selectedListing, setSelectedListing] = useState(null)
+  const [waitlistListing, setWaitlistListing] = useState(null)
   const [category,        setCategory]        = useState('single')
+  // Singles filters
+  const [priceMin,        setPriceMin]        = useState('')
+  const [priceMax,        setPriceMax]        = useState('')
+  const [condFilter,      setCondFilter]      = useState([]) // [] = all
+  const [foilFilter,      setFoilFilter]      = useState('all') // 'all'|'foil'|'nonfoil'
+  const [showFilters,     setShowFilters]     = useState(false)
 
-  // Fetch active listings from Supabase (public — no auth required)
+  // Fetch active listings — also include out-of-stock for waitlist
   useEffect(() => {
     supabase
       .from('store_listings')
       .select('*')
       .eq('active', true)
-      .gt('qty_available', 0)
       .order('name')
       .then(({ data }) => {
         setListings(data || [])
@@ -998,23 +1063,67 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
       })
   }, [])
 
+  // Shareable URL: read ?product=<id> on mount, auto-open modal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const productId = params.get('product')
+    if (productId && listings.length > 0) {
+      const found = listings.find(l => l.id === productId)
+      if (found) setSelectedListing(found)
+    }
+  }, [listings])
+
+  // Update URL when a product modal opens/closes
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (selectedListing) {
+      url.searchParams.set('product', selectedListing.id)
+    } else {
+      url.searchParams.delete('product')
+    }
+    window.history.replaceState({}, '', url.toString())
+  }, [selectedListing])
+
   // Persist cart to localStorage
   useEffect(() => { saveCart(cart) }, [cart])
 
   const cartIds = useMemo(() => new Set(cart.map(i => i.id)), [cart])
 
+  const CONDITIONS_LIST = ['NM', 'LP', 'MP', 'HP', 'DMG']
+
   const filtered = useMemo(() => {
     let list = listings.filter(l => {
       const type = l.product_type || 'single'
       if (type !== category) return false
-      return !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.set_name?.toLowerCase().includes(search.toLowerCase())
+      // Only show in-stock items in the main grid (out-of-stock handled separately below)
+      if (l.qty_available <= 0) return false
+      if (search && !l.name.toLowerCase().includes(search.toLowerCase()) && !l.set_name?.toLowerCase().includes(search.toLowerCase())) return false
+      // Singles-only filters
+      if (category === 'single') {
+        if (priceMin !== '' && parseFloat(l.price) < parseFloat(priceMin)) return false
+        if (priceMax !== '' && parseFloat(l.price) > parseFloat(priceMax)) return false
+        if (condFilter.length > 0 && !condFilter.includes(l.condition)) return false
+        if (foilFilter === 'foil'    && !l.is_foil) return false
+        if (foilFilter === 'nonfoil' &&  l.is_foil) return false
+      }
+      return true
     })
     if (sortBy === 'price_asc')  list = [...list].sort((a, b) => a.price - b.price)
     if (sortBy === 'price_desc') list = [...list].sort((a, b) => b.price - a.price)
     if (sortBy === 'name')       list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     if (sortBy === 'newest')     list = [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     return list
-  }, [listings, search, sortBy, category])
+  }, [listings, search, sortBy, category, priceMin, priceMax, condFilter, foilFilter])
+
+  // Separate out-of-stock list for the same category (for waitlist section)
+  const outOfStock = useMemo(() => {
+    return listings.filter(l => {
+      const type = l.product_type || 'single'
+      return type === category && l.qty_available <= 0
+    })
+  }, [listings, category])
+
+  const hasActiveFilters = priceMin !== '' || priceMax !== '' || condFilter.length > 0 || foilFilter !== 'all'
 
   const addToCart = useCallback((listing) => {
     setCart(prev => {
@@ -1111,16 +1220,30 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
         ))}
       </div>
 
-      {/* ── Search + Sort ── */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* ── Search + Sort + Filters ── */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Search cards…"
+          placeholder={`Search ${category === 'single' ? 'cards' : 'products'}…`}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="form-input"
           style={{ flex: 1, minWidth: 180, padding: '9px 14px', fontSize: '.85rem' }}
         />
+        {category === 'single' && (
+          <button
+            onClick={() => setShowFilters(s => !s)}
+            style={{
+              padding: '9px 14px', borderRadius: 10, border: `1px solid ${hasActiveFilters ? 'var(--accent-gold)' : 'var(--border)'}`,
+              background: hasActiveFilters ? 'rgba(201,168,76,.12)' : 'transparent',
+              color: hasActiveFilters ? 'var(--accent-gold)' : 'var(--text-muted)',
+              fontWeight: hasActiveFilters ? 700 : 400, fontSize: '.82rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            🔧 Filters {hasActiveFilters && '●'}
+          </button>
+        )}
         <select
           value={sortBy}
           onChange={e => setSortBy(e.target.value)}
@@ -1133,6 +1256,70 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
           <option value="newest">Sort: Newest</option>
         </select>
       </div>
+
+      {/* ── Singles filter panel ── */}
+      {category === 'single' && showFilters && (
+        <div style={{
+          marginBottom: 14, padding: '14px 16px', borderRadius: 12,
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+          {/* Price range */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--text-muted)', minWidth: 70 }}>Price range</span>
+            <input
+              type="number" placeholder="Min $" value={priceMin} onChange={e => setPriceMin(e.target.value)}
+              min="0" step="0.01"
+              className="form-input"
+              style={{ width: 90, padding: '6px 10px', fontSize: '.8rem' }}
+            />
+            <span style={{ color: 'var(--text-muted)' }}>—</span>
+            <input
+              type="number" placeholder="Max $" value={priceMax} onChange={e => setPriceMax(e.target.value)}
+              min="0" step="0.01"
+              className="form-input"
+              style={{ width: 90, padding: '6px 10px', fontSize: '.8rem' }}
+            />
+          </div>
+
+          {/* Condition chips */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--text-muted)', minWidth: 70 }}>Condition</span>
+            {CONDITIONS_LIST.map(c => {
+              const active = condFilter.includes(c)
+              return (
+                <button key={c} onClick={() => setCondFilter(prev => active ? prev.filter(x => x !== c) : [...prev, c])} style={{
+                  padding: '4px 10px', borderRadius: 6, border: `1px solid ${active ? 'var(--accent-gold)' : 'var(--border)'}`,
+                  background: active ? 'rgba(201,168,76,.15)' : 'transparent',
+                  color: active ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  fontSize: '.72rem', fontWeight: active ? 700 : 400, cursor: 'pointer',
+                }}>{c}</button>
+              )
+            })}
+          </div>
+
+          {/* Foil toggle */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--text-muted)', minWidth: 70 }}>Foil</span>
+            {[['all','All'],['foil','✦ Foil only'],['nonfoil','Non-foil only']].map(([val, label]) => (
+              <button key={val} onClick={() => setFoilFilter(val)} style={{
+                padding: '4px 10px', borderRadius: 6, border: `1px solid ${foilFilter === val ? 'var(--accent-gold)' : 'var(--border)'}`,
+                background: foilFilter === val ? 'rgba(201,168,76,.15)' : 'transparent',
+                color: foilFilter === val ? 'var(--accent-gold)' : 'var(--text-muted)',
+                fontSize: '.72rem', fontWeight: foilFilter === val ? 700 : 400, cursor: 'pointer',
+              }}>{label}</button>
+            ))}
+          </div>
+
+          {hasActiveFilters && (
+            <button onClick={() => { setPriceMin(''); setPriceMax(''); setCondFilter([]); setFoilFilter('all') }} style={{
+              alignSelf: 'flex-start', padding: '4px 12px', borderRadius: 6,
+              border: '1px solid rgba(239,68,68,.3)', background: 'none',
+              color: '#f87171', fontSize: '.72rem', cursor: 'pointer',
+            }}>Clear filters</button>
+          )}
+        </div>
+      )}
 
       {/* ── Empty / loading states ── */}
       {loading && (
@@ -1183,6 +1370,53 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
         </div>
       )}
 
+      {/* ── Out-of-stock / waitlist section ── */}
+      {!loading && outOfStock.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>
+            Out of Stock — Join Waitlist
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: category === 'single'
+              ? 'repeat(auto-fill,minmax(185px,1fr))'
+              : 'repeat(auto-fill,minmax(220px,1fr))',
+            gap: 12,
+          }}>
+            {outOfStock.map(listing => (
+              <div key={listing.id} style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: 14, overflow: 'hidden', opacity: 0.65,
+                display: 'flex', flexDirection: 'column',
+              }}>
+                <div style={{ position: 'relative' }}>
+                  {listing.img_url
+                    ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: category === 'single' ? '63/88' : '3/4', objectFit: 'cover', filter: 'grayscale(40%)' }} />
+                    : <div style={{ width: '100%', aspectRatio: category === 'single' ? '63/88' : '3/4', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>{category === 'single' ? '🃏' : '📦'}</div>
+                  }
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '.65rem', fontWeight: 800, background: 'rgba(0,0,0,.7)', color: '#f87171', borderRadius: 6, padding: '4px 10px', letterSpacing: '.06em' }}>OUT OF STOCK</span>
+                  </div>
+                </div>
+                <div style={{ padding: '8px 10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div style={{ fontWeight: 700, fontSize: '.8rem', color: 'var(--text-secondary)', lineHeight: 1.25 }}>{listing.name}</div>
+                  {listing.set_name && <div style={{ fontSize: '.63rem', color: 'var(--text-muted)' }}>{listing.set_name}</div>}
+                  <div style={{ fontWeight: 800, fontSize: '.95rem', color: 'var(--text-muted)', marginTop: 'auto', paddingTop: 6 }}>{fmt(listing.price)}</div>
+                  <button
+                    onClick={() => setWaitlistListing(listing)}
+                    style={{
+                      marginTop: 6, padding: '7px', borderRadius: 8, border: '1px solid rgba(201,168,76,.4)',
+                      background: 'transparent', color: 'var(--accent-gold)', fontWeight: 700,
+                      fontSize: '.72rem', cursor: 'pointer', width: '100%',
+                    }}
+                  >🔔 Notify Me</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Cart drawer ── */}
       {cartOpen && (
         <CartDrawer
@@ -1208,6 +1442,11 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
         (selectedListing.product_type || 'single') === 'single'
           ? <CardDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} onAdd={addToCart} inCart={cartIds.has(selectedListing.id)} />
           : <ProductDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} onAdd={addToCart} inCart={cartIds.has(selectedListing.id)} />
+      )}
+
+      {/* ── Waitlist modal ── */}
+      {waitlistListing && (
+        <WaitlistModal listing={waitlistListing} user={user} onClose={() => setWaitlistListing(null)} />
       )}
 
       {/* ── Floating cart bar ── */}

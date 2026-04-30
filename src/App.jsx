@@ -247,7 +247,7 @@ export default function App() {
               {page === 'friends'    && <Friends {...pageProps} />}
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
-              {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} />}
+              {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} />}
               {page === 'about'     && <About />}
               {page === 'admin'     && <AdminPanel user={user} />}
             </>
