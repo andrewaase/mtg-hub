@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, hasSupabase } from './lib/supabase'
 import { getMatches, getCollection, addCard, addMatch } from './lib/db'
 import { handleEbayCallback } from './lib/ebay'
@@ -75,8 +75,15 @@ export default function App() {
   const [prefillCard, setPrefillCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Deck modal nav-block: prevents accidental navigation while deck editor is open
+  const deckModalOpenRef = useRef(false)
+  const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
+  // Store pre-search: set by clicking a card name in the deck builder
+  const [storeSearch, setStoreSearch] = useState('')
 
   const setPage = useCallback((newPage) => {
+    // Silently block navigation while the deck import/edit modal is open
+    if (deckModalOpenRef.current) return
     setPageState(newPage)
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
     document.title = PAGE_TITLES[newPage] || 'Vaulted Singles'
@@ -194,12 +201,21 @@ export default function App() {
     load()
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const openStoreSearch = useCallback((cardName) => {
+    setStoreSearch(cardName)
+    setPageState('store')
+    window.history.pushState({ page: 'store' }, '', '#store')
+    document.title = PAGE_TITLES['store']
+  }, [])
+
   const pageProps = {
     user, matches, setMatches, collection, setCollection, showToast, setPage,
     openLogMatch: () => setShowLogMatch(true),
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
     openCamera: () => setShowCamera(true),
     openDecklist: (deck) => setDecklistDeck(deck),
+    setDeckModalOpen,
+    openStoreSearch,
   }
 
   return (
@@ -221,7 +237,7 @@ export default function App() {
               {page === 'friends'    && <Friends {...pageProps} />}
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
-              {page === 'store'     && <Store />}
+              {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} />}
               {page === 'about'     && <About />}
               {page === 'admin'     && <AdminPanel user={user} />}
             </>
