@@ -398,6 +398,243 @@ function ListingCard({ listing, onAdd, inCart, onView }) {
   )
 }
 
+// ── Pack art placeholders (shown when no img_url is set) ─────────────────────
+
+function VaultedRaritiesArt() {
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '3/4',
+      background: 'linear-gradient(160deg,#0d0618 0%,#1a0f35 40%,#0f1a2e 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 40%, rgba(201,168,76,.12) 0%, transparent 65%)' }} />
+      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
+      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
+      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
+      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
+      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(201,168,76,.5))' }}>🏛️</div>
+      <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.22em', color: '#c9a84c', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(201,168,76,.6)' }}>
+        Vaulted<br />Rarities
+      </div>
+      <div style={{ width: 44, height: 1, background: 'linear-gradient(90deg,transparent,#c9a84c,transparent)', margin: '9px 0' }} />
+      <div style={{ fontSize: '.5rem', color: 'rgba(201,168,76,.55)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Premium Singles</div>
+    </div>
+  )
+}
+
+function RelicsAwakenedArt() {
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '3/4',
+      background: 'linear-gradient(160deg,#1a0600 0%,#2d1200 40%,#1a1a00 75%,#001a0d 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 45%, rgba(180,110,30,.14) 0%, transparent 65%)' }} />
+      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
+      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
+      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
+      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
+      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(180,110,30,.5))' }}>⚗️</div>
+      <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.2em', color: '#b46e1e', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(180,110,30,.55)' }}>
+        Relics<br />Awakened
+      </div>
+      <div style={{ width: 44, height: 1, background: 'linear-gradient(90deg,transparent,#b46e1e,transparent)', margin: '9px 0' }} />
+      <div style={{ fontSize: '.5rem', color: 'rgba(180,110,30,.55)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Magic's History</div>
+    </div>
+  )
+}
+
+function GenericResealedArt({ name }) {
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '3/4',
+      background: 'linear-gradient(160deg,#0f0f1a 0%,#1a1435 55%,#0f1a14 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 45%, rgba(139,92,246,.1) 0%, transparent 65%)' }} />
+      <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>🎴</div>
+      <div style={{ fontSize: '.65rem', fontWeight: 900, letterSpacing: '.14em', color: '#a78bfa', textTransform: 'uppercase', textAlign: 'center', maxWidth: '80%', lineHeight: 1.45 }}>{name}</div>
+    </div>
+  )
+}
+
+function SealedPackArt({ name, productFormat }) {
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '3/4',
+      background: 'linear-gradient(160deg,#0f1a2e 0%,#162040 55%,#0f1a0f 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 45%, rgba(59,130,246,.1) 0%, transparent 65%)' }} />
+      <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>📦</div>
+      <div style={{ fontSize: '.65rem', fontWeight: 900, letterSpacing: '.12em', color: '#60a5fa', textTransform: 'uppercase', textAlign: 'center', maxWidth: '80%', lineHeight: 1.45 }}>{name}</div>
+      {productFormat && (
+        <div style={{ fontSize: '.5rem', color: 'rgba(96,165,250,.55)', marginTop: 6, letterSpacing: '.1em', textTransform: 'uppercase' }}>{productFormat}</div>
+      )}
+    </div>
+  )
+}
+
+// ── Sealed product card ───────────────────────────────────────────────────────
+function SealedCard({ listing, onAdd, inCart, onView }) {
+  const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
+  return (
+    <div style={{
+      background: 'var(--bg-card)', border: `1px solid ${inCart ? 'var(--accent-gold)' : 'rgba(59,130,246,.2)'}`,
+      borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      transition: 'border-color .15s, box-shadow .15s',
+      boxShadow: inCart ? '0 0 0 1px var(--accent-gold)' : '0 4px 20px rgba(59,130,246,.06)',
+    }}>
+      <div onClick={() => onView(listing)} style={{ cursor: 'pointer' }}>
+        {listing.img_url
+          ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: '3/4', objectFit: 'cover' }} />
+          : <SealedPackArt name={listing.name} productFormat={listing.product_format} />}
+      </div>
+      <div style={{ padding: '10px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div onClick={() => onView(listing)} style={{ fontWeight: 700, fontSize: '.85rem', lineHeight: 1.3, cursor: 'pointer', color: 'var(--text-primary)' }}>{listing.name}</div>
+        {listing.set_name && <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>{listing.set_name}</div>}
+        {listing.product_format && (
+          <span style={{ fontSize: '.6rem', fontWeight: 700, background: 'rgba(59,130,246,.12)', color: '#60a5fa', borderRadius: 4, padding: '2px 6px', alignSelf: 'flex-start' }}>
+            {listing.product_format}
+          </span>
+        )}
+        <div style={{ fontSize: '.6rem', color: stockColor, fontWeight: 600 }}>
+          {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
+          <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
+          <button onClick={() => onAdd(listing)} style={{
+            padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontSize: '.72rem', fontWeight: 700,
+            background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+            color: inCart ? 'var(--accent-gold)' : '#000', transition: 'all .15s',
+          }}>{inCart ? '✓ In Cart' : '+ Cart'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Resealed product card ─────────────────────────────────────────────────────
+function ResealedCard({ listing, onAdd, inCart, onView }) {
+  const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
+  const getPackArt = () => {
+    const n = listing.name.toLowerCase()
+    if (n.includes('vaulted rarities')) return <VaultedRaritiesArt />
+    if (n.includes('relics awakened'))  return <RelicsAwakenedArt />
+    return <GenericResealedArt name={listing.name} />
+  }
+  return (
+    <div style={{
+      background: 'var(--bg-card)', border: `1px solid ${inCart ? 'var(--accent-gold)' : 'rgba(139,92,246,.25)'}`,
+      borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      transition: 'border-color .15s, box-shadow .15s',
+      boxShadow: inCart ? '0 0 0 1px var(--accent-gold)' : '0 4px 20px rgba(139,92,246,.08)',
+    }}>
+      <div onClick={() => onView(listing)} style={{ cursor: 'pointer', position: 'relative' }}>
+        {listing.img_url
+          ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: '3/4', objectFit: 'cover' }} />
+          : getPackArt()}
+        {listing.qty_available <= 5 && listing.qty_available > 0 && (
+          <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(249,115,22,.9)', color: '#fff', fontSize: '.58rem', fontWeight: 800, padding: '3px 7px', borderRadius: 4, letterSpacing: '.04em' }}>
+            ALMOST GONE
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '10px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div onClick={() => onView(listing)} style={{ fontWeight: 800, fontSize: '.88rem', lineHeight: 1.3, cursor: 'pointer', color: 'var(--text-primary)' }}>{listing.name}</div>
+        {listing.description && (
+          <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {listing.description.length > 85 ? listing.description.slice(0, 85) + '…' : listing.description}
+          </div>
+        )}
+        <span style={{ fontSize: '.6rem', fontWeight: 700, background: 'rgba(139,92,246,.12)', color: '#a78bfa', borderRadius: 4, padding: '2px 6px', alignSelf: 'flex-start' }}>
+          🎴 Resealed Pack
+        </span>
+        <div style={{ fontSize: '.6rem', color: stockColor, fontWeight: 600 }}>
+          {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
+          <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
+          <button onClick={() => onAdd(listing)} style={{
+            padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontSize: '.72rem', fontWeight: 700,
+            background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+            color: inCart ? 'var(--accent-gold)' : '#000', transition: 'all .15s',
+          }}>{inCart ? '✓ In Cart' : '+ Cart'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Product detail modal (sealed / resealed — no Scryfall data) ───────────────
+function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
+  const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
+  const getPackArt = () => {
+    const n = listing.name.toLowerCase()
+    if (n.includes('vaulted rarities')) return <VaultedRaritiesArt />
+    if (n.includes('relics awakened'))  return <RelicsAwakenedArt />
+    if ((listing.product_type || 'single') === 'resealed') return <GenericResealedArt name={listing.name} />
+    return <SealedPackArt name={listing.name} productFormat={listing.product_format} />
+  }
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(520px,96vw)', maxHeight: '90vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 401, padding: '20px',
+        boxShadow: '0 24px 60px rgba(0,0,0,.65)',
+      }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          <div style={{ width: 'min(170px,38vw)', flexShrink: 0, borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 28px rgba(0,0,0,.6)' }}>
+            {listing.img_url
+              ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block' }} />
+              : getPackArt()}
+          </div>
+          <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontWeight: 800, fontSize: '1.1rem', lineHeight: 1.25, paddingRight: 32 }}>{listing.name}</div>
+            {listing.set_name && <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{listing.set_name}</div>}
+            {listing.product_format && (
+              <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(59,130,246,.12)', color: '#60a5fa', borderRadius: 6, padding: '3px 8px', alignSelf: 'flex-start' }}>
+                {listing.product_format}
+              </span>
+            )}
+            {(listing.product_type || 'single') === 'resealed' && (
+              <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(139,92,246,.12)', color: '#a78bfa', borderRadius: 6, padding: '3px 8px', alignSelf: 'flex-start' }}>
+                🎴 Resealed Pack
+              </span>
+            )}
+            {listing.description && (
+              <div style={{ fontSize: '.82rem', lineHeight: 1.7, color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+                {listing.description}
+              </div>
+            )}
+            <div style={{ fontSize: '.72rem', fontWeight: 600, color: stockColor }}>
+              {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
+              <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
+                padding: '10px 22px', borderRadius: 10, border: 'none', cursor: inCart ? 'default' : 'pointer',
+                background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 800, fontSize: '.88rem',
+              }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Cart drawer ───────────────────────────────────────────────────────────────
 function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout }) {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
@@ -745,6 +982,7 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
   const [cartOpen,        setCartOpen]        = useState(false)
   const [checkoutOpen,    setCheckoutOpen]    = useState(false)
   const [selectedListing, setSelectedListing] = useState(null)
+  const [category,        setCategory]        = useState('single')
 
   // Fetch active listings from Supabase (public — no auth required)
   useEffect(() => {
@@ -766,15 +1004,17 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
   const cartIds = useMemo(() => new Set(cart.map(i => i.id)), [cart])
 
   const filtered = useMemo(() => {
-    let list = listings.filter(l =>
-      !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.set_name?.toLowerCase().includes(search.toLowerCase())
-    )
+    let list = listings.filter(l => {
+      const type = l.product_type || 'single'
+      if (type !== category) return false
+      return !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.set_name?.toLowerCase().includes(search.toLowerCase())
+    })
     if (sortBy === 'price_asc')  list = [...list].sort((a, b) => a.price - b.price)
     if (sortBy === 'price_desc') list = [...list].sort((a, b) => b.price - a.price)
     if (sortBy === 'name')       list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     if (sortBy === 'newest')     list = [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     return list
-  }, [listings, search, sortBy])
+  }, [listings, search, sortBy, category])
 
   const addToCart = useCallback((listing) => {
     setCart(prev => {
@@ -827,7 +1067,7 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
             🏪 Card Shop
           </div>
           <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
-            {loading ? 'Loading…' : `${listings.length} card${listings.length !== 1 ? 's' : ''} available`}
+            {loading ? 'Loading…' : `${filtered.length} ${category === 'single' ? 'card' : 'product'}${filtered.length !== 1 ? 's' : ''} available`}
           </div>
         </div>
         <button
@@ -849,6 +1089,26 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
             }}>{cartCount}</span>
           )}
         </button>
+      </div>
+
+      {/* ── Category tabs ── */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+        {[
+          { id: 'single',   label: '🃏 Singles'  },
+          { id: 'sealed',   label: '📦 Sealed'   },
+          { id: 'resealed', label: '🎴 Resealed' },
+        ].map(t => (
+          <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
+            padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
+            background: category === t.id ? 'rgba(201,168,76,.1)' : 'transparent',
+            color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
+            fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem', cursor: 'pointer',
+            borderBottom: `2px solid ${category === t.id ? 'var(--accent-gold)' : 'transparent'}`,
+            transition: 'all .15s',
+          }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Search + Sort ── */}
@@ -883,33 +1143,43 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
         </div>
       )}
 
-      {!loading && listings.length === 0 && (
+      {!loading && filtered.length === 0 && !search && (
         <div className="empty-state">
-          <div className="empty-icon">🏪</div>
-          <p>No cards listed yet.<br />Check back soon!</p>
+          <div className="empty-icon">{category === 'single' ? '🃏' : category === 'sealed' ? '📦' : '🎴'}</div>
+          <p>
+            {category === 'single'   && 'No singles listed yet. Check back soon!'}
+            {category === 'sealed'   && 'No sealed products listed yet. Check back soon!'}
+            {category === 'resealed' && 'No resealed packs listed yet. Check back soon!'}
+          </p>
         </div>
       )}
 
-      {!loading && listings.length > 0 && filtered.length === 0 && (
+      {!loading && filtered.length === 0 && search && (
         <div className="empty-state">
           <div className="empty-icon">🔍</div>
-          <p>No cards match "{search}"</p>
+          <p>No results for "{search}"</p>
           <button className="btn btn-ghost" onClick={() => setSearch('')} style={{ marginTop: 12 }}>Clear search</button>
         </div>
       )}
 
-      {/* ── Card grid ── */}
+      {/* ── Card / product grid ── */}
       {!loading && filtered.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 }}>
-          {filtered.map(listing => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              inCart={cartIds.has(listing.id)}
-              onAdd={addToCart}
-              onView={setSelectedListing}
-            />
-          ))}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: category === 'single'
+            ? 'repeat(auto-fill,minmax(140px,1fr))'
+            : 'repeat(auto-fill,minmax(200px,1fr))',
+          gap: 12,
+        }}>
+          {filtered.map(listing =>
+            category === 'single' ? (
+              <ListingCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+            ) : category === 'sealed' ? (
+              <SealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+            ) : (
+              <ResealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+            )
+          )}
         </div>
       )}
 
@@ -933,14 +1203,11 @@ export default function Store({ initialSearch = '', onSearchUsed }) {
         />
       )}
 
-      {/* ── Card detail modal ── */}
+      {/* ── Detail modal (single vs sealed/resealed) ── */}
       {selectedListing && (
-        <CardDetailModal
-          listing={selectedListing}
-          onClose={() => setSelectedListing(null)}
-          onAdd={addToCart}
-          inCart={cartIds.has(selectedListing.id)}
-        />
+        (selectedListing.product_type || 'single') === 'single'
+          ? <CardDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} onAdd={addToCart} inCart={cartIds.has(selectedListing.id)} />
+          : <ProductDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} onAdd={addToCart} inCart={cartIds.has(selectedListing.id)} />
       )}
 
       {/* ── Floating cart bar ── */}
