@@ -242,8 +242,10 @@ function UserTable({ users }) {
 
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG']
 
+const PRODUCT_FORMATS = ['Draft Booster', 'Set Booster', 'Collector Booster', 'Draft Booster Box', 'Set Booster Box', 'Collector Booster Box', 'Bundle', 'Commander Deck', 'Starter Kit', 'Gift Bundle', 'Other']
+
 function CreateListingModal({ onClose, onSaved }) {
-  const [form,     setForm]     = useState({ name: '', set_name: '', condition: 'NM', is_foil: false, price: '', qty_available: 1, img_url: '', active: true, scryfall_id: null })
+  const [form,     setForm]     = useState({ product_type: 'single', name: '', set_name: '', condition: 'NM', is_foil: false, price: '', qty_available: 1, img_url: '', active: true, scryfall_id: null, product_format: '', description: '' })
   const [query,    setQuery]    = useState('')
   const [results,  setResults]  = useState([])
   const [searching,setSearching]= useState(false)
@@ -285,18 +287,35 @@ function CreateListingModal({ onClose, onSaved }) {
     setSaving(true); setErr(null)
     try {
       const qty = parseInt(form.qty_available, 10) || 1
-      const { merged } = await upsertStoreListing({
-        name:        form.name.trim(),
-        set_name:    form.set_name.trim() || null,
-        condition:   form.condition,
-        is_foil:     form.is_foil,
-        price:       parseFloat(form.price),
-        img_url:     form.img_url.trim() || null,
-        scryfall_id: form.scryfall_id || null,
-        qty,
-      })
-      setSaving(false)
-      onSaved(merged)
+      if (form.product_type === 'single') {
+        const { merged } = await upsertStoreListing({
+          name:        form.name.trim(),
+          set_name:    form.set_name.trim() || null,
+          condition:   form.condition,
+          is_foil:     form.is_foil,
+          price:       parseFloat(form.price),
+          img_url:     form.img_url.trim() || null,
+          scryfall_id: form.scryfall_id || null,
+          qty,
+        })
+        setSaving(false)
+        onSaved(merged)
+      } else {
+        const { error: insErr } = await supabase.from('store_listings').insert({
+          product_type:    form.product_type,
+          name:            form.name.trim(),
+          set_name:        form.set_name.trim() || null,
+          price:           parseFloat(form.price),
+          qty_available:   qty,
+          img_url:         form.img_url.trim() || null,
+          active:          form.active,
+          product_format:  form.product_format || null,
+          description:     form.description.trim() || null,
+        })
+        if (insErr) throw new Error(insErr.message)
+        setSaving(false)
+        onSaved(false)
+      }
       onClose()
     } catch (err) {
       setSaving(false)
@@ -322,58 +341,125 @@ function CreateListingModal({ onClose, onSaved }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
         </div>
 
-        {/* Card search */}
-        <div style={{ position: 'relative', marginBottom: 14 }}>
-          <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Search Card Name</label>
-          <input
-            value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. Lightning Bolt"
-            className="form-input"
-            style={{ width: '100%', padding: '9px 12px', fontSize: '.85rem', boxSizing: 'border-box' }}
-          />
-          {searching && <div style={{ fontSize: '.7rem', color: '#64748b', marginTop: 4 }}>Searching…</div>}
-          {results.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1e293b', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, zIndex: 10, maxHeight: 220, overflowY: 'auto' }}>
-              {results.map(c => (
-                <div key={c.id} onClick={() => pickCard(c)} style={{ display: 'flex', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.05)', alignItems: 'center' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.06)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  {(c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small) &&
-                    <img src={c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small} style={{ width: 30, borderRadius: 3 }} alt="" />}
-                  <div>
-                    <div style={{ fontSize: '.82rem', color: '#e2e8f0', fontWeight: 600 }}>{c.name}</div>
-                    <div style={{ fontSize: '.65rem', color: '#64748b' }}>{c.set_name} · {c.prices?.usd ? `$${c.prices.usd}` : '—'}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Product type selector */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          {[
+            { id: 'single',   label: '🃏 Single'   },
+            { id: 'sealed',   label: '📦 Sealed'   },
+            { id: 'resealed', label: '🎴 Resealed' },
+          ].map(t => (
+            <button key={t.id} type="button" onClick={() => setForm(f => ({ ...f, product_type: t.id }))} style={{
+              flex: 1, padding: '8px 0', borderRadius: 8, border: `1px solid ${form.product_type === t.id ? '#c9a84c' : 'rgba(255,255,255,.12)'}`,
+              background: form.product_type === t.id ? 'rgba(201,168,76,.15)' : 'transparent',
+              color: form.product_type === t.id ? '#c9a84c' : '#64748b',
+              fontWeight: form.product_type === t.id ? 700 : 400, fontSize: '.78rem', cursor: 'pointer',
+            }}>{t.label}</button>
+          ))}
         </div>
 
+        {/* Card search — singles only */}
+        {form.product_type === 'single' && (
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Search Card Name</label>
+            <input
+              value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. Lightning Bolt"
+              className="form-input"
+              style={{ width: '100%', padding: '9px 12px', fontSize: '.85rem', boxSizing: 'border-box' }}
+            />
+            {searching && <div style={{ fontSize: '.7rem', color: '#64748b', marginTop: 4 }}>Searching…</div>}
+            {results.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1e293b', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, zIndex: 10, maxHeight: 220, overflowY: 'auto' }}>
+                {results.map(c => (
+                  <div key={c.id} onClick={() => pickCard(c)} style={{ display: 'flex', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,.05)', alignItems: 'center' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.06)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    {(c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small) &&
+                      <img src={c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small} style={{ width: 30, borderRadius: 3 }} alt="" />}
+                    <div>
+                      <div style={{ fontSize: '.82rem', color: '#e2e8f0', fontWeight: 600 }}>{c.name}</div>
+                      <div style={{ fontSize: '.65rem', color: '#64748b' }}>{c.set_name} · {c.prices?.usd ? `$${c.prices.usd}` : '—'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {inp('Card Name', 'name', 'text', { required: true, placeholder: 'Lightning Bolt' })}
-          {inp('Set Name', 'set_name', 'text', { placeholder: 'e.g. Magic 2011' })}
+          {inp(form.product_type === 'single' ? 'Card Name' : 'Product Name', 'name', 'text', { required: true, placeholder: form.product_type === 'single' ? 'Lightning Bolt' : form.product_type === 'sealed' ? 'Duskmourn: House of Horror Booster Box' : 'Vaulted Rarities — Vol. 1' })}
+          {inp('Set Name', 'set_name', 'text', { placeholder: form.product_type === 'single' ? 'e.g. Magic 2011' : 'e.g. Duskmourn' })}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Condition</label>
-              <select value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} className="form-input" style={{ width: '100%', padding: '9px 10px', fontSize: '.85rem' }}>
-                {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01', placeholder: '0.99' })}
-            {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
-          </div>
+          {/* Singles: condition + foil */}
+          {form.product_type === 'single' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Condition</label>
+                  <select value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} className="form-input" style={{ width: '100%', padding: '9px 10px', fontSize: '.85rem' }}>
+                    {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01', placeholder: '0.99' })}
+                {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
+              </div>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
+                  <input type="checkbox" checked={form.is_foil} onChange={e => setForm(f => ({ ...f, is_foil: e.target.checked }))} />
+                  ✦ Foil
+                </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
+                  <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
+                  Active (visible in store)
+                </label>
+              </div>
+            </>
+          )}
 
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
-              <input type="checkbox" checked={form.is_foil} onChange={e => setForm(f => ({ ...f, is_foil: e.target.checked }))} />
-              ✦ Foil
-            </label>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
-              <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
-              Active (visible in store)
-            </label>
-          </div>
+          {/* Sealed: product format */}
+          {form.product_type === 'sealed' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Format</label>
+                  <select value={form.product_format} onChange={e => setForm(f => ({ ...f, product_format: e.target.value }))} className="form-input" style={{ width: '100%', padding: '9px 10px', fontSize: '.85rem' }}>
+                    <option value="">— Select —</option>
+                    {PRODUCT_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+                {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01', placeholder: '24.99' })}
+                {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
+              </div>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
+                <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
+                Active (visible in store)
+              </label>
+            </>
+          )}
+
+          {/* Resealed: description */}
+          {form.product_type === 'resealed' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10 }}>
+                {inp('Price ($)', 'price', 'number', { required: true, step: '0.01', min: '0.01', placeholder: '14.99' })}
+                {inp('Qty', 'qty_available', 'number', { min: '0', style: { padding: '9px 8px' } })}
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '.65rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Pack Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="e.g. 5 hand-picked rare and mythic singles. May include foils, special treatments, or chase cards."
+                  className="form-input"
+                  style={{ width: '100%', padding: '9px 12px', fontSize: '.82rem', boxSizing: 'border-box', minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: '.82rem', color: '#94a3b8' }}>
+                <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
+                Active (visible in store)
+              </label>
+            </>
+          )}
 
           {form.img_url && (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -381,7 +467,7 @@ function CreateListingModal({ onClose, onSaved }) {
               <div style={{ fontSize: '.7rem', color: '#64748b', flex: 1, wordBreak: 'break-all' }}>{form.img_url}</div>
             </div>
           )}
-          {inp('Image URL (auto-filled from search)', 'img_url', 'text', { placeholder: 'https://…' })}
+          {inp('Image URL (optional)', 'img_url', 'text', { placeholder: 'https://…' })}
 
           {err && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>{err}</div>}
 
