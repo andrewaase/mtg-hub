@@ -31,7 +31,7 @@ function getTypeBucket(typeLine) {
 const IMG_CACHE = new Map()
 
 // ── Main Decks page ───────────────────────────────────────────────────────────
-export default function Decks({ user, collection, showToast }) {
+export default function Decks({ user, collection, showToast, setDeckModalOpen, openStoreSearch }) {
   const [decks, setDecks]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [selected, setSelected]     = useState(null)
@@ -44,6 +44,12 @@ export default function Decks({ user, collection, showToast }) {
   useEffect(() => {
     getDecks(user?.id).then(d => { setDecks(d); setLoading(false) })
   }, [user])
+
+  // Block sidebar navigation while deck modal is open
+  useEffect(() => {
+    setDeckModalOpen?.(showImport)
+    return () => setDeckModalOpen?.(false)
+  }, [showImport, setDeckModalOpen])
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
   const handleSave = async (deckData) => {
@@ -107,6 +113,7 @@ export default function Decks({ user, collection, showToast }) {
         onModalClose={() => { setShowImport(false); setEditDeck(null) }}
         onModalSave={handleSave}
         editDeck={editDeck}
+        openStoreSearch={openStoreSearch}
       />
     )
   }
@@ -247,7 +254,7 @@ function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
 }
 
 // ── Card row with hover preview ───────────────────────────────────────────────
-function CardRow({ card, cardValues, isLast }) {
+function CardRow({ card, cardValues, isLast, openStoreSearch }) {
   const [previewImg, setPreviewImg] = useState(null)
   const [hoverPos,   setHoverPos]   = useState(null)
   const price = cardValues?.[card.name]
@@ -280,8 +287,6 @@ function CardRow({ card, cardValues, isLast }) {
     setHoverPos(null)
   }, [])
 
-  const scryfallHref = `https://scryfall.com/search?q=!%22${encodeURIComponent(card.name)}%22&order=released&dir=asc`
-
   return (
     <>
       <div
@@ -293,17 +298,17 @@ function CardRow({ card, cardValues, isLast }) {
           borderBottom: isLast ? 'none' : '1px solid var(--bg-secondary)',
         }}
       >
-        <a
-          href={scryfallHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          style={{ fontSize: '.83rem', color: 'var(--text-primary)', flex: 1, minWidth: 0, textDecoration: 'none', transition: 'color .1s' }}
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={() => openStoreSearch?.(card.name)}
+          onKeyDown={e => e.key === 'Enter' && openStoreSearch?.(card.name)}
+          style={{ fontSize: '.83rem', color: 'var(--text-primary)', flex: 1, minWidth: 0, cursor: 'pointer', transition: 'color .1s' }}
           onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-teal)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
         >
           {card.name}
-        </a>
+        </span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexShrink: 0, marginLeft: '8px' }}>
           {price != null && (
             <span style={{ fontSize: '.68rem', color: 'var(--accent-gold)' }}>
@@ -332,7 +337,7 @@ function CardRow({ card, cardValues, isLast }) {
 }
 
 // ── Deck section ──────────────────────────────────────────────────────────────
-function DeckSection({ title, cards, highlight, cardValues }) {
+function DeckSection({ title, cards, highlight, cardValues, openStoreSearch }) {
   return (
     <div style={{
       background: 'var(--bg-card)',
@@ -346,14 +351,14 @@ function DeckSection({ title, cards, highlight, cardValues }) {
         {title}
       </div>
       {cards.map((card, i) => (
-        <CardRow key={`${card.name}-${i}`} card={card} cardValues={cardValues} isLast={i === cards.length - 1} />
+        <CardRow key={`${card.name}-${i}`} card={card} cardValues={cardValues} isLast={i === cards.length - 1} openStoreSearch={openStoreSearch} />
       ))}
     </div>
   )
 }
 
 // ── Deck detail view ──────────────────────────────────────────────────────────
-function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck }) {
+function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck, openStoreSearch }) {
   const { main, side } = countCards(deck)
   const isCmdr   = isCommanderFormat(deck.format)
   const fmt      = FORMAT_COLORS[deck.format] || { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' }
@@ -369,19 +374,20 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
     setDeckValue(getDeckValueSync(deck, collection || []))
   }, [deck, collection])
 
-  async function handleFetchAllPrices() {
-    if (!deckValue || fetchingAll) return
+  const handleFetchAllPrices = useCallback(async (valueSnapshot) => {
+    const dv = valueSnapshot || deckValue
+    if (!dv || fetchingAll) return
     setFetchingAll(true)
-    setFetchProg({ done: 0, total: deckValue.unknownCards.length })
-    const prices = await fetchUnknownDeckPrices(deckValue.unknownCards, {
+    setFetchProg({ done: 0, total: dv.unknownCards.length })
+    const prices = await fetchUnknownDeckPrices(dv.unknownCards, {
       onProgress: (done, total) => setFetchProg({ done, total }),
     })
     setDeckValue(prev => {
       if (!prev) return prev
       const cardValues = { ...prev.cardValues, ...prices }
+      const allCards = [...mainboard, ...sideboard, ...(deck.commander ? [{ name: deck.commander, qty: 1 }] : [])]
       const totalValue = Object.entries(cardValues).reduce((s, [name, p]) => {
         if (p == null) return s
-        const allCards = [...mainboard, ...sideboard, ...(deck.commander ? [{ name: deck.commander, qty: 1 }] : [])]
         const card = allCards.find(c => c.name === name)
         return s + (p * (card?.qty || 1))
       }, 0)
@@ -389,7 +395,16 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
     })
     setFetchingAll(false)
     setFetchProg(null)
-  }
+  }, [deckValue, fetchingAll, mainboard, sideboard, deck.commander]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch market prices when deck is first opened
+  const didAutoFetch = useRef(false)
+  useEffect(() => {
+    if (deckValue && !didAutoFetch.current && deckValue.unknownCards.length > 0) {
+      didAutoFetch.current = true
+      handleFetchAllPrices(deckValue)
+    }
+  }, [deckValue]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Card type grouping ────────────────────────────────────────────────────
   const [cardTypes,    setCardTypes]    = useState({})
@@ -512,7 +527,7 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
 
         {/* Commander */}
         {isCmdr && deck.commander && (
-          <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} />
+          <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} openStoreSearch={openStoreSearch} />
         )}
 
         {/* Mainboard — typed groups or fallback while loading */}
@@ -524,6 +539,7 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
                   title={`${group.label} (${group.count})`}
                   cards={group.cards}
                   cardValues={deckValue?.cardValues}
+                  openStoreSearch={openStoreSearch}
                 />
               ))
             : (
@@ -535,13 +551,14 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
                 }
                 cards={mainboard}
                 cardValues={deckValue?.cardValues}
+                openStoreSearch={openStoreSearch}
               />
             )
         )}
 
         {/* Sideboard */}
         {sideboard.length > 0 && (
-          <DeckSection title={`🔄 Sideboard (${side})`} cards={sideboard} cardValues={deckValue?.cardValues} />
+          <DeckSection title={`🔄 Sideboard (${side})`} cards={sideboard} cardValues={deckValue?.cardValues} openStoreSearch={openStoreSearch} />
         )}
       </div>
 
