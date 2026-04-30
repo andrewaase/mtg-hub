@@ -4,10 +4,11 @@ import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getCardPriceHistory } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 import { getWishlist, addWishlistItem, updateWishlistItem, removeWishlistItem } from '../lib/db'
+import { supabase, hasSupabase } from '../lib/supabase'
 
 function fmt(n) { return n != null ? `$${parseFloat(n).toFixed(2)}` : '—' }
 
-export default function Wishlist({ user, showToast }) {
+export default function Wishlist({ user, showToast, openStoreSearch }) {
   const [items,      setItems]      = useState([])
   const [loading,    setLoading]    = useState(true)
   const [cardName,   setCardName]   = useState('')
@@ -231,7 +232,7 @@ export default function Wishlist({ user, showToast }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {items.map(item => (
-            <WishlistItem key={item.id} item={item} onRemove={handleRemove} onSetTarget={handleSetTarget} />
+            <WishlistItem key={item.id} item={item} onRemove={handleRemove} onSetTarget={handleSetTarget} onStoreSearch={openStoreSearch} />
           ))}
         </div>
       )}
@@ -241,9 +242,24 @@ export default function Wishlist({ user, showToast }) {
 
 // ── Single wishlist item ───────────────────────────────────────────────────────
 
-function WishlistItem({ item, onRemove, onSetTarget }) {
+function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
   const [editTarget, setEditTarget] = useState(false)
   const [targetVal,  setTargetVal]  = useState(item.targetPrice?.toFixed(2) || '')
+  const [storeListing, setStoreListing] = useState(null)
+
+  // Check if this card is available in the Vaulted Singles store
+  useEffect(() => {
+    if (!hasSupabase) return
+    supabase.from('store_listings')
+      .select('id, price, qty_available, is_foil, condition')
+      .eq('name', item.name)
+      .eq('active', true)
+      .gt('qty_available', 0)
+      .order('price', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setStoreListing(data || null))
+  }, [item.name])
 
   const atTarget  = item.targetPrice != null && item.currentPrice != null && item.currentPrice <= item.targetPrice
   const hasPrice  = item.currentPrice != null
@@ -342,18 +358,35 @@ function WishlistItem({ item, onRemove, onSetTarget }) {
             </div>
           )}
 
-          <a
-            href={getTCGPlayerLink(item.tcgUrl || item.name)}
-            target="_blank" rel="noopener noreferrer"
-            style={{
-              display: 'inline-block', marginTop: '10px', padding: '6px 14px',
-              background: 'rgba(74,222,128,.10)', color: '#4ade80',
-              border: '1px solid rgba(74,222,128,.25)', borderRadius: '8px',
-              fontSize: '.75rem', fontWeight: 700, textDecoration: 'none',
-            }}
-          >
-            🛒 Buy on TCGPlayer
-          </a>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+            {storeListing && (
+              <button
+                onClick={() => onStoreSearch?.(item.name)}
+                style={{
+                  padding: '6px 14px',
+                  background: 'linear-gradient(135deg, #c9a84c, #f0c060)',
+                  color: '#000', border: 'none', borderRadius: '8px',
+                  fontSize: '.75rem', fontWeight: 800, cursor: 'pointer',
+                }}
+              >
+                🏪 Buy from Vaulted Singles — ${storeListing.price?.toFixed(2)}
+                {storeListing.is_foil ? ' ✨' : ''}
+                {storeListing.condition && storeListing.condition !== 'NM' ? ` (${storeListing.condition})` : ''}
+              </button>
+            )}
+            <a
+              href={getTCGPlayerLink(item.tcgUrl || item.name)}
+              target="_blank" rel="noopener noreferrer"
+              style={{
+                display: 'inline-block', padding: '6px 14px',
+                background: 'rgba(74,222,128,.10)', color: '#4ade80',
+                border: '1px solid rgba(74,222,128,.25)', borderRadius: '8px',
+                fontSize: '.75rem', fontWeight: 700, textDecoration: 'none',
+              }}
+            >
+              🛒 Buy on TCGPlayer
+            </a>
+          </div>
         </div>
       </div>
     </div>
