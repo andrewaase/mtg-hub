@@ -273,6 +273,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
   const sparkLabels = priceHist.map(e => e.date.slice(5))
 
   return (
+    <>
     <div style={{
       background: atTarget ? 'rgba(62,207,178,.06)' : 'var(--bg-card)',
       border: `1px solid ${atTarget ? 'rgba(62,207,178,.4)' : 'var(--border)'}`,
@@ -426,5 +427,6 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
         </div>
       </>
     )}
+    </>
   )
 }
