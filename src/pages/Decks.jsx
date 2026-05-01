@@ -365,6 +365,9 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
   const mainboard = deck.mainboard || []
   const sideboard = deck.sideboard || []
 
+  // ── Hand simulator ────────────────────────────────────────────────────────
+  const [showSimulator, setShowSimulator] = useState(false)
+
   // ── Budget tracker ────────────────────────────────────────────────────────
   const [deckValue,   setDeckValue]   = useState(null)
   const [fetchingAll, setFetchingAll] = useState(false)
@@ -432,7 +435,16 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
         .then(r => r.ok ? r.json() : { data: [] })
         .then(({ data = [] }) => {
           const types = {}
-          for (const card of data) types[card.name] = card.type_line || ''
+          for (const card of data) {
+            // For DFCs the type_line is "Creature — X // Planeswalker — Y".
+            // Use only the front face so the card goes in the right bucket.
+            const typeLine = (card.type_line || '').split(' // ')[0]
+            types[card.name] = typeLine
+            // Also index by front-face name so "Delver of Secrets" resolves
+            // even though Scryfall returns the full "Delver of Secrets // Insectile Aberration".
+            const frontName = card.name.split(' // ')[0]
+            if (frontName !== card.name) types[frontName] = typeLine
+          }
           return types
         })
         .catch(() => ({}))
@@ -486,7 +498,10 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <button className={`btn btn-sm ${copied ? 'btn-ghost' : 'btn-primary'}`} onClick={onCopyArena} style={{ fontWeight: 700 }}>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowSimulator(true)} style={{ fontWeight: 700 }}>
+            🎲 Simulate Hand
+          </button>
+          <button className={`btn btn-sm ${copied ? 'btn-ghost' : 'btn-ghost'}`} onClick={onCopyArena}>
             {copied ? '✓ Copied!' : '📋 Copy for Arena'}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={onEdit}>✏️ Edit</button>
@@ -525,9 +540,12 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
       {/* Card grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
 
-        {/* Commander */}
+        {/* Commander — alignSelf:start so the box stays compact (1-2 cards) instead of
+            stretching to match the height of adjacent type sections */}
         {isCmdr && deck.commander && (
-          <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} openCardSearch={openCardSearch} />
+          <div style={{ alignSelf: 'start' }}>
+            <DeckSection title="⭐ Commander" cards={[{ qty: 1, name: deck.commander }]} highlight cardValues={deckValue?.cardValues} openCardSearch={openCardSearch} />
+          </div>
         )}
 
         {/* Mainboard — typed groups or fallback while loading */}
@@ -569,6 +587,352 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
           onSave={onModalSave}
         />
       )}
+
+      {showSimulator && (
+        <HandSimulatorModal deck={deck} onClose={() => setShowSimulator(false)} />
+      )}
     </div>
+  )
+}
+
+// ── Card image for the hand simulator ─────────────────────────────────────────
+// Fetches from Scryfall (using the shared IMG_CACHE) and renders a card image.
+function SimCardImage({ name, width = 90, onClick, dimmed, style }) {
+  const cached = IMG_CACHE.has(name) ? IMG_CACHE.get(name) : undefined
+  const [img, setImg] = useState(cached)
+  const fetchedRef = useRef(cached !== undefined)
+
+  useEffect(() => {
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(card => {
+        const url = card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || null
+        IMG_CACHE.set(name, url)
+        setImg(url)
+      })
+      .catch(() => { IMG_CACHE.set(name, null) })
+  }, [name])
+
+  const height = Math.round(width * 1.4)
+
+  return (
+    <div
+      onClick={onClick}
+      title={name}
+      style={{
+        width, height, borderRadius: 7, overflow: 'hidden', flexShrink: 0,
+        background: '#1e2a3a', border: '1px solid rgba(255,255,255,.08)',
+        cursor: onClick ? 'pointer' : 'default',
+        opacity: dimmed ? 0.45 : 1,
+        transition: 'transform .12s, box-shadow .12s, opacity .15s',
+        ...style,
+      }}
+      onMouseEnter={onClick ? e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.5)' } : undefined}
+      onMouseLeave={onClick ? e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' } : undefined}
+    >
+      {img
+        ? <img src={img} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+        : (
+          <div style={{
+            width: '100%', height: '100%', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: '6px', textAlign: 'center',
+          }}>
+            <span style={{ fontSize: '.55rem', color: '#94a3b8', lineHeight: 1.4 }}>{name}</span>
+          </div>
+        )
+      }
+    </div>
+  )
+}
+
+// ── Hand simulator modal ───────────────────────────────────────────────────────
+function HandSimulatorModal({ deck, onClose }) {
+  // Expand mainboard cards by qty into individual card objects with unique IDs
+  const allCards = useMemo(() => {
+    const cards = []
+    let id = 0
+    for (const card of (deck.mainboard || [])) {
+      for (let i = 0; i < (card.qty || 1); i++) {
+        cards.push({ name: card.name, _id: id++ })
+      }
+    }
+    return cards
+  }, [deck])
+
+  function fisherYatesShuffle(arr) {
+    const a = [...arr]
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[a[i], a[j]] = [a[j], a[i]]
+    }
+    return a
+  }
+
+  const [mode,          setMode]          = useState('hand')   // 'hand' | 'solitaire'
+  const [library,       setLibrary]       = useState([])
+  const [hand,          setHand]          = useState([])
+  const [graveyard,     setGraveyard]     = useState([])
+  const [mulliganCount, setMulliganCount] = useState(0)
+  const [turn,          setTurn]          = useState(1)
+
+  // Deal initial 7 on mount
+  useEffect(() => {
+    const shuffled = fisherYatesShuffle(allCards)
+    setHand(shuffled.slice(0, 7))
+    setLibrary(shuffled.slice(7))
+    setGraveyard([])
+    setMulliganCount(0)
+    setTurn(1)
+  }, [allCards])
+
+  // Mulligan: London rules — always see 7, keep (7 - mulliganCount) cards.
+  // We simulate this by just handing a new set of cards at the reduced size.
+  function mulligan() {
+    const newCount   = mulliganCount + 1
+    const keepCount  = Math.max(1, 7 - newCount)
+    const shuffled   = fisherYatesShuffle(allCards)
+    setHand(shuffled.slice(0, keepCount))
+    setLibrary(shuffled.slice(keepCount))
+    setGraveyard([])
+    setMulliganCount(newCount)
+    setTurn(1)
+  }
+
+  // Full reset — new 7 with no mulligan penalty
+  function fullReset() {
+    const shuffled = fisherYatesShuffle(allCards)
+    setHand(shuffled.slice(0, 7))
+    setLibrary(shuffled.slice(7))
+    setGraveyard([])
+    setMulliganCount(0)
+    setTurn(1)
+  }
+
+  // Draw 1 card from top of library into hand
+  function drawOne() {
+    if (library.length === 0) return
+    setHand(prev => [...prev, library[0]])
+    setLibrary(prev => prev.slice(1))
+  }
+
+  // Draw a full turn (draw 1, advance turn counter) — used in solitaire
+  function drawTurn() {
+    if (library.length === 0) return
+    setHand(prev => [...prev, library[0]])
+    setLibrary(prev => prev.slice(1))
+    setTurn(t => t + 1)
+  }
+
+  // Cast / play a card from hand to graveyard (solitaire mode)
+  function castCard(id) {
+    const card = hand.find(c => c._id === id)
+    if (!card) return
+    setHand(prev => prev.filter(c => c._id !== id))
+    setGraveyard(prev => [card, ...prev])
+  }
+
+  const isCmdr   = isCommanderFormat(deck.format)
+  const handNote = mulliganCount > 0
+    ? `Hand (${hand.length}) — ${mulliganCount} mulligan${mulliganCount > 1 ? 's' : ''}`
+    : `Hand (${hand.length})`
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)',
+        zIndex: 700, backdropFilter: 'blur(6px)',
+      }} />
+
+      {/* Modal */}
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(780px, 97vw)', maxHeight: '92vh',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 701,
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 28px 70px rgba(0,0,0,.85)',
+        overflow: 'hidden',
+      }}>
+
+        {/* ── Header ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: '1.3rem' }}>🎲</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: '.95rem' }}>Hand Simulator</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deck.name}</div>
+          </div>
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 2, gap: 2, flexShrink: 0 }}>
+            {[['hand', '🖐 Hand'], ['solitaire', '♟ Solitaire']].map(([m, l]) => (
+              <button key={m} onClick={() => { setMode(m); fullReset() }} style={{
+                padding: '5px 11px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: mode === m ? 'var(--bg-card)' : 'transparent',
+                color: mode === m ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontWeight: mode === m ? 700 : 400, fontSize: '.73rem', transition: 'all .15s',
+              }}>{l}</button>
+            ))}
+          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'var(--text-muted)',
+            cursor: 'pointer', fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0,
+          }}>✕</button>
+        </div>
+
+        {/* ── Stats bar ── */}
+        <div style={{
+          display: 'flex', gap: 18, padding: '8px 18px',
+          background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)',
+          flexShrink: 0, flexWrap: 'wrap', alignItems: 'center',
+        }}>
+          {[
+            ['📚', 'Library', library.length, library.length > 0 ? 'var(--text-primary)' : 'var(--text-muted)'],
+            ['🖐', 'Hand',    hand.length,    'var(--text-primary)'],
+            ['🗑', 'Graveyard', graveyard.length, graveyard.length > 0 ? '#f87171' : 'var(--text-muted)'],
+          ].map(([icon, label, count, color]) => (
+            <div key={label} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <span style={{ fontSize: '.8rem' }}>{icon}</span>
+              <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{label}:</span>
+              <span style={{ fontSize: '.8rem', fontWeight: 700, color }}>{count}</span>
+            </div>
+          ))}
+          {mode === 'solitaire' && (
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <span style={{ fontSize: '.8rem' }}>🕐</span>
+              <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>Turn:</span>
+              <span style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--accent-gold)' }}>{turn}</span>
+            </div>
+          )}
+          {isCmdr && deck.commander && (
+            <div style={{ marginLeft: 'auto', fontSize: '.7rem', color: 'var(--accent-gold)', display: 'flex', gap: 4 }}>
+              <span>⭐</span><span>{deck.commander}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Main content ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', minHeight: 0 }}>
+
+          {/* Hand */}
+          <div>
+            <div style={{
+              fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 10,
+            }}>
+              {handNote}
+              {mode === 'solitaire' && hand.length > 0 && (
+                <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>
+                  — click a card to cast it
+                </span>
+              )}
+            </div>
+
+            {hand.length === 0 ? (
+              <div style={{
+                height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-muted)', fontSize: '.85rem', background: 'var(--bg-secondary)',
+                borderRadius: 10, border: '1px dashed var(--border)',
+              }}>
+                {library.length === 0 ? '📚 Library is empty' : 'Hand is empty — draw a card'}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 6 }}>
+                {hand.map(card => (
+                  <SimCardImage
+                    key={card._id}
+                    name={card.name}
+                    width={94}
+                    onClick={mode === 'solitaire' ? () => castCard(card._id) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Solitaire: graveyard strip */}
+          {mode === 'solitaire' && graveyard.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{
+                fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 8,
+              }}>
+                Graveyard ({graveyard.length})
+              </div>
+              <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4 }}>
+                {graveyard.slice(0, 12).map((card, i) => (
+                  <SimCardImage key={card._id} name={card.name} width={68} dimmed />
+                ))}
+                {graveyard.length > 12 && (
+                  <div style={{
+                    width: 68, height: 95, borderRadius: 6, background: 'var(--bg-secondary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, color: 'var(--text-muted)', fontSize: '.75rem', fontWeight: 700,
+                  }}>
+                    +{graveyard.length - 12}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Solitaire: library empty state */}
+          {mode === 'solitaire' && library.length === 0 && (
+            <div style={{
+              marginTop: 16, padding: '12px 16px', borderRadius: 10,
+              background: 'rgba(201,168,76,.07)', border: '1px solid rgba(201,168,76,.2)',
+              fontSize: '.8rem', color: 'var(--accent-gold)', textAlign: 'center',
+            }}>
+              📚 Library empty — you drew all {allCards.length} cards
+            </div>
+          )}
+        </div>
+
+        {/* ── Action bar ── */}
+        <div style={{
+          display: 'flex', gap: 8, padding: '12px 18px',
+          borderTop: '1px solid var(--border)', flexShrink: 0,
+          flexWrap: 'wrap', alignItems: 'center',
+        }}>
+          {mode === 'hand' ? (
+            <>
+              <button className="btn btn-ghost btn-sm" onClick={mulligan}>
+                🔄 Mulligan {mulliganCount > 0 ? `(keep ${Math.max(1, 7 - mulliganCount)})` : ''}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={fullReset}>↺ New 7</button>
+              <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={drawOne}
+                disabled={library.length === 0}
+              >
+                + Draw 1 {library.length > 0 ? `(${library.length} left)` : '(empty)'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={drawTurn}
+                disabled={library.length === 0}
+                style={{ fontWeight: 700 }}
+              >
+                📥 Draw for Turn {turn} {library.length === 0 ? '(empty)' : ''}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={fullReset}>↺ Restart</button>
+              <div style={{ flex: 1 }} />
+              <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>
+                Click cards in hand to cast
+              </span>
+            </>
+          )}
+        </div>
+
+      </div>
+    </>
   )
 }
