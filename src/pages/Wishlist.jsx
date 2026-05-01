@@ -131,7 +131,7 @@ export default function Wishlist({ user, showToast, openStoreSearch }) {
       {/* Sign-in nudge for guests */}
       {!user && (
         <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#fbbf24' }}>
-          ⚠️ Sign in to sync your watchlist across devices — items added as a guest won't carry over.
+          ⚠️ Sign in to sync your watchlist across devices. Items added as a guest won't carry over.
         </div>
       )}
 
@@ -401,7 +401,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
                   fontSize: '.75rem', fontWeight: 800, cursor: 'pointer',
                 }}
               >
-                🏪 Buy from Vaulted Singles — ${storeListing.price?.toFixed(2)}
+                🏪 Buy from Vaulted Singles · ${storeListing.price?.toFixed(2)}
                 {storeListing.is_foil ? ' ✨' : ''}
                 {storeListing.condition && storeListing.condition !== 'NM' ? ` (${storeListing.condition})` : ''}
               </button>
@@ -457,7 +457,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
                   fontSize: '.78rem', fontWeight: 800, cursor: 'pointer', textAlign: 'center',
                 }}
               >
-                🏪 Buy from Vaulted Singles — ${storeListing.price?.toFixed(2)}
+                🏪 Buy from Vaulted Singles · ${storeListing.price?.toFixed(2)}
               </button>
             )}
             <a

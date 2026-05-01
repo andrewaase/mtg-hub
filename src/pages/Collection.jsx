@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { removeCard, exportData } from '../lib/db'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
@@ -55,10 +55,420 @@ function ChipRow({ options, value, onChange, multi = false, labelFn }) {
 }
 
 const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
+const CONDITION_LIST   = ['NM', 'LP', 'MP', 'HP', 'DMG']
 
-function CollectionCardModal({ card, onClose, onRemove }) {
+// ── Bulk Import ───────────────────────────────────────────────────────────────
+
+function parseBulkText(raw) {
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('//') && !l.startsWith('#'))
+  if (lines.length === 0) return { rows: [], format: 'empty' }
+
+  // ── CSV detection: first line contains a comma and a word like "name" ──
+  const firstLower = lines[0].toLowerCase()
+  if (firstLower.includes(',') && (firstLower.includes('name') || firstLower.includes('card'))) {
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const nameIdx = headers.findIndex(h => h === 'name' || h === 'card name' || h === 'card')
+    const qtyIdx  = headers.findIndex(h => h === 'qty' || h === 'quantity' || h === 'count' || h === 'amount')
+    const condIdx = headers.findIndex(h => h === 'condition' || h === 'cond')
+    const setIdx  = headers.findIndex(h => h === 'set' || h === 'set name' || h === 'edition')
+    if (nameIdx === -1) return { rows: [], format: 'csv-bad-headers' }
+    const rows = []
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const name = cols[nameIdx]
+      if (!name) continue
+      rows.push({
+        name,
+        qty:       parseInt(cols[qtyIdx]) || 1,
+        condition: (condIdx >= 0 && cols[condIdx] ? cols[condIdx].toUpperCase() : 'NM'),
+        setName:   setIdx >= 0 ? (cols[setIdx] || null) : null,
+      })
+    }
+    return { rows, format: 'csv' }
+  }
+
+  // ── Line-by-line formats ──
+  const rows = []
+  let format = 'plain'
+
+  for (const line of lines) {
+    let name, qty, condition, setName
+
+    // "4 Lightning Bolt (M19) 100" — Arena with collector number
+    let m = line.match(/^(\d+)[x\s]+(.+?)\s+\(([A-Z0-9]+)\)\s*\d+\s*(?:(NM|LP|MP|HP|DMG))?$/i)
+    if (m) {
+      ;[, qty, name, , condition] = m
+      qty = parseInt(qty); format = 'arena'
+      rows.push({ name: name.trim(), qty, condition: (condition || 'NM').toUpperCase(), setName: null })
+      continue
+    }
+
+    // "4 Lightning Bolt (M19)" — set code only
+    m = line.match(/^(\d+)[x\s]+(.+?)\s+\(([A-Z0-9]+)\)\s*(?:(NM|LP|MP|HP|DMG))?$/i)
+    if (m) {
+      ;[, qty, name, setName, condition] = m
+      qty = parseInt(qty); format = 'arena'
+      rows.push({ name: name.trim(), qty, condition: (condition || 'NM').toUpperCase(), setName: setName || null })
+      continue
+    }
+
+    // "4x Lightning Bolt" or "4 Lightning Bolt" (with optional condition)
+    m = line.match(/^(\d+)x?\s+(.+?)(?:\s+(NM|LP|MP|HP|DMG))?$/i)
+    if (m) {
+      ;[, qty, name, condition] = m
+      qty = parseInt(qty); if (format === 'plain') format = 'mtgo'
+      rows.push({ name: name.trim(), qty, condition: (condition || 'NM').toUpperCase(), setName: null })
+      continue
+    }
+
+    // "Lightning Bolt x4" (with optional condition)
+    m = line.match(/^(.+?)\s+x(\d+)(?:\s+(NM|LP|MP|HP|DMG))?$/i)
+    if (m) {
+      ;[, name, qty, condition] = m
+      qty = parseInt(qty); if (format === 'plain') format = 'reverse'
+      rows.push({ name: name.trim(), qty, condition: (condition || 'NM').toUpperCase(), setName: null })
+      continue
+    }
+
+    // "Lightning Bolt NM" — plain with condition
+    m = line.match(/^(.+?)\s+(NM|LP|MP|HP|DMG)$/i)
+    if (m) {
+      ;[, name, condition] = m
+      rows.push({ name: name.trim(), qty: 1, condition: condition.toUpperCase(), setName: null })
+      continue
+    }
+
+    // Bare card name — qty 1
+    if (/^[A-Za-z'',\-’ ]+$/.test(line)) {
+      rows.push({ name: line, qty: 1, condition: 'NM', setName: null })
+    }
+    // else: skip unparseable lines silently
+  }
+
+  return { rows, format }
+}
+
+const FORMAT_LABELS = {
+  plain:          'Card names (1 each)',
+  mtgo:           'MTGO / clipboard format',
+  arena:          'MTG Arena format',
+  reverse:        'Name x# format',
+  csv:            'CSV with headers',
+  'csv-bad-headers': 'CSV (no "name" column found)',
+  empty:          'No cards found',
+}
+
+function BulkImportModal({ onClose, collection, setCollection, user, showToast }) {
+  const [step,      setStep]      = useState('input')   // input | preview | importing | done
+  const [rawText,   setRawText]   = useState('')
+  const [parsed,    setParsed]    = useState([])         // [{name,qty,condition,setName,_id}]
+  const [parseInfo, setParseInfo] = useState(null)       // {format, count}
+  const [parseErr,  setParseErr]  = useState('')
+  const [progress,  setProgress]  = useState({ done: 0, total: 0 })
+  const [results,   setResults]   = useState(null)       // {added,updated,errors[]}
+  const fileRef = useRef()
+
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = evt => setRawText(evt.target.result || '')
+    reader.readAsText(file)
+  }
+
+  function handleParse() {
+    const { rows, format } = parseBulkText(rawText)
+    if (rows.length === 0) {
+      setParseErr(
+        format === 'empty'            ? 'Nothing to import. Paste some cards first.' :
+        format === 'csv-bad-headers'  ? 'CSV detected but no "name" column found. Add a header row.' :
+        'No cards could be parsed from this text.'
+      )
+      return
+    }
+    setParseErr('')
+    setParseInfo({ format, count: rows.length })
+    setParsed(rows.map((r, i) => ({ ...r, _id: i })))
+    setStep('preview')
+  }
+
+  function updateRow(id, patch) {
+    setParsed(prev => prev.map(r => r._id === id ? { ...r, ...patch } : r))
+  }
+
+  function removeRow(id) {
+    setParsed(prev => prev.filter(r => r._id !== id))
+  }
+
+  async function handleImport() {
+    if (parsed.length === 0) return
+    setStep('importing')
+    setProgress({ done: 0, total: parsed.length })
+
+    // ── Batch-fetch Scryfall data (up to 75 per request) ──
+    const uniqueNames = [...new Set(parsed.map(r => r.name))]
+    const sfMap = {} // lowercase name → scryfall card object
+
+    for (let i = 0; i < uniqueNames.length; i += 75) {
+      const batch = uniqueNames.slice(i, i + 75)
+      try {
+        const res  = await fetch('https://api.scryfall.com/cards/collection', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ identifiers: batch.map(name => ({ name })) }),
+        })
+        const json = await res.json()
+        ;(json.data || []).forEach(card => {
+          sfMap[card.name.toLowerCase()] = card
+        })
+      } catch {
+        // Continue without enrichment for this batch
+      }
+      if (i + 75 < uniqueNames.length) await new Promise(r => setTimeout(r, 120))
+    }
+
+    // ── Enrich parsed rows with Scryfall data ──
+    const enriched = parsed.map(row => {
+      const sf     = sfMap[row.name.toLowerCase()]
+      const img    = sf?.image_uris?.small || sf?.card_faces?.[0]?.image_uris?.small || null
+      const colors = sf?.colors            || sf?.card_faces?.[0]?.colors            || []
+      const price  = sf ? (parseFloat(sf.prices?.usd) || null) : null
+      const setName = sf?.set_name || row.setName || null
+      return { name: row.name, qty: row.qty, condition: row.condition, setName, img, colors, price }
+    })
+
+    // ── Bulk insert / update ──
+    let added = 0, updated = 0
+    const errors = []
+    try {
+      const prevSize  = collection.length
+      const newColl   = await bulkAddCards(enriched, user?.id, {
+        onProgress: (done, total) => setProgress({ done, total }),
+      })
+      added   = newColl.length - prevSize
+      updated = enriched.length - Math.max(0, added)
+      setCollection(newColl)
+    } catch (e) {
+      errors.push(e.message)
+    }
+
+    setResults({ added: Math.max(0, added), updated: Math.max(0, updated), errors })
+    setStep('done')
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, backdropFilter: 'blur(4px)' }} />
+
+      {/* Modal */}
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(680px, 97vw)', maxHeight: '92vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 501, padding: '24px 24px 20px',
+        boxShadow: '0 24px 60px rgba(0,0,0,.7)',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <span style={{ fontSize: '1.5rem' }}>📥</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Bulk Import Collection</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 1 }}>
+              Paste a card list or upload a .txt / .csv file
+            </div>
+          </div>
+          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem' }}>✕</button>
+        </div>
+
+        {/* Step: input */}
+        {step === 'input' && (
+          <>
+            {/* Format examples */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, fontSize: '.72rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Supported formats:</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 20px' }}>
+                <span><code style={{ color: 'var(--accent-teal)' }}>4 Lightning Bolt</code> MTGO/clipboard</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>4x Lightning Bolt</code> x prefix</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>Lightning Bolt x4</code> x suffix</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>4 Lightning Bolt (M19)</code> Arena</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>Lightning Bolt</code> plain (qty 1)</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>name,qty,condition</code> CSV</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: '.68rem' }}>Add <code style={{ color: 'var(--accent-teal)' }}>NM</code>, <code>LP</code>, <code>MP</code>, or <code>HP</code> after the name to set condition.</div>
+            </div>
+
+            <textarea
+              value={rawText}
+              onChange={e => setRawText(e.target.value)}
+              placeholder={'4 Lightning Bolt\n2 Counterspell LP\n1 Black Lotus NM\n\nOr paste a full Arena / MTGO deck export…'}
+              style={{
+                width: '100%', minHeight: 220, resize: 'vertical',
+                background: 'var(--bg-card)', border: `1.5px solid ${parseErr ? '#f87171' : 'var(--border)'}`,
+                borderRadius: 10, padding: '12px 14px', color: 'var(--text-primary)',
+                fontFamily: 'monospace', fontSize: '.82rem', lineHeight: 1.6,
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            {parseErr && <div style={{ color: '#f87171', fontSize: '.75rem', marginTop: 6 }}>{parseErr}</div>}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleParse}
+                disabled={!rawText.trim()}
+              >
+                Preview Import →
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => fileRef.current?.click()}
+              >
+                📁 Upload File
+              </button>
+              <input ref={fileRef} type="file" accept=".txt,.csv,.dec,.mwdeck" style={{ display: 'none' }} onChange={handleFile} />
+              {rawText.trim() && (
+                <span style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                  {rawText.split('\n').filter(l => l.trim() && !l.trim().startsWith('//') && !l.trim().startsWith('#')).length} lines
+                </span>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Step: preview */}
+        {step === 'preview' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>
+                Detected: <strong style={{ color: 'var(--accent-teal)' }}>{FORMAT_LABELS[parseInfo?.format] || parseInfo?.format}</strong>
+              </div>
+              <div style={{ background: 'rgba(99,102,241,.15)', color: '#a5b4fc', borderRadius: 99, padding: '2px 10px', fontSize: '.72rem', fontWeight: 700 }}>
+                {parsed.length} card{parsed.length !== 1 ? 's' : ''}
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setStep('input')} style={{ marginLeft: 'auto', fontSize: '.72rem' }}>
+                ← Edit
+              </button>
+            </div>
+
+            {/* Preview table */}
+            <div style={{ maxHeight: 340, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-card)', position: 'sticky', top: 0, zIndex: 1 }}>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Card Name</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: 60 }}>Qty</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: 80 }}>Condition</th>
+                    <th style={{ padding: '8px 8px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: 36 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsed.map(row => (
+                    <tr key={row._id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+                      <td style={{ padding: '6px 12px', color: 'var(--text-primary)' }}>{row.name}</td>
+                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                        <input
+                          type="number" min="1" max="99"
+                          value={row.qty}
+                          onChange={e => updateRow(row._id, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                          style={{ width: 48, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '3px 4px', fontSize: '.78rem' }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                        <select
+                          value={row.condition}
+                          onChange={e => updateRow(row._id, { condition: e.target.value })}
+                          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '3px 6px', fontSize: '.75rem', cursor: 'pointer' }}
+                        >
+                          {CONDITION_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                        <button onClick={() => removeRow(row._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '.8rem', lineHeight: 1, padding: '2px 4px' }} title="Remove">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleImport}
+                disabled={parsed.length === 0}
+              >
+                Import {parsed.length} Card{parsed.length !== 1 ? 's' : ''} →
+              </button>
+              <button className="btn btn-ghost" onClick={() => setStep('input')}>← Back</button>
+              <span style={{ marginLeft: 'auto', fontSize: '.7rem', color: 'var(--text-muted)' }}>
+                Existing cards will have their qty increased
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Step: importing */}
+        {step === 'importing' && (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>⏳</div>
+            <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: 6 }}>Importing your collection…</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+              Fetching card data from Scryfall, then saving to your collection.
+            </div>
+            <div style={{ height: 6, background: 'var(--bg-hover)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{
+                height: '100%', background: 'var(--accent-teal)', borderRadius: 99,
+                width: `${progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0}%`,
+                transition: 'width .4s',
+              }} />
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
+              {progress.done} / {progress.total}
+            </div>
+          </div>
+        )}
+
+        {/* Step: done */}
+        {step === 'done' && results && (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>
+              {results.errors.length === 0 ? '🎉' : '⚠️'}
+            </div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 16 }}>Import Complete</div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.3)', borderRadius: 10, padding: '10px 20px', minWidth: 80 }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#4ade80' }}>{results.added}</div>
+                <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>New cards</div>
+              </div>
+              <div style={{ background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, padding: '10px 20px', minWidth: 80 }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#a5b4fc' }}>{results.updated}</div>
+                <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>Qty updated</div>
+              </div>
+              {results.errors.length > 0 && (
+                <div style={{ background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '10px 20px', minWidth: 80 }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f87171' }}>{results.errors.length}</div>
+                  <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>Errors</div>
+                </div>
+              )}
+            </div>
+            {results.errors.length > 0 && (
+              <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, textAlign: 'left', fontSize: '.72rem', color: '#f87171', maxHeight: 100, overflowY: 'auto' }}>
+                {results.errors.map((e, i) => <div key={i}>{e}</div>)}
+              </div>
+            )}
+            <button className="btn btn-primary" onClick={onClose}>Done</button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
   const [scryfallData, setScryfallData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading,      setLoading]      = useState(true)
+  const [editQty,      setEditQty]      = useState(card.qty)
 
   useEffect(() => {
     const url = card.scryfallId
@@ -70,6 +480,12 @@ function CollectionCardModal({ card, onClose, onRemove }) {
       .catch(() => setLoading(false))
   }, [card.name, card.scryfallId])
 
+  function commitQty(val) {
+    const n = Math.max(1, parseInt(val) || 1)
+    setEditQty(n)
+    if (n !== card.qty) onUpdateCard?.(card.id, { qty: n })
+  }
+
   const face     = scryfallData?.card_faces?.[0] || scryfallData
   const oracle   = face?.oracle_text || ''
   const typeLine = face?.type_line || scryfallData?.type_line || ''
@@ -78,7 +494,6 @@ function CollectionCardModal({ card, onClose, onRemove }) {
   const power    = scryfallData?.power
   const tough    = scryfallData?.toughness
   const loyalty  = scryfallData?.loyalty
-  // prefer hi-res Scryfall image, fall back to stored thumbnail
   const img = scryfallData
     ? (scryfallData.image_uris?.normal || scryfallData.card_faces?.[0]?.image_uris?.normal)
     : card.img
@@ -136,10 +551,30 @@ function CollectionCardModal({ card, onClose, onRemove }) {
             )}
 
             {/* Collection metadata */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-              <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 8px' }}>
-                ×{card.qty}
-              </span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+              {/* Editable qty */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>Copies</span>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-hover)', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                  <button
+                    onClick={() => commitQty(editQty - 1)}
+                    disabled={editQty <= 1}
+                    style={{ padding: '2px 8px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: editQty > 1 ? 'pointer' : 'default', fontSize: '1rem', lineHeight: 1 }}
+                  >−</button>
+                  <input
+                    type="number" min="1" max="999"
+                    value={editQty}
+                    onChange={e => setEditQty(parseInt(e.target.value) || 1)}
+                    onBlur={e => commitQty(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && commitQty(e.target.value)}
+                    style={{ width: 36, textAlign: 'center', background: 'none', border: 'none', color: 'var(--text-primary)', fontWeight: 700, fontSize: '.82rem', padding: '3px 0', outline: 'none' }}
+                  />
+                  <button
+                    onClick={() => commitQty(editQty + 1)}
+                    style={{ padding: '2px 8px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+                  >+</button>
+                </div>
+              </div>
               {card.condition && (
                 <span style={{ fontSize: '.65rem', fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 8px' }}>
                   {CONDITION_LABELS[card.condition] || card.condition}
@@ -168,10 +603,18 @@ function CollectionCardModal({ card, onClose, onRemove }) {
   )
 }
 
+const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle']
+
 export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast }) {
   const [view,         setView]         = useState('all')
   const [search,       setSearch]       = useState('')
   const [showFilters,  setShowFilters]  = useState(false)
+  const [showBulk,     setShowBulk]     = useState(false)
+
+  // Card type filter with lazy Scryfall fetch
+  const [filterType,   setFilterType]   = useState(null)
+  const [typeCache,    setTypeCache]    = useState({}) // name.toLowerCase() -> typeLine
+  const [typesLoading, setTypesLoading] = useState(false)
   const [listingId,    setListingId]    = useState(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [refreshProg,  setRefreshProg]  = useState(null)
@@ -199,6 +642,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
     filterRarity != null,
     filterCondition != null,
     filterFoil != null,
+    filterType != null,
     filterMinPrice !== '',
     filterMaxPrice !== '',
   ].filter(Boolean).length
@@ -208,9 +652,39 @@ export default function Collection({ collection, setCollection, user, openAddCar
     setFilterRarity(null)
     setFilterCondition(null)
     setFilterFoil(null)
+    setFilterType(null)
     setFilterMinPrice('')
     setFilterMaxPrice('')
   }
+
+  // Lazy-fetch card types from Scryfall when type filter is activated
+  useEffect(() => {
+    if (!filterType) return
+    const uncached = collection.filter(c => !(c.name.toLowerCase() in typeCache))
+    if (uncached.length === 0) return
+
+    setTypesLoading(true)
+    const names = uncached.map(c => c.name)
+    const batches = []
+    for (let i = 0; i < names.length; i += 75) batches.push(names.slice(i, i + 75))
+
+    Promise.all(batches.map(batch =>
+      fetch('https://api.scryfall.com/cards/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers: batch.map(name => ({ name })) }),
+      }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
+    )).then(results => {
+      const newEntries = {}
+      results.forEach(r => {
+        ;(r.data || []).forEach(card => {
+          newEntries[card.name.toLowerCase()] = card.type_line || ''
+        })
+      })
+      setTypeCache(prev => ({ ...prev, ...newEntries }))
+      setTypesLoading(false)
+    })
+  }, [filterType, collection.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -220,6 +694,10 @@ export default function Collection({ collection, setCollection, user, openAddCar
     const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
     stored.collection = next
     localStorage.setItem('mtg-hub-v1', JSON.stringify(stored))
+    // Persist qty / condition changes to Supabase
+    if (patch.qty !== undefined || patch.condition !== undefined) {
+      updateCollectionCard(id, patch, user?.id).catch(e => console.warn('[updateCard]', e))
+    }
   }
 
   async function handleRemove(id) {
@@ -290,7 +768,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
 
   function copyTradeList() {
     const text = tradeCards.map(c =>
-      `${c.qty}x ${c.name} (${c.setName || '?'}) — $${(parseFloat(c.price) || 0).toFixed(2)}`
+      `${c.qty}x ${c.name} (${c.setName || '?'}) $${(parseFloat(c.price) || 0).toFixed(2)}`
     ).join('\n') + `\n\nTotal: $${tradeValue.toFixed(2)}`
     navigator.clipboard.writeText(text).then(
       () => showToast('Trade list copied ✓'),
@@ -317,8 +795,15 @@ export default function Collection({ collection, setCollection, user, openAddCar
       base = base.filter(c => (parseFloat(c.price) || 0) >= parseFloat(filterMinPrice))
     if (filterMaxPrice !== '')
       base = base.filter(c => (parseFloat(c.price) || 0) <= parseFloat(filterMaxPrice))
+    if (filterType) {
+      base = base.filter(c => {
+        const tl = typeCache[c.name.toLowerCase()]
+        if (tl === undefined) return true // not yet fetched, keep visible while loading
+        return tl.includes(filterType)
+      })
+    }
     return base
-  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice])
+  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice, filterType, typeCache])
 
   const total        = collection.reduce((s, c) => s + (c.qty || 1), 0)
   const totalValue   = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
@@ -338,6 +823,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
         />
         <button className="btn btn-primary" onClick={() => openAddCard()}>+ Add</button>
         <button className="btn btn-ghost" onClick={() => openCamera()}>📷 Scan</button>
+        <button className="btn btn-ghost" onClick={() => setShowBulk(true)} title="Bulk import from text or file" style={{ fontSize: '.78rem' }}>📥 Import</button>
         <button
           className="btn btn-ghost"
           onClick={handleBulkRefresh}
@@ -481,6 +967,15 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   onChange={setFilterFoil}
                   labelFn={v => v === 'foil' ? '✦ Foil' : 'Non-Foil'}
                 />
+              </div>
+
+              {/* Card Type */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Card Type
+                  {typesLoading && <span style={{ marginLeft: 8, fontStyle: 'italic', fontWeight: 400, textTransform: 'none' }}>fetching…</span>}
+                </div>
+                <ChipRow options={CARD_TYPES} value={filterType} onChange={setFilterType} />
               </div>
 
               {/* Price range */}
@@ -765,9 +1260,9 @@ export default function Collection({ collection, setCollection, user, openAddCar
             borderRadius: 'var(--radius)', padding: '10px 14px',
             display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', fontSize: '.76rem', color: 'var(--text-muted)',
           }}>
-            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> — opens the product page to list manually</span>
+            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> opens the product page to list manually</span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span>📦 <strong style={{ color: 'var(--text-secondary)' }}>eBay Auto-List</strong> — creates a draft listing via API</span>
+            <span>📦 <strong style={{ color: 'var(--text-secondary)' }}>eBay Auto-List</strong> creates a draft listing via API</span>
             {!ebayConnected && (
               <button className="btn btn-primary btn-sm" onClick={connectEbay} style={{ fontSize: '.68rem', marginLeft: 'auto' }}>
                 🔗 Connect eBay
@@ -794,6 +1289,16 @@ export default function Collection({ collection, setCollection, user, openAddCar
           card={selectedCard}
           onClose={() => setSelectedCard(null)}
           onRemove={(id) => { handleRemove(id); setSelectedCard(null) }}
+          onUpdateCard={updateCard}
+        />
+      )}
+      {showBulk && (
+        <BulkImportModal
+          onClose={() => setShowBulk(false)}
+          collection={collection}
+          setCollection={setCollection}
+          user={user}
+          showToast={showToast}
         />
       )}
     </div>
