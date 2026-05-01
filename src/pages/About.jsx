@@ -2,12 +2,12 @@ const FEATURES = [
   {
     icon: '🏪',
     title: 'Card Shop',
-    desc: 'Browse singles, sealed product, and curated resealed packs — all in one store. Filter by price range, condition, or foil status. Share any listing with a direct link.',
+    desc: 'Browse singles, sealed product, and curated resealed packs, all in one store. Filter by price range, condition, or foil status. Share any listing with a direct link.',
   },
   {
     icon: '🎴',
     title: 'Sealed & Resealed Products',
-    desc: 'Pick up booster boxes, collector packs, and our exclusive resealed packs like Vaulted Rarities and Relics Awakened — hand-curated surprises at every price point.',
+    desc: 'Pick up booster boxes, collector packs, and our exclusive resealed packs like Vaulted Rarities and Relics Awakened. Hand-curated surprises at every price point.',
   },
   {
     icon: '💳',
@@ -17,12 +17,12 @@ const FEATURES = [
   {
     icon: '🔔',
     title: 'Restock Waitlist',
-    desc: 'Sold out on something you want? Hit "Notify Me" and we\'ll email you the second it\'s back in stock — no account required.',
+    desc: 'Sold out on something you want? Hit "Notify Me" and we\'ll email you the second it\'s back in stock. No account required.',
   },
   {
     icon: '📦',
     title: 'Collection Tracker',
-    desc: 'Add cards by search or camera scan. Tap any card for full oracle text, type line, mana cost, flavor text, and live market value — all in one view.',
+    desc: 'Add cards by search or camera scan. Tap any card for full oracle text, type line, mana cost, flavor text, and live market value, all from one view.',
   },
   {
     icon: '📈',
@@ -42,7 +42,7 @@ const FEATURES = [
   {
     icon: '🎯',
     title: 'Wishlist & Previews',
-    desc: 'Save cards you\'re hunting. Click any thumbnail for a full-size card preview with live market price — great for quick buy decisions.',
+    desc: 'Save cards you\'re hunting. Click any thumbnail for a full-size card preview with live market price. Great for quick buy decisions.',
   },
   {
     icon: '🔍',
@@ -52,7 +52,7 @@ const FEATURES = [
   {
     icon: '📸',
     title: 'Camera Scanning',
-    desc: 'Point your phone at a card and it\'s added to your collection instantly — no typing required.',
+    desc: 'Point your phone at a card and it\'s added to your collection instantly. No typing required.',
   },
   {
     icon: '💰',
@@ -166,12 +166,12 @@ export default function About() {
         </h2>
         <div style={{ color: 'var(--text-secondary)', fontSize: '.9rem', lineHeight: 1.8 }}>
           <p style={{ margin: '0 0 12px' }}>
-            Magic: The Gathering has been a part of my life for years — the strategy, the art, the community,
+            Magic: The Gathering has been a part of my life for years. The strategy, the art, the community,
             and yes, the hunt for that one card that completes the deck. Over time my collection grew to the
             point where I needed a better way to manage it, price it, and eventually start selling.
           </p>
           <p style={{ margin: 0, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            ✏️ <strong>Placeholder</strong> — add your real story here: how you got into Magic, when you started collecting,
+            ✏️ <strong>Placeholder</strong> - add your real story here: how you got into Magic, when you started collecting,
             what gap Vaulted Singles fills for you, and why you opened the shop.
           </p>
         </div>
@@ -210,12 +210,12 @@ export default function About() {
         </h2>
         <ul style={{ color: 'var(--text-secondary)', fontSize: '.88rem', lineHeight: 1.9, paddingLeft: 20, margin: 0 }}>
           <li>Prices updated daily using live Scryfall market data</li>
-          <li>Every card inspected and graded honestly — NM means NM</li>
+          <li>Every card inspected and graded honestly. NM means NM</li>
           <li>Flat-rate $4.99 shipping, carefully packaged in sleeves and toploaders</li>
           <li>Order confirmation email sent the moment your payment clears</li>
           <li>Singles, sealed product, and exclusive resealed packs all in one place</li>
           <li>Out-of-stock? Join the waitlist and we'll notify you when it's back</li>
-          <li>Real collector behind every listing — not a faceless warehouse</li>
+          <li>Real collector behind every listing, not a faceless warehouse</li>
           <li>Questions? You'll get a real reply, fast</li>
         </ul>
       </div>

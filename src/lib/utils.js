@@ -131,13 +131,14 @@ function parseRssXml(xmlText, source) {
 export async function fetchNews(source) {
   let feedUrl = ''
 
-  if (source === 'magic.wizards.com') {
-    // Try multiple known Wizards feed URLs
-    feedUrl = 'https://magic.wizards.com/en/rss/rss.xml'
+  if (source === 'community') {
+    // Wizards removed their RSS feed in their 2024 site redesign.
+    // r/magicTCG covers official announcements, spoilers, and tournament results.
+    feedUrl = 'https://www.reddit.com/r/magicTCG/.rss'
   } else if (source === 'mtggoldfish') {
     feedUrl = 'https://www.mtggoldfish.com/feed'
   } else if (source === 'edhrec') {
-    feedUrl = 'https://www.edhrec.com/feed'
+    feedUrl = 'https://edhrec.com/articles/feed'
   }
 
   if (!feedUrl) return []

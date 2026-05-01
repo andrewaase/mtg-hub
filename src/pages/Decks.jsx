@@ -87,10 +87,10 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
-      showToast('Copied to clipboard — paste into MTG Arena ✓')
+      showToast('Copied to clipboard. Paste into MTG Arena ✓')
       setTimeout(() => setCopied(false), 2500)
     } catch {
-      showToast('Copy failed — try selecting the text manually')
+      showToast('Copy failed. Try selecting the text manually')
     }
   }
 
@@ -149,7 +149,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
       {activeTab === 'explore' ? (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
           <div className="empty-icon">🔍</div>
-          <p>Browse popular decks from the community.<br />Coming soon — check Meta Tracker for now.</p>
+          <p>Browse popular decks from the community.<br />Coming soon. Check Meta Tracker for now.</p>
         </div>
       ) : (
         <>
@@ -173,7 +173,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
 
           {!user && decks.length > 0 && (
             <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#fbbf24' }}>
-              ⚠️ Sign in to save decks to your profile — decks stored locally will be lost on refresh.
+              ⚠️ Sign in to save decks to your profile. Decks stored locally will be lost on refresh.
             </div>
           )}
 

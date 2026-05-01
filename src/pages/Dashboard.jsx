@@ -71,8 +71,8 @@ function NewsWidget({ setPage }) {
   const [loading, setLoading] = useState(true)
   const sources = [
     { id: 'mtggoldfish', label: 'MTGGoldfish' },
-    { id: 'magic.wizards.com', label: 'Wizards' },
-    { id: 'edhrec', label: 'EDHREC' },
+    { id: 'edhrec',      label: 'EDHREC'      },
+    { id: 'community',   label: 'r/magicTCG'  },
   ]
   const [activeSource, setActiveSource] = useState('mtggoldfish')
 
@@ -152,10 +152,11 @@ function NewsWidget({ setPage }) {
 
 // ── Tournament Widget ─────────────────────────────────────────────────────────
 function TournamentWidget({ collection, setPage }) {
-  const [format,  setFormat]  = useState('standard')
-  const [cards,   setCards]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(false)
+  const [format,     setFormat]     = useState('standard')
+  const [cards,      setCards]      = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState(false)
+  const [shownCount, setShownCount] = useState(10)
 
   const formats = [
     { id: 'standard', label: 'Standard' },
@@ -176,13 +177,14 @@ function TournamentWidget({ collection, setPage }) {
     )
       .then(r => { if (!r.ok) throw new Error('failed'); return r.json() })
       .then(data => {
-        const items = (data.data || []).slice(0, 15).map(c => ({
+        const items = (data.data || []).slice(0, 30).map(c => ({
           name:   c.name,
           price:  parseFloat(c.prices?.usd) || null,
           rarity: c.rarity,
           tcgUrl: c.purchase_uris?.tcgplayer || null,
         }))
         setCards(items)
+        setShownCount(10)
         setLoading(false)
       })
       .catch(() => { setError(true); setLoading(false) })
@@ -192,7 +194,8 @@ function TournamentWidget({ collection, setPage }) {
     (collection || []).map(c => (c.name || '').toLowerCase().trim())
   )
 
-  const top10 = cards.slice(0, 10)
+  const visibleCards = cards.slice(0, shownCount)
+  const hasMore      = cards.length > shownCount
 
   const handleCardClick = (cardName) => {
     window.__lookupCardName = cardName
@@ -234,7 +237,7 @@ function TournamentWidget({ collection, setPage }) {
           </div>
         ) : (
           <>
-            {top10.map((card, i) => {
+            {visibleCards.map((card, i) => {
               const owned = ownedNames.has((card.name || '').toLowerCase().trim())
               return (
                 <div
@@ -243,7 +246,7 @@ function TournamentWidget({ collection, setPage }) {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '8px 12px',
-                    borderBottom: i < top10.length - 1 ? '1px solid var(--border)' : 'none',
+                    borderBottom: i < visibleCards.length - 1 ? '1px solid var(--border)' : 'none',
                     borderLeft: owned ? '3px solid var(--accent-gold)' : '3px solid transparent',
                     background: owned ? 'rgba(201,168,76,.04)' : 'transparent',
                     cursor: 'pointer',
@@ -295,6 +298,21 @@ function TournamentWidget({ collection, setPage }) {
                 </div>
               )
             })}
+            {hasMore && (
+              <button
+                onClick={() => setShownCount(n => n + 10)}
+                style={{
+                  width: '100%', padding: '10px', border: 'none', borderTop: '1px solid var(--border)',
+                  background: 'var(--bg-secondary)', color: 'var(--accent-teal)',
+                  cursor: 'pointer', fontSize: '.76rem', fontWeight: 600,
+                  transition: 'background .15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+              >
+                Show 10 more ({cards.length - shownCount} remaining)
+              </button>
+            )}
             <div style={{ padding: '8px 12px', fontSize: '.62rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
               Base print · Non-foil · Tap a card to look it up
             </div>
@@ -379,25 +397,45 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
         </div>
       )}
 
-      {/* ── Portfolio Donut ── */}
-      <div className="card" style={{ margin: '12px 16px 0', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 0' }}>
-          <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)' }}>Collection Value</div>
-          <button onClick={() => setPage?.('collection')} style={{ fontSize: '.7rem', color: 'var(--accent-teal)', background: 'none', border: 'none', cursor: 'pointer' }}>View All →</button>
+      {/* ── Portfolio Value (compact horizontal layout) ── */}
+      <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px 0', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '0 0 14px' }}>
+          {/* Main value */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)', marginBottom: 4 }}>Collection Value</div>
+            <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#f5f5f5', lineHeight: 1, letterSpacing: '-.5px' }}>${fmt(totalMid)}</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: 5 }}>{totalCards} card{totalCards !== 1 ? 's' : ''}</div>
+          </div>
+          {/* Deltas + link */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+            <button onClick={() => setPage?.('collection')} style={{ fontSize: '.7rem', color: 'var(--accent-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View All →</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {delta7d != null && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>7d</div>
+                  <div style={{ fontSize: '.9rem', fontWeight: 800, color: delta7d.chg >= 0 ? '#4ade80' : '#f87171' }}>
+                    {delta7d.chg >= 0 ? '+' : ''}{delta7d.pct}%
+                  </div>
+                </div>
+              )}
+              {delta30d != null && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>30d</div>
+                  <div style={{ fontSize: '.9rem', fontWeight: 800, color: delta30d.chg >= 0 ? '#4ade80' : '#f87171' }}>
+                    {delta30d.chg >= 0 ? '+' : ''}{delta30d.pct}%
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        <DonutChart
-          total={totalMid}
-          delta={delta7d?.chg ?? null}
-          deltaPercent={delta7d?.pct ?? null}
-          cardCount={totalCards}
-        />
         {/* Low / Mid / High strip */}
         {collection.length > 0 && (
-          <div style={{ display: 'flex', borderTop: '1px solid var(--border)', marginTop: '4px' }}>
+          <div style={{ display: 'flex', borderTop: '1px solid var(--border)' }}>
             {[['Low', totalMid * 0.80], ['Mid', totalMid], ['High', totalMid * 1.25]].map(([label, val]) => (
-              <div key={label} style={{ flex: 1, padding: '10px 8px', textAlign: 'center', borderRight: label !== 'High' ? '1px solid var(--border)' : 'none' }}>
-                <div style={{ fontSize: '.58rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
-                <div style={{ fontSize: '.82rem', fontWeight: 700, color: label === 'Mid' ? 'var(--accent-teal)' : 'var(--text-secondary)', marginTop: '2px' }}>${fmt(val)}</div>
+              <div key={label} style={{ flex: 1, padding: '8px 8px', textAlign: 'center', borderRight: label !== 'High' ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ fontSize: '.55rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
+                <div style={{ fontSize: '.8rem', fontWeight: 700, color: label === 'Mid' ? 'var(--accent-teal)' : 'var(--text-secondary)', marginTop: '2px' }}>${fmt(val)}</div>
               </div>
             ))}
           </div>

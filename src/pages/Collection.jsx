@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { removeCard, exportData, bulkAddCards } from '../lib/db'
+import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
@@ -180,7 +180,7 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
     const { rows, format } = parseBulkText(rawText)
     if (rows.length === 0) {
       setParseErr(
-        format === 'empty'            ? 'Nothing to import — paste some cards first.' :
+        format === 'empty'            ? 'Nothing to import. Paste some cards first.' :
         format === 'csv-bad-headers'  ? 'CSV detected but no "name" column found. Add a header row.' :
         'No cards could be parsed from this text.'
       )
@@ -288,12 +288,12 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, fontSize: '.72rem', color: 'var(--text-muted)', lineHeight: 1.8 }}>
               <span style={{ fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Supported formats:</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 20px' }}>
-                <span><code style={{ color: 'var(--accent-teal)' }}>4 Lightning Bolt</code> — MTGO/clipboard</span>
-                <span><code style={{ color: 'var(--accent-teal)' }}>4x Lightning Bolt</code> — x prefix</span>
-                <span><code style={{ color: 'var(--accent-teal)' }}>Lightning Bolt x4</code> — x suffix</span>
-                <span><code style={{ color: 'var(--accent-teal)' }}>4 Lightning Bolt (M19)</code> — Arena</span>
-                <span><code style={{ color: 'var(--accent-teal)' }}>Lightning Bolt</code> — plain (qty 1)</span>
-                <span><code style={{ color: 'var(--accent-teal)' }}>name,qty,condition</code> — CSV</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>4 Lightning Bolt</code> MTGO/clipboard</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>4x Lightning Bolt</code> x prefix</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>Lightning Bolt x4</code> x suffix</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>4 Lightning Bolt (M19)</code> Arena</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>Lightning Bolt</code> plain (qty 1)</span>
+                <span><code style={{ color: 'var(--accent-teal)' }}>name,qty,condition</code> CSV</span>
               </div>
               <div style={{ marginTop: 6, fontSize: '.68rem' }}>Add <code style={{ color: 'var(--accent-teal)' }}>NM</code>, <code>LP</code>, <code>MP</code>, or <code>HP</code> after the name to set condition.</div>
             </div>
@@ -465,9 +465,10 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
   )
 }
 
-function CollectionCardModal({ card, onClose, onRemove }) {
+function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
   const [scryfallData, setScryfallData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading,      setLoading]      = useState(true)
+  const [editQty,      setEditQty]      = useState(card.qty)
 
   useEffect(() => {
     const url = card.scryfallId
@@ -479,6 +480,12 @@ function CollectionCardModal({ card, onClose, onRemove }) {
       .catch(() => setLoading(false))
   }, [card.name, card.scryfallId])
 
+  function commitQty(val) {
+    const n = Math.max(1, parseInt(val) || 1)
+    setEditQty(n)
+    if (n !== card.qty) onUpdateCard?.(card.id, { qty: n })
+  }
+
   const face     = scryfallData?.card_faces?.[0] || scryfallData
   const oracle   = face?.oracle_text || ''
   const typeLine = face?.type_line || scryfallData?.type_line || ''
@@ -487,7 +494,6 @@ function CollectionCardModal({ card, onClose, onRemove }) {
   const power    = scryfallData?.power
   const tough    = scryfallData?.toughness
   const loyalty  = scryfallData?.loyalty
-  // prefer hi-res Scryfall image, fall back to stored thumbnail
   const img = scryfallData
     ? (scryfallData.image_uris?.normal || scryfallData.card_faces?.[0]?.image_uris?.normal)
     : card.img
@@ -545,10 +551,30 @@ function CollectionCardModal({ card, onClose, onRemove }) {
             )}
 
             {/* Collection metadata */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-              <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 8px' }}>
-                ×{card.qty}
-              </span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+              {/* Editable qty */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>Copies</span>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-hover)', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                  <button
+                    onClick={() => commitQty(editQty - 1)}
+                    disabled={editQty <= 1}
+                    style={{ padding: '2px 8px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: editQty > 1 ? 'pointer' : 'default', fontSize: '1rem', lineHeight: 1 }}
+                  >−</button>
+                  <input
+                    type="number" min="1" max="999"
+                    value={editQty}
+                    onChange={e => setEditQty(parseInt(e.target.value) || 1)}
+                    onBlur={e => commitQty(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && commitQty(e.target.value)}
+                    style={{ width: 36, textAlign: 'center', background: 'none', border: 'none', color: 'var(--text-primary)', fontWeight: 700, fontSize: '.82rem', padding: '3px 0', outline: 'none' }}
+                  />
+                  <button
+                    onClick={() => commitQty(editQty + 1)}
+                    style={{ padding: '2px 8px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+                  >+</button>
+                </div>
+              </div>
               {card.condition && (
                 <span style={{ fontSize: '.65rem', fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-secondary)', borderRadius: 4, padding: '2px 8px' }}>
                   {CONDITION_LABELS[card.condition] || card.condition}
@@ -577,11 +603,18 @@ function CollectionCardModal({ card, onClose, onRemove }) {
   )
 }
 
+const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle']
+
 export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast }) {
   const [view,         setView]         = useState('all')
   const [search,       setSearch]       = useState('')
   const [showFilters,  setShowFilters]  = useState(false)
   const [showBulk,     setShowBulk]     = useState(false)
+
+  // Card type filter with lazy Scryfall fetch
+  const [filterType,   setFilterType]   = useState(null)
+  const [typeCache,    setTypeCache]    = useState({}) // name.toLowerCase() -> typeLine
+  const [typesLoading, setTypesLoading] = useState(false)
   const [listingId,    setListingId]    = useState(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [refreshProg,  setRefreshProg]  = useState(null)
@@ -609,6 +642,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
     filterRarity != null,
     filterCondition != null,
     filterFoil != null,
+    filterType != null,
     filterMinPrice !== '',
     filterMaxPrice !== '',
   ].filter(Boolean).length
@@ -618,9 +652,39 @@ export default function Collection({ collection, setCollection, user, openAddCar
     setFilterRarity(null)
     setFilterCondition(null)
     setFilterFoil(null)
+    setFilterType(null)
     setFilterMinPrice('')
     setFilterMaxPrice('')
   }
+
+  // Lazy-fetch card types from Scryfall when type filter is activated
+  useEffect(() => {
+    if (!filterType) return
+    const uncached = collection.filter(c => !(c.name.toLowerCase() in typeCache))
+    if (uncached.length === 0) return
+
+    setTypesLoading(true)
+    const names = uncached.map(c => c.name)
+    const batches = []
+    for (let i = 0; i < names.length; i += 75) batches.push(names.slice(i, i + 75))
+
+    Promise.all(batches.map(batch =>
+      fetch('https://api.scryfall.com/cards/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers: batch.map(name => ({ name })) }),
+      }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
+    )).then(results => {
+      const newEntries = {}
+      results.forEach(r => {
+        ;(r.data || []).forEach(card => {
+          newEntries[card.name.toLowerCase()] = card.type_line || ''
+        })
+      })
+      setTypeCache(prev => ({ ...prev, ...newEntries }))
+      setTypesLoading(false)
+    })
+  }, [filterType, collection.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -630,6 +694,10 @@ export default function Collection({ collection, setCollection, user, openAddCar
     const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
     stored.collection = next
     localStorage.setItem('mtg-hub-v1', JSON.stringify(stored))
+    // Persist qty / condition changes to Supabase
+    if (patch.qty !== undefined || patch.condition !== undefined) {
+      updateCollectionCard(id, patch, user?.id).catch(e => console.warn('[updateCard]', e))
+    }
   }
 
   async function handleRemove(id) {
@@ -700,7 +768,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
 
   function copyTradeList() {
     const text = tradeCards.map(c =>
-      `${c.qty}x ${c.name} (${c.setName || '?'}) — $${(parseFloat(c.price) || 0).toFixed(2)}`
+      `${c.qty}x ${c.name} (${c.setName || '?'}) $${(parseFloat(c.price) || 0).toFixed(2)}`
     ).join('\n') + `\n\nTotal: $${tradeValue.toFixed(2)}`
     navigator.clipboard.writeText(text).then(
       () => showToast('Trade list copied ✓'),
@@ -727,8 +795,15 @@ export default function Collection({ collection, setCollection, user, openAddCar
       base = base.filter(c => (parseFloat(c.price) || 0) >= parseFloat(filterMinPrice))
     if (filterMaxPrice !== '')
       base = base.filter(c => (parseFloat(c.price) || 0) <= parseFloat(filterMaxPrice))
+    if (filterType) {
+      base = base.filter(c => {
+        const tl = typeCache[c.name.toLowerCase()]
+        if (tl === undefined) return true // not yet fetched, keep visible while loading
+        return tl.includes(filterType)
+      })
+    }
     return base
-  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice])
+  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice, filterType, typeCache])
 
   const total        = collection.reduce((s, c) => s + (c.qty || 1), 0)
   const totalValue   = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
@@ -892,6 +967,15 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   onChange={setFilterFoil}
                   labelFn={v => v === 'foil' ? '✦ Foil' : 'Non-Foil'}
                 />
+              </div>
+
+              {/* Card Type */}
+              <div>
+                <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Card Type
+                  {typesLoading && <span style={{ marginLeft: 8, fontStyle: 'italic', fontWeight: 400, textTransform: 'none' }}>fetching…</span>}
+                </div>
+                <ChipRow options={CARD_TYPES} value={filterType} onChange={setFilterType} />
               </div>
 
               {/* Price range */}
@@ -1176,9 +1260,9 @@ export default function Collection({ collection, setCollection, user, openAddCar
             borderRadius: 'var(--radius)', padding: '10px 14px',
             display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', fontSize: '.76rem', color: 'var(--text-muted)',
           }}>
-            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> — opens the product page to list manually</span>
+            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> opens the product page to list manually</span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span>📦 <strong style={{ color: 'var(--text-secondary)' }}>eBay Auto-List</strong> — creates a draft listing via API</span>
+            <span>📦 <strong style={{ color: 'var(--text-secondary)' }}>eBay Auto-List</strong> creates a draft listing via API</span>
             {!ebayConnected && (
               <button className="btn btn-primary btn-sm" onClick={connectEbay} style={{ fontSize: '.68rem', marginLeft: 'auto' }}>
                 🔗 Connect eBay
@@ -1205,6 +1289,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
           card={selectedCard}
           onClose={() => setSelectedCard(null)}
           onRemove={(id) => { handleRemove(id); setSelectedCard(null) }}
+          onUpdateCard={updateCard}
         />
       )}
       {showBulk && (

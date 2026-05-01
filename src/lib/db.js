@@ -113,6 +113,16 @@ export async function addCard(card, userId) {
   return newCard
 }
 
+// ── UPDATE COLLECTION CARD ───────────────────────────
+export async function updateCollectionCard(id, patch, userId) {
+  const dbPatch = {}
+  if (patch.qty       !== undefined) dbPatch.qty       = patch.qty
+  if (patch.condition !== undefined) dbPatch.condition = patch.condition
+  if (hasSupabase && userId && Object.keys(dbPatch).length > 0) {
+    await supabase.from('collection').update(dbPatch).eq('id', id).eq('user_id', userId)
+  }
+}
+
 // ── BULK COLLECTION IMPORT ───────────────────────────
 // Efficiently imports many cards at once: 1 select + 1 batch insert + N qty-updates.
 // cards: [{ name, qty, condition, setName, img, colors, price }]
