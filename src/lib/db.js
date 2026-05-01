@@ -113,6 +113,76 @@ export async function addCard(card, userId) {
   return newCard
 }
 
+// ── BULK COLLECTION IMPORT ───────────────────────────
+// Efficiently imports many cards at once: 1 select + 1 batch insert + N qty-updates.
+// cards: [{ name, qty, condition, setName, img, colors, price }]
+// Returns the full updated collection array.
+export async function bulkAddCards(cards, userId, { onProgress } = {}) {
+  if (hasSupabase && userId) {
+    // Fetch what the user already has so we can dedup by name
+    const { data: existing } = await supabase
+      .from('collection').select('id, name, qty').eq('user_id', userId)
+    const existingMap = Object.fromEntries(
+      (existing || []).map(r => [r.name.toLowerCase(), r])
+    )
+
+    const toInsert = []
+    const toUpdate = [] // { id, qty }
+    for (const card of cards) {
+      const ex = existingMap[card.name.toLowerCase()]
+      if (ex) {
+        toUpdate.push({ id: ex.id, qty: ex.qty + (card.qty || 1) })
+      } else {
+        toInsert.push({
+          user_id:       userId,
+          name:          card.name,
+          qty:           card.qty           ?? 1,
+          condition:     card.condition     ?? 'NM',
+          set_name:      card.setName       ?? null,
+          img:           card.img           ?? null,
+          colors:        card.colors        ?? [],
+          price:         card.price         ?? null,
+          tcgplayer_url: card.tcgplayerUrl  ?? null,
+        })
+      }
+    }
+
+    // Batch insert all new cards in one request
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('collection').insert(toInsert)
+      if (error) throw new Error(error.message)
+    }
+    onProgress?.(toInsert.length, cards.length)
+
+    // Update existing card quantities one at a time (no batch update in PostgREST)
+    for (let i = 0; i < toUpdate.length; i++) {
+      const u = toUpdate[i]
+      await supabase.from('collection').update({ qty: u.qty }).eq('id', u.id)
+      onProgress?.(toInsert.length + i + 1, cards.length)
+    }
+
+    // Return the refreshed collection
+    const { data: refreshed } = await supabase.from('collection').select('*').eq('user_id', userId)
+    return (refreshed || []).map(collectionRowToCard)
+  }
+
+  // ── localStorage fallback ──
+  const stored = lsGet()
+  const collection = stored.collection || []
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i]
+    const idx = collection.findIndex(c => c.name.toLowerCase() === card.name.toLowerCase())
+    if (idx >= 0) {
+      collection[idx].qty += card.qty || 1
+    } else {
+      collection.push({ ...card, id: Date.now() + i })
+    }
+    onProgress?.(i + 1, cards.length)
+  }
+  lsSet({ collection })
+  return collection
+}
+
 // ── STORE LISTINGS ────────────────────────────────────
 // Upsert a store listing: if an active listing with the same name +
 // condition + is_foil already exists, increment qty_available instead of
