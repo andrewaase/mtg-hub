@@ -187,6 +187,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                   <DeckArtTile
                     key={deck.id}
                     deck={deck}
+                    collection={collection}
                     onClick={() => setSelected(deck)}
                     onEdit={() => { setEditDeck(deck); setShowImport(true) }}
                     onDelete={() => handleDelete(deck)}
@@ -210,7 +211,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
 }
 
 // ── Deck art tile ─────────────────────────────────────────────────────────────
-function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
+function DeckArtTile({ deck, collection, onClick, onEdit, onDelete }) {
   const [artUrl, setArtUrl] = useState(null)
   const fetchedRef = useRef(false)
 
@@ -229,7 +230,13 @@ function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
   }, [deck])
 
   const { main } = countCards(deck)
-  const isCmdr = isCommanderFormat(deck.format)
+  const isCmdr  = isCommanderFormat(deck.format)
+  const deckVal = useMemo(() => getDeckValueSync(deck, collection || []), [deck, collection])
+  const price   = deckVal.cachedValue > 0
+    ? deckVal.cachedValue >= 1000
+      ? `$${(deckVal.cachedValue / 1000).toFixed(1)}k`
+      : `$${deckVal.cachedValue.toFixed(2)}`
+    : null
 
   return (
     <div className="deck-art-tile" onClick={onClick}>
@@ -239,7 +246,17 @@ function DeckArtTile({ deck, onClick, onEdit, onDelete }) {
       }
       <div className="deck-art-tile-overlay" />
       <div className="deck-art-tile-body">
-        <div className="deck-art-tile-name">{deck.name}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'space-between' }}>
+          <div className="deck-art-tile-name" style={{ flex: 1, minWidth: 0 }}>{deck.name}</div>
+          {price && (
+            <div style={{
+              fontSize: '.75rem', fontWeight: 800, color: 'var(--accent-gold)',
+              flexShrink: 0, textShadow: '0 1px 4px rgba(0,0,0,.8)',
+            }}>
+              {price}
+            </div>
+          )}
+        </div>
         <div className="deck-art-tile-format">
           {deck.format}{isCmdr && deck.commander ? ` · ${deck.commander}` : ''} · {main} cards
         </div>
@@ -597,9 +614,11 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
 
 // ── Card image for the hand simulator ─────────────────────────────────────────
 // Fetches from Scryfall (using the shared IMG_CACHE) and renders a card image.
+// On hover, shows a full-size preview via a portal (same pattern as CardRow).
 function SimCardImage({ name, width = 90, onClick, dimmed, style }) {
   const cached = IMG_CACHE.has(name) ? IMG_CACHE.get(name) : undefined
-  const [img, setImg] = useState(cached)
+  const [img,      setImg]      = useState(cached)
+  const [hoverPos, setHoverPos] = useState(null)
   const fetchedRef = useRef(cached !== undefined)
 
   useEffect(() => {
@@ -617,33 +636,61 @@ function SimCardImage({ name, width = 90, onClick, dimmed, style }) {
 
   const height = Math.round(width * 1.4)
 
+  function handleMouseEnter(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const PW = 220, PH = 308
+    const W  = window.innerWidth, H = window.innerHeight
+    const x  = rect.right + 12 + PW < W ? rect.right + 12 : rect.left - PW - 12
+    const y  = Math.max(8, Math.min(rect.top - 20, H - PH - 8))
+    setHoverPos({ x, y })
+  }
+
   return (
-    <div
-      onClick={onClick}
-      title={name}
-      style={{
-        width, height, borderRadius: 7, overflow: 'hidden', flexShrink: 0,
-        background: '#1e2a3a', border: '1px solid rgba(255,255,255,.08)',
-        cursor: onClick ? 'pointer' : 'default',
-        opacity: dimmed ? 0.45 : 1,
-        transition: 'transform .12s, box-shadow .12s, opacity .15s',
-        ...style,
-      }}
-      onMouseEnter={onClick ? e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.5)' } : undefined}
-      onMouseLeave={onClick ? e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' } : undefined}
-    >
-      {img
-        ? <img src={img} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-        : (
-          <div style={{
-            width: '100%', height: '100%', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', padding: '6px', textAlign: 'center',
-          }}>
-            <span style={{ fontSize: '.55rem', color: '#94a3b8', lineHeight: 1.4 }}>{name}</span>
-          </div>
-        )
-      }
-    </div>
+    <>
+      <div
+        onClick={onClick}
+        title={name}
+        style={{
+          width, height, borderRadius: 7, overflow: 'hidden', flexShrink: 0,
+          background: '#1e2a3a', border: '1px solid rgba(255,255,255,.08)',
+          cursor: onClick ? 'pointer' : 'default',
+          opacity: dimmed ? 0.45 : 1,
+          transition: 'transform .12s, box-shadow .12s, opacity .15s',
+          ...style,
+        }}
+        onMouseEnter={e => {
+          handleMouseEnter(e)
+          if (onClick) { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,.6)' }
+        }}
+        onMouseLeave={e => {
+          setHoverPos(null)
+          if (onClick) { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }
+        }}
+      >
+        {img
+          ? <img src={img} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+          : (
+            <div style={{
+              width: '100%', height: '100%', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', padding: '6px', textAlign: 'center',
+            }}>
+              <span style={{ fontSize: '.55rem', color: '#94a3b8', lineHeight: 1.4 }}>{name}</span>
+            </div>
+          )
+        }
+      </div>
+
+      {hoverPos && img && createPortal(
+        <div style={{
+          position: 'fixed', left: hoverPos.x, top: hoverPos.y,
+          zIndex: 9999, pointerEvents: 'none',
+          filter: 'drop-shadow(0 12px 40px rgba(0,0,0,.9))',
+        }}>
+          <img src={img} alt={name} style={{ width: 220, borderRadius: 14, display: 'block' }} />
+        </div>,
+        document.body
+      )}
+    </>
   )
 }
 
