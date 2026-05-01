@@ -177,7 +177,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
       {/* Card image */}
       {img && (
         <div style={{ padding: '20px 0 12px', display: 'flex', justifyContent: 'center' }}>
-          <img src={img} alt={card.name} style={{ width: '210px', borderRadius: '14px', boxShadow: '0 12px 60px rgba(0,0,0,.9)' }} />
+          <img src={img} alt={card.name} style={{ width: 'min(280px, 72vw)', borderRadius: '14px', boxShadow: '0 12px 60px rgba(0,0,0,.9)' }} />
         </div>
       )}
 

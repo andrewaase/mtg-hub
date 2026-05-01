@@ -1341,12 +1341,132 @@ function OrdersTab() {
   )
 }
 
+// ── Settings tab ─────────────────────────────────────────────────────────────
+
+function SettingsTab() {
+  const [shipping,    setShipping]    = useState('')
+  const [handling,    setHandling]    = useState('')
+  const [loading,     setLoading]     = useState(true)
+  const [saving,      setSaving]      = useState(false)
+  const [result,      setResult]      = useState(null)
+
+  useEffect(() => {
+    supabase.from('store_settings')
+      .select('key, value')
+      .in('key', ['shipping_cost', 'handling_fee'])
+      .then(({ data }) => {
+        const map = {}
+        ;(data || []).forEach(r => { map[r.key] = r.value })
+        setShipping(map.shipping_cost ?? '4.99')
+        setHandling(map.handling_fee  ?? '0.00')
+        setLoading(false)
+      })
+  }, [])
+
+  const save = async (e) => {
+    e.preventDefault()
+    setSaving(true); setResult(null)
+    const shippingVal = parseFloat(shipping)
+    const handlingVal = parseFloat(handling)
+    if (isNaN(shippingVal) || isNaN(handlingVal)) {
+      setResult({ ok: false, message: 'Enter valid numbers for both fields' })
+      setSaving(false); return
+    }
+    try {
+      const { error } = await supabase.from('store_settings').upsert([
+        { key: 'shipping_cost', value: shippingVal.toFixed(2), updated_at: new Date().toISOString() },
+        { key: 'handling_fee',  value: handlingVal.toFixed(2), updated_at: new Date().toISOString() },
+      ], { onConflict: 'key' })
+      if (error) throw new Error(error.message)
+      setResult({ ok: true })
+    } catch (err) {
+      setResult({ ok: false, message: err.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const Field = ({ label, value, onChange, desc }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: '#94a3b8' }}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, overflow: 'hidden', maxWidth: 200 }}>
+        <span style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 700, fontSize: '.9rem', borderRight: '1px solid rgba(255,255,255,.1)' }}>$</span>
+        <input
+          type="number" min="0" step="0.01" value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '10px 12px', color: '#f1f5f9', fontSize: '.95rem', fontWeight: 600 }}
+        />
+      </div>
+      {desc && <div style={{ fontSize: '.68rem', color: '#475569' }}>{desc}</div>}
+    </div>
+  )
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f1f5f9', marginBottom: 4 }}>⚙️ Store Settings</div>
+      <div style={{ fontSize: '.78rem', color: '#64748b', marginBottom: 24 }}>
+        Changes take effect immediately on the store and checkout.
+      </div>
+
+      {loading ? (
+        <div style={{ color: '#64748b', fontSize: '.85rem' }}>Loading settings…</div>
+      ) : (
+        <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+          {/* Shipping & Handling card */}
+          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: '20px 22px', marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem', color: '#e2e8f0', marginBottom: 4 }}>🚚 Shipping & Handling</div>
+            <div style={{ fontSize: '.72rem', color: '#64748b', marginBottom: 18 }}>
+              Flat rate charged per order at checkout. Set to 0 for free shipping.
+            </div>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              <Field
+                label="Shipping Cost"
+                value={shipping}
+                onChange={setShipping}
+                desc="Standard flat-rate shipping per order"
+              />
+              <Field
+                label="Handling Fee"
+                value={handling}
+                onChange={setHandling}
+                desc="Added to shipping (packaging, supplies, etc.)"
+              />
+            </div>
+
+            {/* Live preview */}
+            <div style={{ marginTop: 18, padding: '12px 14px', background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.15)', borderRadius: 10 }}>
+              <div style={{ fontSize: '.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Live preview — what customers see</div>
+              <div style={{ display: 'flex', gap: 16, fontSize: '.82rem' }}>
+                <div style={{ color: '#94a3b8' }}>Shipping: <span style={{ color: '#c9a84c', fontWeight: 700 }}>${(parseFloat(shipping) || 0).toFixed(2)}</span></div>
+                <div style={{ color: '#94a3b8' }}>Handling: <span style={{ color: '#c9a84c', fontWeight: 700 }}>${(parseFloat(handling) || 0).toFixed(2)}</span></div>
+                <div style={{ color: '#94a3b8' }}>Total added: <span style={{ color: '#4ade80', fontWeight: 800 }}>${((parseFloat(shipping) || 0) + (parseFloat(handling) || 0)).toFixed(2)}</span></div>
+              </div>
+            </div>
+          </div>
+
+          {result && (
+            <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, fontSize: '.78rem', background: result.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${result.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: result.ok ? '#4ade80' : '#fca5a5' }}>
+              {result.ok ? '✓ Settings saved successfully' : `⚠️ ${result.message}`}
+            </div>
+          )}
+
+          <button type="submit" disabled={saving} style={{ alignSelf: 'flex-start', padding: '11px 28px', borderRadius: 10, border: 'none', background: saving ? 'rgba(201,168,76,.4)' : '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer' }}>
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 const TABS = [
   { id: 'overview',  label: '📊 Overview'  },
   { id: 'listings',  label: '🏪 Listings'  },
   { id: 'orders',    label: '📦 Orders'    },
+  { id: 'settings',  label: '⚙️ Settings'  },
 ]
 
 export default function AdminPanel({ user }) {
@@ -1519,6 +1639,9 @@ export default function AdminPanel({ user }) {
 
       {/* ── Orders tab ── */}
       {tab === 'orders' && <OrdersTab />}
+
+      {/* ── Settings tab ── */}
+      {tab === 'settings' && <SettingsTab />}
 
       <style>{`
         @keyframes spin  { to { transform: rotate(360deg); } }

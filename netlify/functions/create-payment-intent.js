@@ -2,7 +2,7 @@
 // Creates a Stripe PaymentIntent after validating cart prices server-side.
 // Never trusts client-supplied prices.
 
-const SHIPPING_FLAT = 4.99
+const DEFAULT_SHIPPING = 4.99
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -36,6 +36,22 @@ exports.handler = async (event) => {
   }
 
   try {
+    // ── Fetch shipping settings from store_settings ──────────────────────────
+    let shippingFlat = DEFAULT_SHIPPING
+    try {
+      const settingsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/store_settings?key=in.(shipping_cost,handling_fee)&select=key,value`,
+        { headers: adminHeaders }
+      )
+      const settings = await settingsRes.json()
+      if (Array.isArray(settings)) {
+        const map = Object.fromEntries(settings.map(r => [r.key, parseFloat(r.value) || 0]))
+        shippingFlat = (map.shipping_cost ?? DEFAULT_SHIPPING) + (map.handling_fee ?? 0)
+      }
+    } catch (e) {
+      console.warn('[create-payment-intent] Could not fetch store_settings, using default shipping:', e.message)
+    }
+
     // Fetch real prices from Supabase — never trust client-supplied prices
     const ids = items.map(i => i.id).join(',')
     const listingsRes = await fetch(
@@ -60,7 +76,7 @@ exports.handler = async (event) => {
       subtotal += listing.price * (item.qty || 1)
     }
 
-    const total = subtotal + SHIPPING_FLAT
+    const total = subtotal + shippingFlat
 
     // Build a human-readable description for the Stripe receipt email
     const lineItems = items.map(item => {
@@ -92,7 +108,7 @@ exports.handler = async (event) => {
         shipping_zip:     (shipping.zip   || '').slice(0, 500),
         shipping_country: (shipping.country || 'US').slice(0, 500),
         subtotal:         subtotal.toFixed(2),
-        shipping_cost:    SHIPPING_FLAT.toFixed(2),
+        shipping_cost:    shippingFlat.toFixed(2),
       },
     })
 
@@ -103,7 +119,7 @@ exports.handler = async (event) => {
         clientSecret: paymentIntent.client_secret,
         total,
         subtotal,
-        shipping: SHIPPING_FLAT,
+        shipping: shippingFlat,
       }),
     }
   } catch (err) {

@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
 const CART_KEY      = 'vs-cart-v1'
-const SHIPPING_COST = 4.99
+const DEFAULT_SHIPPING = 4.99
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) {
@@ -216,8 +216,8 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
           {/* Card image */}
           <div style={{ flexShrink: 0 }}>
             {listing.img_url
-              ? <img src={listing.img_url} alt={listing.name} style={{ width: 'min(180px, 38vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
-              : <div style={{ width: 'min(180px, 38vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+              ? <img src={listing.img_url} alt={listing.name} style={{ width: 'min(230px, 42vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
+              : <div style={{ width: 'min(230px, 42vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
             }
           </div>
 
@@ -1049,6 +1049,26 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
   const [condFilter,      setCondFilter]      = useState([]) // [] = all
   const [foilFilter,      setFoilFilter]      = useState('all') // 'all'|'foil'|'nonfoil'
   const [showFilters,     setShowFilters]     = useState(false)
+
+  // Dynamic shipping from admin settings
+  const [shippingCost,    setShippingCost]    = useState(DEFAULT_SHIPPING)
+  const [handlingFee,     setHandlingFee]     = useState(0)
+
+  useEffect(() => {
+    supabase
+      .from('store_settings')
+      .select('key, value')
+      .in('key', ['shipping_cost', 'handling_fee'])
+      .then(({ data }) => {
+        if (!data) return
+        const map = Object.fromEntries(data.map(r => [r.key, parseFloat(r.value) || 0]))
+        if (map.shipping_cost != null) setShippingCost(map.shipping_cost)
+        if (map.handling_fee  != null) setHandlingFee(map.handling_fee)
+      })
+  }, [])
+
+  // Derived: total shipping displayed in cart / checkout
+  const SHIPPING_COST = shippingCost + handlingFee
 
   // Fetch active listings — also include out-of-stock for waitlist
   useEffect(() => {

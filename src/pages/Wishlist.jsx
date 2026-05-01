@@ -55,7 +55,7 @@ export default function Wishlist({ user, showToast, openStoreSearch }) {
       name:         cardName.trim(),
       targetPrice:  target ? parseFloat(target) : null,
       currentPrice: cardData?.prices?.usd ? parseFloat(cardData.prices.usd) : null,
-      img:          cardData?.image_uris?.small || cardData?.card_faces?.[0]?.image_uris?.small || null,
+      img:          cardData?.image_uris?.normal || cardData?.card_faces?.[0]?.image_uris?.normal || null,
       setName:      cardData?.set_name || null,
       addedAt:      new Date().toISOString(),
     }
@@ -243,10 +243,19 @@ export default function Wishlist({ user, showToast, openStoreSearch }) {
 // ── Single wishlist item ───────────────────────────────────────────────────────
 
 function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
-  const [editTarget,   setEditTarget]   = useState(false)
-  const [targetVal,    setTargetVal]    = useState(item.targetPrice?.toFixed(2) || '')
-  const [storeListing, setStoreListing] = useState(null)
-  const [showPreview,  setShowPreview]  = useState(false)
+  const [editTarget,    setEditTarget]   = useState(false)
+  const [targetVal,     setTargetVal]    = useState(item.targetPrice?.toFixed(2) || '')
+  const [storeListing,  setStoreListing] = useState(null)
+  const [showPreview,   setShowPreview]  = useState(false)
+  const [scryfallData,  setScryfallData] = useState(null)
+
+  // Fetch Scryfall data for sharp large image + real TCGPlayer purchase URL
+  useEffect(() => {
+    fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.name)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setScryfallData(data) })
+      .catch(() => {})
+  }, [item.name])
 
   // Check if this card is available in the Vaulted Singles store
   useEffect(() => {
@@ -261,6 +270,18 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
       .maybeSingle()
       .then(({ data }) => setStoreListing(data || null))
   }, [item.name])
+
+  // Best image: large from Scryfall > normal from Scryfall > stored img
+  const largeImg = scryfallData?.image_uris?.large
+    || scryfallData?.card_faces?.[0]?.image_uris?.large
+    || scryfallData?.image_uris?.normal
+    || scryfallData?.card_faces?.[0]?.image_uris?.normal
+    || item.img
+
+  // Real TCGPlayer product URL from Scryfall purchase_uris
+  const tcgLink = getTCGPlayerLink(
+    scryfallData?.purchase_uris?.tcgplayer || item.tcgUrl || item.name
+  )
 
   const atTarget  = item.targetPrice != null && item.currentPrice != null && item.currentPrice <= item.targetPrice
   const hasPrice  = item.currentPrice != null
@@ -386,7 +407,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
               </button>
             )}
             <a
-              href={getTCGPlayerLink(item.tcgUrl || item.name)}
+              href={tcgLink}
               target="_blank" rel="noopener noreferrer"
               style={{
                 display: 'inline-block', padding: '6px 14px',
@@ -405,25 +426,58 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
     {/* ── Card preview modal ── */}
     {showPreview && (
       <>
-        <div onClick={() => setShowPreview(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+        <div onClick={() => setShowPreview(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, backdropFilter: 'blur(6px)' }} />
         <div style={{
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          zIndex: 401, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+          zIndex: 401, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+          width: 'min(340px, 90vw)',
         }}>
-          {item.img
-            ? <img src={item.img} alt={item.name} style={{ width: 'min(320px,80vw)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,.8)', display: 'block' }} />
-            : <div style={{ width: 'min(320px,80vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>🃏</div>
+          {/* Sharp large image */}
+          {largeImg
+            ? <img src={largeImg} alt={item.name} style={{ width: '100%', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,.9)', display: 'block' }} />
+            : <div style={{ width: '100%', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>🃏</div>
           }
-          <div style={{ display: 'flex', gap: 8 }}>
-            {item.currentPrice != null && (
-              <div style={{ background: 'rgba(201,168,76,.15)', border: '1px solid rgba(201,168,76,.3)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent-gold)', fontWeight: 800, fontSize: '.9rem' }}>
-                Market {fmt(item.currentPrice)}
-              </div>
+
+          {/* Price badge */}
+          {item.currentPrice != null && (
+            <div style={{ background: 'rgba(201,168,76,.18)', border: '1px solid rgba(201,168,76,.4)', borderRadius: 8, padding: '6px 16px', color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1rem' }}>
+              Market {fmt(item.currentPrice)}
+            </div>
+          )}
+
+          {/* Buy buttons — always visible in preview */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+            {storeListing && (
+              <button
+                onClick={() => { setShowPreview(false); onStoreSearch?.(item.name) }}
+                style={{
+                  flex: 1, minWidth: 140, padding: '9px 14px',
+                  background: 'linear-gradient(135deg,#c9a84c,#f0c060)',
+                  color: '#000', border: 'none', borderRadius: 10,
+                  fontSize: '.78rem', fontWeight: 800, cursor: 'pointer', textAlign: 'center',
+                }}
+              >
+                🏪 Buy from Vaulted Singles — ${storeListing.price?.toFixed(2)}
+              </button>
             )}
-            <button onClick={() => setShowPreview(false)} style={{ padding: '6px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontSize: '.85rem' }}>
-              Close
-            </button>
+            <a
+              href={tcgLink}
+              target="_blank" rel="noopener noreferrer"
+              onClick={() => setShowPreview(false)}
+              style={{
+                flex: 1, minWidth: 140, padding: '9px 14px',
+                background: 'rgba(74,222,128,.12)', color: '#4ade80',
+                border: '1px solid rgba(74,222,128,.3)', borderRadius: 10,
+                fontSize: '.78rem', fontWeight: 700, textDecoration: 'none', textAlign: 'center',
+              }}
+            >
+              🛒 Buy on TCGPlayer
+            </a>
           </div>
+
+          <button onClick={() => setShowPreview(false)} style={{ padding: '7px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.08)', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontSize: '.82rem' }}>
+            Close
+          </button>
         </div>
       </>
     )}

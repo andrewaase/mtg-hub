@@ -9,6 +9,7 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
   const navItems = [
     { id: 'dashboard',  icon: '🏠', label: 'Dashboard',        section: 'Main'      },
     { id: 'store',      icon: '🏪', label: 'Store',             section: 'Main'      },
+    { id: 'about',      icon: '💬', label: 'About Us',          section: 'Main'      },
     { id: 'cards',      icon: '🔍', label: 'Card Lookup',       section: 'Resources' },
     { id: 'news',       icon: '📰', label: 'MTG News',          section: 'Resources' },
     { id: 'releases',   icon: '📅', label: 'Set Releases',      section: 'Resources' },
