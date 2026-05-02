@@ -694,9 +694,76 @@ function SimCardImage({ name, width = 90, onClick, dimmed, style }) {
   )
 }
 
+// ── Battlefield card (solitaire) ──────────────────────────────────────────────
+// Fixed 116×116 slot so layout doesn't shift when rotating tapped/untapped.
+function BattlefieldCard({ card, onTap, onDiscard, onReturn, onDragStart, onDragEnd }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div
+      style={{ position: 'relative', width: 116, height: 116, flexShrink: 0 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Rotating card */}
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onClick={onTap}
+        title={card.tapped ? `${card.name} — click to untap` : `${card.name} — click to tap`}
+        style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: `translate(-50%, -50%) rotate(${card.tapped ? 90 : 0}deg)`,
+          transition: 'transform .22s ease',
+          cursor: 'grab',
+        }}
+      >
+        <SimCardImage name={card.name} width={74} />
+      </div>
+
+      {/* Tapped label */}
+      {card.tapped && (
+        <div style={{
+          position: 'absolute', bottom: 1, left: '50%', transform: 'translateX(-50%)',
+          fontSize: '.48rem', color: 'rgba(248,113,113,0.75)', fontWeight: 700,
+          letterSpacing: '.6px', textTransform: 'uppercase', pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+        }}>TAPPED</div>
+      )}
+
+      {/* Action buttons — dim when not hovered, bright on hover */}
+      <div style={{
+        position: 'absolute', top: 0, right: 0,
+        display: 'flex', flexDirection: 'column', gap: 3,
+        opacity: hovered ? 1 : 0.18,
+        transition: 'opacity .15s',
+        zIndex: 5,
+      }}>
+        <button
+          onClick={e => { e.stopPropagation(); onReturn() }}
+          title="Return to hand"
+          style={{
+            width: 20, height: 20, borderRadius: '50%', border: 'none',
+            background: '#6366f1', color: '#fff', fontSize: '.68rem',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >↩</button>
+        <button
+          onClick={e => { e.stopPropagation(); onDiscard() }}
+          title="Send to graveyard"
+          style={{
+            width: 20, height: 20, borderRadius: '50%', border: 'none',
+            background: '#ef4444', color: '#fff', fontSize: '.7rem',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >✕</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Hand simulator modal ───────────────────────────────────────────────────────
 function HandSimulatorModal({ deck, onClose }) {
-  // Expand mainboard cards by qty into individual card objects with unique IDs
   const allCards = useMemo(() => {
     const cards = []
     let id = 0
@@ -717,86 +784,144 @@ function HandSimulatorModal({ deck, onClose }) {
     return a
   }
 
-  const [mode,          setMode]          = useState('hand')   // 'hand' | 'solitaire'
+  const [mode,          setMode]          = useState('hand')
   const [library,       setLibrary]       = useState([])
   const [hand,          setHand]          = useState([])
+  const [battlefield,   setBattlefield]   = useState([])  // { _id, name, tapped }
   const [graveyard,     setGraveyard]     = useState([])
   const [mulliganCount, setMulliganCount] = useState(0)
   const [turn,          setTurn]          = useState(1)
+  const [dragSource,    setDragSource]    = useState(null) // { zone, id }
+  const [dragOverZone,  setDragOverZone]  = useState(null)
 
-  // Deal initial 7 on mount
   useEffect(() => {
     const shuffled = fisherYatesShuffle(allCards)
     setHand(shuffled.slice(0, 7))
     setLibrary(shuffled.slice(7))
     setGraveyard([])
+    setBattlefield([])
     setMulliganCount(0)
     setTurn(1)
   }, [allCards])
 
-  // Mulligan: London rules — always see 7, keep (7 - mulliganCount) cards.
-  // We simulate this by just handing a new set of cards at the reduced size.
-  function mulligan() {
-    const newCount   = mulliganCount + 1
-    const keepCount  = Math.max(1, 7 - newCount)
-    const shuffled   = fisherYatesShuffle(allCards)
-    setHand(shuffled.slice(0, keepCount))
-    setLibrary(shuffled.slice(keepCount))
-    setGraveyard([])
-    setMulliganCount(newCount)
-    setTurn(1)
-  }
-
-  // Full reset — new 7 with no mulligan penalty
   function fullReset() {
     const shuffled = fisherYatesShuffle(allCards)
     setHand(shuffled.slice(0, 7))
     setLibrary(shuffled.slice(7))
     setGraveyard([])
+    setBattlefield([])
     setMulliganCount(0)
     setTurn(1)
   }
 
-  // Draw 1 card from top of library into hand
+  function mulligan() {
+    const newCount  = mulliganCount + 1
+    const keepCount = Math.max(1, 7 - newCount)
+    const shuffled  = fisherYatesShuffle(allCards)
+    setHand(shuffled.slice(0, keepCount))
+    setLibrary(shuffled.slice(keepCount))
+    setGraveyard([])
+    setBattlefield([])
+    setMulliganCount(newCount)
+    setTurn(1)
+  }
+
   function drawOne() {
     if (library.length === 0) return
     setHand(prev => [...prev, library[0]])
     setLibrary(prev => prev.slice(1))
   }
 
-  // Draw a full turn (draw 1, advance turn counter) — used in solitaire
-  function drawTurn() {
-    if (library.length === 0) return
-    setHand(prev => [...prev, library[0]])
-    setLibrary(prev => prev.slice(1))
+  // Next turn: untap all permanents → draw 1 → advance turn counter
+  function nextTurn() {
+    setBattlefield(prev => prev.map(c => ({ ...c, tapped: false })))
+    if (library.length > 0) {
+      setHand(prev => [...prev, library[0]])
+      setLibrary(prev => prev.slice(1))
+    }
     setTurn(t => t + 1)
   }
 
-  // Cast / play a card from hand to graveyard (solitaire mode)
-  function castCard(id) {
+  // Play a hand card to the battlefield
+  function playCard(id) {
     const card = hand.find(c => c._id === id)
     if (!card) return
     setHand(prev => prev.filter(c => c._id !== id))
+    setBattlefield(prev => [...prev, { ...card, tapped: false }])
+  }
+
+  function toggleTap(id) {
+    setBattlefield(prev => prev.map(c => c._id === id ? { ...c, tapped: !c.tapped } : c))
+  }
+
+  function discardFromField(id) {
+    const card = battlefield.find(c => c._id === id)
+    if (!card) return
+    setBattlefield(prev => prev.filter(c => c._id !== id))
     setGraveyard(prev => [card, ...prev])
   }
 
-  const isCmdr   = isCommanderFormat(deck.format)
-  const handNote = mulliganCount > 0
-    ? `Hand (${hand.length}) — ${mulliganCount} mulligan${mulliganCount > 1 ? 's' : ''}`
-    : `Hand (${hand.length})`
+  function returnToHand(id) {
+    const card = battlefield.find(c => c._id === id)
+    if (!card) return
+    setBattlefield(prev => prev.filter(c => c._id !== id))
+    setHand(prev => [...prev, card])
+  }
+
+  // ── Drag and drop ──────────────────────────────────────────────────────────
+  function handleDragStart(e, zone, id) {
+    setDragSource({ zone, id })
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e, zone) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverZone(zone)
+  }
+
+  function handleDrop(e, targetZone) {
+    e.preventDefault()
+    setDragOverZone(null)
+    if (!dragSource) return
+    const { zone: srcZone, id } = dragSource
+    setDragSource(null)
+    if (srcZone === targetZone) return
+
+    let card = null
+    if (srcZone === 'hand')        card = hand.find(c => c._id === id)
+    else if (srcZone === 'battlefield') card = battlefield.find(c => c._id === id)
+    else if (srcZone === 'graveyard')   card = graveyard.find(c => c._id === id)
+    if (!card) return
+
+    if (srcZone === 'hand')        setHand(prev => prev.filter(c => c._id !== id))
+    else if (srcZone === 'battlefield') setBattlefield(prev => prev.filter(c => c._id !== id))
+    else if (srcZone === 'graveyard')   setGraveyard(prev => prev.filter(c => c._id !== id))
+
+    if (targetZone === 'battlefield') setBattlefield(prev => [...prev, { ...card, tapped: false }])
+    else if (targetZone === 'hand')   setHand(prev => [...prev, card])
+    else if (targetZone === 'graveyard') setGraveyard(prev => [card, ...prev])
+  }
+
+  function handleDragEnd() {
+    setDragSource(null)
+    setDragOverZone(null)
+  }
+
+  const isCmdr = isCommanderFormat(deck.format)
 
   return (
     <>
-      {/* Backdrop */}
       <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)',
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)',
         zIndex: 700, backdropFilter: 'blur(6px)',
       }} />
 
-      {/* Modal */}
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: 'min(780px, 97vw)', maxHeight: '92vh',
+        width: mode === 'solitaire' ? 'min(1020px, 99vw)' : 'min(780px, 97vw)',
+        height: mode === 'solitaire' ? '90vh' : 'auto',
+        maxHeight: '94vh',
         background: 'var(--bg-primary)', border: '1px solid var(--border)',
         borderRadius: 18, zIndex: 701,
         display: 'flex', flexDirection: 'column',
@@ -814,7 +939,6 @@ function HandSimulatorModal({ deck, onClose }) {
             <div style={{ fontWeight: 800, fontSize: '.95rem' }}>Hand Simulator</div>
             <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deck.name}</div>
           </div>
-          {/* Mode toggle */}
           <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 2, gap: 2, flexShrink: 0 }}>
             {[['hand', '🖐 Hand'], ['solitaire', '♟ Solitaire']].map(([m, l]) => (
               <button key={m} onClick={() => { setMode(m); fullReset() }} style={{
@@ -838,9 +962,10 @@ function HandSimulatorModal({ deck, onClose }) {
           flexShrink: 0, flexWrap: 'wrap', alignItems: 'center',
         }}>
           {[
-            ['📚', 'Library', library.length, library.length > 0 ? 'var(--text-primary)' : 'var(--text-muted)'],
-            ['🖐', 'Hand',    hand.length,    'var(--text-primary)'],
-            ['🗑', 'Graveyard', graveyard.length, graveyard.length > 0 ? '#f87171' : 'var(--text-muted)'],
+            ['📚', 'Library',    library.length,     library.length > 0 ? 'var(--text-primary)' : 'var(--text-muted)'],
+            ['🖐',  'Hand',       hand.length,        'var(--text-primary)'],
+            ...(mode === 'solitaire' ? [['🟩', 'Field', battlefield.length, battlefield.length > 0 ? '#4ade80' : 'var(--text-muted)']] : []),
+            ['🗑',  'Graveyard',  graveyard.length,   graveyard.length > 0 ? '#f87171' : 'var(--text-muted)'],
           ].map(([icon, label, count, color]) => (
             <div key={label} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
               <span style={{ fontSize: '.8rem' }}>{icon}</span>
@@ -862,23 +987,172 @@ function HandSimulatorModal({ deck, onClose }) {
           )}
         </div>
 
-        {/* ── Main content ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', minHeight: 0 }}>
+        {/* ════════════════ SOLITAIRE LAYOUT ════════════════ */}
+        {mode === 'solitaire' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
-          {/* Hand */}
-          <div>
+            {/* ── Battlefield drop zone ── */}
+            <div
+              onDragOver={e => handleDragOver(e, 'battlefield')}
+              onDrop={e => handleDrop(e, 'battlefield')}
+              style={{
+                flex: 1, minHeight: 0,
+                background: dragOverZone === 'battlefield'
+                  ? 'rgba(0,110,45,0.45)'
+                  : 'rgba(0,45,20,0.38)',
+                border: `2px ${dragOverZone === 'battlefield'
+                  ? 'dashed rgba(74,222,128,0.75)'
+                  : 'solid rgba(0,70,25,0.55)'}`,
+                borderRadius: 12, margin: '10px 14px 6px',
+                padding: '28px 12px 10px',
+                overflowY: 'auto',
+                transition: 'background .15s, border-color .15s',
+                position: 'relative',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 7, left: 13,
+                fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '1.2px', color: 'rgba(100,220,120,0.5)',
+                pointerEvents: 'none',
+              }}>🟩 Battlefield</div>
+
+              {battlefield.length === 0 ? (
+                <div style={{
+                  height: '100%', minHeight: 110,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, pointerEvents: 'none',
+                  color: 'rgba(100,200,120,0.28)',
+                }}>
+                  <div style={{ fontSize: '2.2rem' }}>🃏</div>
+                  <div style={{ fontSize: '.8rem' }}>Drag cards here — or click a hand card to play</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignContent: 'flex-start' }}>
+                  {battlefield.map(card => (
+                    <BattlefieldCard
+                      key={card._id}
+                      card={card}
+                      onTap={() => toggleTap(card._id)}
+                      onDiscard={() => discardFromField(card._id)}
+                      onReturn={() => returnToHand(card._id)}
+                      onDragStart={e => handleDragStart(e, 'battlefield', card._id)}
+                      onDragEnd={handleDragEnd}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Bottom strip: Hand + Graveyard ── */}
+            <div style={{ display: 'flex', gap: 8, padding: '0 14px 10px', flexShrink: 0 }}>
+
+              {/* Hand zone */}
+              <div
+                onDragOver={e => handleDragOver(e, 'hand')}
+                onDrop={e => handleDrop(e, 'hand')}
+                style={{
+                  flex: 1, minWidth: 0,
+                  background: dragOverZone === 'hand' ? 'rgba(99,102,241,0.12)' : 'var(--bg-secondary)',
+                  border: `1.5px ${dragOverZone === 'hand' ? 'dashed #818cf8' : 'solid var(--border)'}`,
+                  borderRadius: 10, padding: '8px 10px',
+                  transition: 'background .15s, border-color .15s',
+                }}
+              >
+                <div style={{
+                  fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 6,
+                }}>
+                  ✋ Hand ({hand.length})
+                  {hand.length > 0 && (
+                    <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6, opacity: .7 }}>
+                      click to play · drag to GY to discard
+                    </span>
+                  )}
+                </div>
+                {hand.length === 0 ? (
+                  <div style={{
+                    height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-muted)', fontSize: '.78rem',
+                  }}>
+                    {library.length === 0 ? 'Library empty' : 'No cards — hit Next Turn to draw'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+                    {hand.map(card => (
+                      <div
+                        key={card._id}
+                        draggable
+                        onDragStart={e => handleDragStart(e, 'hand', card._id)}
+                        onDragEnd={handleDragEnd}
+                        style={{ flexShrink: 0, cursor: 'grab' }}
+                        title="Click to play to battlefield · drag to GY to discard"
+                      >
+                        <SimCardImage
+                          name={card.name}
+                          width={80}
+                          onClick={() => playCard(card._id)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Graveyard zone */}
+              <div
+                onDragOver={e => handleDragOver(e, 'graveyard')}
+                onDrop={e => handleDrop(e, 'graveyard')}
+                style={{
+                  width: 94, flexShrink: 0,
+                  background: dragOverZone === 'graveyard' ? 'rgba(239,68,68,0.12)' : 'var(--bg-secondary)',
+                  border: `1.5px ${dragOverZone === 'graveyard' ? 'dashed #f87171' : 'solid var(--border)'}`,
+                  borderRadius: 10, padding: '8px 8px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  transition: 'background .15s, border-color .15s',
+                }}
+              >
+                <div style={{
+                  fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 6, textAlign: 'center',
+                }}>
+                  🪦 GY ({graveyard.length})
+                </div>
+                {graveyard.length === 0 ? (
+                  <div style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'rgba(248,113,113,0.22)', fontSize: '1.8rem',
+                  }}>🪦</div>
+                ) : (
+                  <div style={{ position: 'relative', width: 72 }}>
+                    <SimCardImage name={graveyard[0].name} width={72} dimmed />
+                    {graveyard.length > 1 && (
+                      <div style={{
+                        position: 'absolute', top: -7, right: -7,
+                        background: '#ef4444', color: '#fff', borderRadius: '50%',
+                        width: 20, height: 20, display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        fontSize: '.65rem', fontWeight: 800,
+                      }}>{graveyard.length}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════ HAND MODE LAYOUT ════════════════ */}
+        {mode === 'hand' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', minHeight: 0 }}>
             <div style={{
               fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase',
               letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 10,
             }}>
-              {handNote}
-              {mode === 'solitaire' && hand.length > 0 && (
-                <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>
-                  — click a card to cast it
-                </span>
-              )}
+              {mulliganCount > 0
+                ? `Hand (${hand.length}) — ${mulliganCount} mulligan${mulliganCount > 1 ? 's' : ''}`
+                : `Hand (${hand.length})`}
             </div>
-
             {hand.length === 0 ? (
               <div style={{
                 height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -890,54 +1164,12 @@ function HandSimulatorModal({ deck, onClose }) {
             ) : (
               <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 6 }}>
                 {hand.map(card => (
-                  <SimCardImage
-                    key={card._id}
-                    name={card.name}
-                    width={94}
-                    onClick={mode === 'solitaire' ? () => castCard(card._id) : undefined}
-                  />
+                  <SimCardImage key={card._id} name={card.name} width={94} />
                 ))}
               </div>
             )}
           </div>
-
-          {/* Solitaire: graveyard strip */}
-          {mode === 'solitaire' && graveyard.length > 0 && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{
-                fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase',
-                letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 8,
-              }}>
-                Graveyard ({graveyard.length})
-              </div>
-              <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4 }}>
-                {graveyard.slice(0, 12).map((card, i) => (
-                  <SimCardImage key={card._id} name={card.name} width={68} dimmed />
-                ))}
-                {graveyard.length > 12 && (
-                  <div style={{
-                    width: 68, height: 95, borderRadius: 6, background: 'var(--bg-secondary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, color: 'var(--text-muted)', fontSize: '.75rem', fontWeight: 700,
-                  }}>
-                    +{graveyard.length - 12}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Solitaire: library empty state */}
-          {mode === 'solitaire' && library.length === 0 && (
-            <div style={{
-              marginTop: 16, padding: '12px 16px', borderRadius: 10,
-              background: 'rgba(201,168,76,.07)', border: '1px solid rgba(201,168,76,.2)',
-              fontSize: '.8rem', color: 'var(--accent-gold)', textAlign: 'center',
-            }}>
-              📚 Library empty — you drew all {allCards.length} cards
-            </div>
-          )}
-        </div>
+        )}
 
         {/* ── Action bar ── */}
         <div style={{
@@ -952,28 +1184,22 @@ function HandSimulatorModal({ deck, onClose }) {
               </button>
               <button className="btn btn-ghost btn-sm" onClick={fullReset}>↺ New 7</button>
               <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={drawOne}
-                disabled={library.length === 0}
-              >
+              <button className="btn btn-primary btn-sm" onClick={drawOne} disabled={library.length === 0}>
                 + Draw 1 {library.length > 0 ? `(${library.length} left)` : '(empty)'}
               </button>
             </>
           ) : (
             <>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={drawTurn}
-                disabled={library.length === 0}
-                style={{ fontWeight: 700 }}
-              >
-                📥 Draw for Turn {turn} {library.length === 0 ? '(empty)' : ''}
+              <button className="btn btn-primary btn-sm" onClick={nextTurn} style={{ fontWeight: 700 }}>
+                ⟳ Next Turn → T{turn + 1}{library.length === 0 ? ' (no draw)' : ''}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setBattlefield(prev => prev.map(c => ({ ...c, tapped: false })))}>
+                Untap All
               </button>
               <button className="btn btn-ghost btn-sm" onClick={fullReset}>↺ Restart</button>
               <div style={{ flex: 1 }} />
-              <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>
-                Click cards in hand to cast
+              <span style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>
+                click = tap · hover for actions
               </span>
             </>
           )}
