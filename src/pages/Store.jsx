@@ -21,6 +21,53 @@ function saveCart(cart) {
 
 const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
 
+const COLOR_OPTIONS = [
+  { id: 'W', label: '☀️ White' },
+  { id: 'U', label: '💧 Blue' },
+  { id: 'B', label: '💀 Black' },
+  { id: 'R', label: '🔥 Red' },
+  { id: 'G', label: '🌿 Green' },
+  { id: 'C', label: '⬡ Colorless' },
+]
+const RARITY_OPTIONS = ['common', 'uncommon', 'rare', 'mythic']
+const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle']
+
+function ChipRow({ options, value, onChange, multi = false, labelFn }) {
+  function toggle(id) {
+    if (multi) {
+      const next = value.includes(id) ? value.filter(v => v !== id) : [...value, id]
+      onChange(next)
+    } else {
+      onChange(value === id ? null : id)
+    }
+  }
+  const isActive = (id) => multi ? value.includes(id) : value === id
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      {options.map(opt => {
+        const id = typeof opt === 'string' ? opt : opt.id
+        const label = labelFn ? labelFn(opt) : (typeof opt === 'string' ? opt : opt.label)
+        return (
+          <button
+            key={id}
+            onClick={() => toggle(id)}
+            style={{
+              padding: '5px 12px', borderRadius: '99px',
+              border: `1.5px solid ${isActive(id) ? 'var(--accent-gold)' : 'var(--border)'}`,
+              background: isActive(id) ? 'rgba(201,168,76,.15)' : 'var(--bg-secondary)',
+              color: isActive(id) ? 'var(--accent-gold)' : 'var(--text-secondary)',
+              fontSize: '.72rem', fontWeight: isActive(id) ? 700 : 400,
+              cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Price history chart (pure SVG, no external deps) ────────────────────────
 function PriceChart({ scryfallId, isFoil, currentPrice }) {
   const [history, setHistory] = useState(null) // null = loading
@@ -1048,6 +1095,11 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
   const [priceMax,        setPriceMax]        = useState('')
   const [condFilter,      setCondFilter]      = useState([]) // [] = all
   const [foilFilter,      setFoilFilter]      = useState('all') // 'all'|'foil'|'nonfoil'
+  const [filterColors,    setFilterColors]    = useState([])
+  const [filterRarity,    setFilterRarity]    = useState(null)
+  const [filterType,      setFilterType]      = useState(null)
+  const [cardDataCache,   setCardDataCache]   = useState({}) // scryfall_id -> {colors,rarity,typeLine}
+  const [dataLoading,     setDataLoading]     = useState(false)
   const [showFilters,     setShowFilters]     = useState(false)
 
   // Dynamic shipping from admin settings
@@ -1069,6 +1121,39 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
 
   // Derived: total shipping displayed in cart / checkout
   const SHIPPING_COST = shippingCost + handlingFee
+
+  // Lazy-fetch color/rarity/type from Scryfall when filter panel opens
+  useEffect(() => {
+    if (!showFilters || category !== 'single') return
+    const singles = listings.filter(l => (l.product_type || 'single') === 'single' && l.scryfall_id)
+    const uncached = singles.filter(l => !(l.scryfall_id in cardDataCache))
+    if (uncached.length === 0) return
+    setDataLoading(true)
+    const ids = uncached.map(l => l.scryfall_id)
+    const batches = []
+    for (let i = 0; i < ids.length; i += 75) batches.push(ids.slice(i, i + 75))
+    Promise.all(batches.map(batch =>
+      fetch('https://api.scryfall.com/cards/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers: batch.map(id => ({ id })) }),
+      }).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
+    )).then(results => {
+      const newEntries = {}
+      results.forEach(r => {
+        ;(r.data || []).forEach(card => {
+          const typeLine = (card.type_line || '').split(' // ')[0]
+          newEntries[card.id] = {
+            colors:   card.colors || card.card_faces?.[0]?.colors || [],
+            rarity:   card.rarity || '',
+            typeLine,
+          }
+        })
+      })
+      setCardDataCache(prev => ({ ...prev, ...newEntries }))
+      setDataLoading(false)
+    })
+  }, [showFilters, category, listings.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch active listings — also include out-of-stock for waitlist
   useEffect(() => {
@@ -1125,6 +1210,19 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         if (condFilter.length > 0 && !condFilter.includes(l.condition)) return false
         if (foilFilter === 'foil'    && !l.is_foil) return false
         if (foilFilter === 'nonfoil' &&  l.is_foil) return false
+        const cd = l.scryfall_id ? cardDataCache[l.scryfall_id] : null
+        if (filterColors.length > 0) {
+          if (!cd) return true // not yet fetched — keep visible while loading
+          if (!filterColors.some(col => (cd.colors || []).includes(col))) return false
+        }
+        if (filterRarity) {
+          if (!cd) return true
+          if (cd.rarity !== filterRarity) return false
+        }
+        if (filterType) {
+          if (!cd) return true
+          if (!(cd.typeLine || '').includes(filterType)) return false
+        }
       }
       return true
     })
@@ -1133,7 +1231,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
     if (sortBy === 'name')       list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     if (sortBy === 'newest')     list = [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     return list
-  }, [listings, search, sortBy, category, priceMin, priceMax, condFilter, foilFilter])
+  }, [listings, search, sortBy, category, priceMin, priceMax, condFilter, foilFilter, filterColors, filterRarity, filterType, cardDataCache])
 
   // Separate out-of-stock list for the same category (for waitlist section)
   const outOfStock = useMemo(() => {
@@ -1143,7 +1241,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
     })
   }, [listings, category])
 
-  const hasActiveFilters = priceMin !== '' || priceMax !== '' || condFilter.length > 0 || foilFilter !== 'all'
+  const hasActiveFilters = priceMin !== '' || priceMax !== '' || condFilter.length > 0 || foilFilter !== 'all' || filterColors.length > 0 || filterRarity != null || filterType != null
 
   const addToCart = useCallback((listing) => {
     setCart(prev => {
@@ -1254,14 +1352,24 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
           <button
             onClick={() => setShowFilters(s => !s)}
             style={{
-              padding: '9px 14px', borderRadius: 10, border: `1px solid ${hasActiveFilters ? 'var(--accent-gold)' : 'var(--border)'}`,
+              padding: '9px 14px', borderRadius: 10,
+              border: `1.5px solid ${hasActiveFilters ? 'var(--accent-gold)' : 'var(--border)'}`,
               background: hasActiveFilters ? 'rgba(201,168,76,.12)' : 'transparent',
               color: hasActiveFilters ? 'var(--accent-gold)' : 'var(--text-muted)',
               fontWeight: hasActiveFilters ? 700 : 400, fontSize: '.82rem', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 5,
+              display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
-            🔧 Filters {hasActiveFilters && '●'}
+            ⚙️ Filter
+            {hasActiveFilters && (
+              <span style={{
+                background: 'var(--accent-gold)', color: '#1a1000',
+                borderRadius: '99px', padding: '0 6px', fontSize: '.65rem', fontWeight: 800, minWidth: '18px', textAlign: 'center',
+              }}>
+                {[priceMin !== '', priceMax !== '', condFilter.length > 0, foilFilter !== 'all', filterColors.length > 0, filterRarity != null, filterType != null].filter(Boolean).length}
+              </span>
+            )}
+            <span style={{ opacity: 0.5, fontSize: '.65rem' }}>{showFilters ? '▲' : '▼'}</span>
           </button>
         )}
         <select
@@ -1282,68 +1390,94 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         <div style={{
           marginBottom: 14, padding: '14px 16px', borderRadius: 12,
           background: 'var(--bg-card)', border: '1px solid var(--border)',
-          display: 'flex', flexDirection: 'column', gap: 12,
+          display: 'flex', flexDirection: 'column', gap: 14,
         }}>
+
+          {/* Color */}
+          <div>
+            <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Color</div>
+            <ChipRow options={COLOR_OPTIONS} value={filterColors} onChange={setFilterColors} multi />
+          </div>
+
+          {/* Rarity */}
+          <div>
+            <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Rarity</div>
+            <ChipRow
+              options={RARITY_OPTIONS}
+              value={filterRarity}
+              onChange={setFilterRarity}
+              labelFn={r => ({ common: '● Common', uncommon: '◈ Uncommon', rare: '◆ Rare', mythic: '✦ Mythic' }[r] || r)}
+            />
+          </div>
+
+          {/* Condition */}
+          <div>
+            <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Condition</div>
+            <ChipRow options={CONDITIONS_LIST} value={condFilter} onChange={setCondFilter} multi />
+          </div>
+
+          {/* Foil */}
+          <div>
+            <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Finish</div>
+            <ChipRow
+              options={['foil', 'nonfoil']}
+              value={foilFilter === 'all' ? null : foilFilter}
+              onChange={v => setFoilFilter(v || 'all')}
+              labelFn={v => v === 'foil' ? '✦ Foil' : 'Non-Foil'}
+            />
+          </div>
+
+          {/* Card Type */}
+          <div>
+            <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              Card Type
+              {dataLoading && <span style={{ marginLeft: 8, fontStyle: 'italic', fontWeight: 400, textTransform: 'none' }}>fetching…</span>}
+            </div>
+            <ChipRow options={CARD_TYPES} value={filterType} onChange={setFilterType} />
+          </div>
+
           {/* Price range */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--text-muted)', minWidth: 70 }}>Price range</span>
-            <input
-              type="number" placeholder="Min $" value={priceMin} onChange={e => setPriceMin(e.target.value)}
-              min="0" step="0.01"
-              className="form-input"
-              style={{ width: 90, padding: '6px 10px', fontSize: '.8rem' }}
-            />
-            <span style={{ color: 'var(--text-muted)' }}>—</span>
-            <input
-              type="number" placeholder="Max $" value={priceMax} onChange={e => setPriceMax(e.target.value)}
-              min="0" step="0.01"
-              className="form-input"
-              style={{ width: 90, padding: '6px 10px', fontSize: '.8rem' }}
-            />
-          </div>
-
-          {/* Condition chips */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--text-muted)', minWidth: 70 }}>Condition</span>
-            {CONDITIONS_LIST.map(c => {
-              const active = condFilter.includes(c)
-              return (
-                <button key={c} onClick={() => setCondFilter(prev => active ? prev.filter(x => x !== c) : [...prev, c])} style={{
-                  padding: '4px 10px', borderRadius: 6, border: `1px solid ${active ? 'var(--accent-gold)' : 'var(--border)'}`,
-                  background: active ? 'rgba(201,168,76,.15)' : 'transparent',
-                  color: active ? 'var(--accent-gold)' : 'var(--text-muted)',
-                  fontSize: '.72rem', fontWeight: active ? 700 : 400, cursor: 'pointer',
-                }}>{c}</button>
-              )
-            })}
-          </div>
-
-          {/* Foil toggle */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--text-muted)', minWidth: 70 }}>Foil</span>
-            {[['all','All'],['foil','✦ Foil only'],['nonfoil','Non-foil only']].map(([val, label]) => (
-              <button key={val} onClick={() => setFoilFilter(val)} style={{
-                padding: '4px 10px', borderRadius: 6, border: `1px solid ${foilFilter === val ? 'var(--accent-gold)' : 'var(--border)'}`,
-                background: foilFilter === val ? 'rgba(201,168,76,.15)' : 'transparent',
-                color: foilFilter === val ? 'var(--accent-gold)' : 'var(--text-muted)',
-                fontSize: '.72rem', fontWeight: foilFilter === val ? 700 : 400, cursor: 'pointer',
-              }}>{label}</button>
-            ))}
+          <div>
+            <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>Price Range</div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>$</span>
+                <input
+                  type="number" min="0" step="0.01" placeholder="Min"
+                  value={priceMin} onChange={e => setPriceMin(e.target.value)}
+                  className="form-input"
+                  style={{ width: '72px', padding: '5px 8px', fontSize: '.78rem' }}
+                />
+              </div>
+              <span style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>–</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>$</span>
+                <input
+                  type="number" min="0" step="0.01" placeholder="Max"
+                  value={priceMax} onChange={e => setPriceMax(e.target.value)}
+                  className="form-input"
+                  style={{ width: '72px', padding: '5px 8px', fontSize: '.78rem' }}
+                />
+              </div>
+            </div>
           </div>
 
           {hasActiveFilters && (
-            <button onClick={() => { setPriceMin(''); setPriceMax(''); setCondFilter([]); setFoilFilter('all') }} style={{
+            <button onClick={() => {
+              setPriceMin(''); setPriceMax(''); setCondFilter([]); setFoilFilter('all')
+              setFilterColors([]); setFilterRarity(null); setFilterType(null)
+            }} style={{
               alignSelf: 'flex-start', padding: '4px 12px', borderRadius: 6,
               border: '1px solid rgba(239,68,68,.3)', background: 'none',
               color: '#f87171', fontSize: '.72rem', cursor: 'pointer',
-            }}>Clear filters</button>
+            }}>Clear all filters</button>
           )}
         </div>
       )}
 
       {/* ── Empty / loading states ── */}
       {loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(185px,1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))', gap: 12 }}>
           {[...Array(8)].map((_, i) => (
             <div key={i} style={{ aspectRatio: '63/120', borderRadius: 14, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
           ))}
@@ -1374,8 +1508,8 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         <div style={{
           display: 'grid',
           gridTemplateColumns: category === 'single'
-            ? 'repeat(auto-fill,minmax(185px,1fr))'
-            : 'repeat(auto-fill,minmax(220px,1fr))',
+            ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
+            : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
           gap: 12,
         }}>
           {filtered.map(listing =>
@@ -1399,8 +1533,8 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: category === 'single'
-              ? 'repeat(auto-fill,minmax(185px,1fr))'
-              : 'repeat(auto-fill,minmax(220px,1fr))',
+              ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
+              : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
             gap: 12,
           }}>
             {outOfStock.map(listing => (
