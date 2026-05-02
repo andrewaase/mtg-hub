@@ -179,6 +179,7 @@ export default function CameraModal({
   const [adding,        setAdding]        = useState(false)
   const [lookingUp,     setLookingUp]     = useState(false)
   const [lookupFailed,  setLookupFailed]  = useState(false)
+  const [scanError,     setScanError]     = useState(null)   // visible function error
   const [priceMode,      setPriceMode]      = useState('normal')
   const [printings,      setPrintings]      = useState([])
   const [showPrintings,  setShowPrintings]  = useState(false)
@@ -263,6 +264,7 @@ export default function CameraModal({
 
     scanningRef.current = true
     setScanStatus('scanning')
+    setScanError(null)
 
     try {
       const image = captureCardImage(video)
@@ -271,7 +273,22 @@ export default function CameraModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image }),
       })
-      if (!res.ok) throw new Error(`scan-card ${res.status}`)
+
+      if (!res.ok) {
+        // Try to surface a human-readable error from the function body
+        let msg = `Scan service error (${res.status})`
+        try {
+          const errJson = await res.json()
+          if (errJson?.error) {
+            msg = errJson.error === 'ANTHROPIC_API_KEY not configured'
+              ? 'Scan API key not set — check Netlify env vars'
+              : errJson.error
+          }
+        } catch { /* ignore parse failure */ }
+        setScanError(msg)
+        throw new Error(msg)
+      }
+
       const { name, setCode, collectorNumber } = await res.json()
 
       const cleanName = (name || '').trim().replace(/["""]/g, '"').replace(/[''']/g, "'")
@@ -286,6 +303,7 @@ export default function CameraModal({
           stableRef.current = 0
           setFoundCard(card)
           setPriceMode('normal')
+          setScanError(null)
           if (navigator.vibrate) navigator.vibrate(40)
           // Fetch all printings in background
           fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`)
@@ -487,6 +505,23 @@ export default function CameraModal({
         }}>
           <div style={{ fontSize: '3rem' }}>📷</div>
           <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, textAlign: 'center', padding: '0 32px' }}>{cameraError}</p>
+        </div>
+      )}
+
+      {/* ── Scan function error (API key missing, server error, etc.) ── */}
+      {scanError && !foundCard && (
+        <div style={{
+          position: 'absolute', top: '60px', left: '16px', right: '16px',
+          background: 'rgba(239,68,68,0.9)', borderRadius: '10px',
+          padding: '10px 14px', backdropFilter: 'blur(8px)', zIndex: 10,
+          display: 'flex', alignItems: 'center', gap: '8px',
+        }}>
+          <span style={{ fontSize: '1rem' }}>⚠️</span>
+          <span style={{ fontSize: '.75rem', color: '#fff', fontWeight: 600 }}>{scanError}</span>
+          <button
+            onClick={() => setScanError(null)}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '.9rem' }}
+          >✕</button>
         </div>
       )}
 
