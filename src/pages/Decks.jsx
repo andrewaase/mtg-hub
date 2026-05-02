@@ -606,7 +606,7 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
       )}
 
       {showSimulator && (
-        <HandSimulatorModal deck={deck} onClose={() => setShowSimulator(false)} />
+        <HandSimulatorModal deck={deck} cardTypes={cardTypes} onClose={() => setShowSimulator(false)} />
       )}
     </div>
   )
@@ -763,7 +763,7 @@ function BattlefieldCard({ card, onTap, onDiscard, onReturn, onDragStart, onDrag
 }
 
 // ── Hand simulator modal ───────────────────────────────────────────────────────
-function HandSimulatorModal({ deck, onClose }) {
+function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
   const allCards = useMemo(() => {
     const cards = []
     let id = 0
@@ -793,6 +793,11 @@ function HandSimulatorModal({ deck, onClose }) {
   const [turn,          setTurn]          = useState(1)
   const [dragSource,    setDragSource]    = useState(null) // { zone, id }
   const [dragOverZone,  setDragOverZone]  = useState(null)
+
+  // Determines if a card is a land based on the type data fetched by DeckDetail
+  function isLandCard(name) {
+    return /\bLand\b/.test(cardTypes[name] || '')
+  }
 
   useEffect(() => {
     const shuffled = fisherYatesShuffle(allCards)
@@ -847,7 +852,7 @@ function HandSimulatorModal({ deck, onClose }) {
     const card = hand.find(c => c._id === id)
     if (!card) return
     setHand(prev => prev.filter(c => c._id !== id))
-    setBattlefield(prev => [...prev, { ...card, tapped: false }])
+    setBattlefield(prev => [...prev, { ...card, tapped: false, isLand: isLandCard(card.name) }])
   }
 
   function toggleTap(id) {
@@ -898,7 +903,7 @@ function HandSimulatorModal({ deck, onClose }) {
     else if (srcZone === 'battlefield') setBattlefield(prev => prev.filter(c => c._id !== id))
     else if (srcZone === 'graveyard')   setGraveyard(prev => prev.filter(c => c._id !== id))
 
-    if (targetZone === 'battlefield') setBattlefield(prev => [...prev, { ...card, tapped: false }])
+    if (targetZone === 'battlefield') setBattlefield(prev => [...prev, { ...card, tapped: false, isLand: isLandCard(card.name) }])
     else if (targetZone === 'hand')   setHand(prev => [...prev, card])
     else if (targetZone === 'graveyard') setGraveyard(prev => [card, ...prev])
   }
@@ -1027,21 +1032,54 @@ function HandSimulatorModal({ deck, onClose }) {
                   <div style={{ fontSize: '2.2rem' }}>🃏</div>
                   <div style={{ fontSize: '.8rem' }}>Drag cards here — or click a hand card to play</div>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignContent: 'flex-start' }}>
-                  {battlefield.map(card => (
-                    <BattlefieldCard
-                      key={card._id}
-                      card={card}
-                      onTap={() => toggleTap(card._id)}
-                      onDiscard={() => discardFromField(card._id)}
-                      onReturn={() => returnToHand(card._id)}
-                      onDragStart={e => handleDragStart(e, 'battlefield', card._id)}
-                      onDragEnd={handleDragEnd}
-                    />
-                  ))}
-                </div>
-              )}
+              ) : (() => {
+                const bfNonLands = battlefield.filter(c => !c.isLand)
+                const bfLands    = battlefield.filter(c => c.isLand)
+                const BfRow = ({ cards }) => (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {cards.map(card => (
+                      <BattlefieldCard
+                        key={card._id}
+                        card={card}
+                        onTap={() => toggleTap(card._id)}
+                        onDiscard={() => discardFromField(card._id)}
+                        onReturn={() => returnToHand(card._id)}
+                        onDragStart={e => handleDragStart(e, 'battlefield', card._id)}
+                        onDragEnd={handleDragEnd}
+                      />
+                    ))}
+                  </div>
+                )
+                const zoneLabel = (text) => (
+                  <div style={{
+                    fontSize: '.54rem', fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '1.2px', color: 'rgba(100,220,120,0.45)', marginBottom: 5,
+                  }}>{text}</div>
+                )
+                const emptyRow = (
+                  <div style={{
+                    minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'rgba(100,220,120,0.18)', fontSize: '.7rem',
+                    border: '1px dashed rgba(100,220,120,0.12)', borderRadius: 8,
+                  }}>— none —</div>
+                )
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {/* Non-lands: creatures, planeswalkers, enchantments, etc. */}
+                    <div>
+                      {zoneLabel('🦎 Creatures & Spells')}
+                      {bfNonLands.length > 0 ? <BfRow cards={bfNonLands} /> : emptyRow}
+                    </div>
+                    {/* Separator */}
+                    <div style={{ borderTop: '1px solid rgba(100,220,120,0.18)', margin: '2px 0' }} />
+                    {/* Lands */}
+                    <div>
+                      {zoneLabel('🌍 Lands')}
+                      {bfLands.length > 0 ? <BfRow cards={bfLands} /> : emptyRow}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* ── Bottom strip: Hand + Graveyard ── */}
