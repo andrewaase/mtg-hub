@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
-import SetTracker from '../components/SetTracker'
 import { getCKPriceMap, getCKBuyPrice, getSellSignal } from '../lib/cardkingdom'
 
 const COLOR_OPTIONS = [
@@ -644,6 +643,17 @@ function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
 
 const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Battle']
 
+// ── Binder persistence ─────────────────────────────────────────────────────────
+// forSale / forTrade don't live in Supabase, so we track them in a separate
+// localStorage key that survives page refreshes and Supabase reloads.
+const BINDER_LS_KEY = 'mtg-hub-binders'
+function readBinders() {
+  try { return JSON.parse(localStorage.getItem(BINDER_LS_KEY) || '{}') } catch { return {} }
+}
+function writeBinders(map) {
+  try { localStorage.setItem(BINDER_LS_KEY, JSON.stringify(map)) } catch {}
+}
+
 export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast }) {
   const [view,         setView]         = useState('all')
   const [search,       setSearch]       = useState('')
@@ -672,6 +682,24 @@ export default function Collection({ collection, setCollection, user, openAddCar
   useEffect(() => {
     getCKPriceMap().then(setCkMap).catch(() => {})
   }, [])
+
+  // Restore forSale / forTrade flags from dedicated localStorage binder store.
+  // Runs whenever collection.length changes (initial load, card add/remove).
+  // Length-dep avoids re-firing after our own setCollection call below.
+  useEffect(() => {
+    if (collection.length === 0) return
+    const binders = readBinders()
+    if (Object.keys(binders).length === 0) return
+    setCollection(prev => prev.map(c => {
+      const b = binders[String(c.id)]
+      if (!b) return c
+      return {
+        ...c,
+        forSale:  b.forSale  ?? !!c.forSale,
+        forTrade: b.forTrade ?? !!c.forTrade,
+      }
+    }))
+  }, [collection.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeFilterCount = [
     filterColors.length > 0,
@@ -730,9 +758,18 @@ export default function Collection({ collection, setCollection, user, openAddCar
     const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
     stored.collection = next
     localStorage.setItem('mtg-hub-v1', JSON.stringify(stored))
-    // Persist qty / condition / binder changes to Supabase
-    if (patch.qty !== undefined || patch.condition !== undefined ||
-        patch.forSale !== undefined || patch.forTrade !== undefined) {
+    // Persist forSale / forTrade to dedicated binder store (survives Supabase reloads)
+    if (patch.forSale !== undefined || patch.forTrade !== undefined) {
+      const binders = readBinders()
+      const key = String(id)
+      const prev = binders[key] || {}
+      binders[key] = { ...prev }
+      if (patch.forSale  !== undefined) binders[key].forSale  = patch.forSale
+      if (patch.forTrade !== undefined) binders[key].forTrade = patch.forTrade
+      writeBinders(binders)
+    }
+    // Persist qty / condition to Supabase
+    if (patch.qty !== undefined || patch.condition !== undefined) {
       updateCollectionCard(id, patch, user?.id).catch(e => console.warn('[updateCard]', e))
     }
   }

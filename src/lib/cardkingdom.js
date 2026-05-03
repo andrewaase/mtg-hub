@@ -7,24 +7,37 @@ let _ckMap = null // in-memory session cache
 export async function getCKPriceMap() {
   if (_ckMap) return _ckMap
   try {
-    const res = await fetch('/.netlify/functions/ck-prices')
-    if (!res.ok) return {}
-    const { data } = await res.json()
+    // Try Netlify proxy first (avoids CORS), fall back to direct if proxy errors
+    let res = await fetch('/.netlify/functions/ck-prices').catch(() => null)
+    if (!res || !res.ok) {
+      res = await fetch('https://api.cardkingdom.com/api/pricelist')
+    }
+    if (!res || !res.ok) return {}
+
+    const json = await res.json()
+    const data = json.data || []
+    console.log(`[CK] loaded ${data.length} entries`)
+
     const map = {}
-    for (const item of (data || [])) {
+    for (const item of data) {
       const key = (item.name || '').toLowerCase().trim()
       if (!map[key]) map[key] = {}
+      const price = parseFloat(item.buy_price) || 0
+      // Use Math.max so a card with multiple printings keeps the best buylist price
       if (item.foil) {
-        map[key].buyFoil  = parseFloat(item.buy_price)  || 0
-        map[key].sellFoil = parseFloat(item.sell_price) || 0
+        map[key].buyFoil  = Math.max(map[key].buyFoil  || 0, price)
+        map[key].sellFoil = Math.max(map[key].sellFoil || 0, parseFloat(item.sell_price) || 0)
       } else {
-        map[key].buyNormal  = parseFloat(item.buy_price)  || 0
-        map[key].sellNormal = parseFloat(item.sell_price) || 0
+        map[key].buyNormal  = Math.max(map[key].buyNormal  || 0, price)
+        map[key].sellNormal = Math.max(map[key].sellNormal || 0, parseFloat(item.sell_price) || 0)
       }
     }
     _ckMap = map
     return map
-  } catch { return {} }
+  } catch (err) {
+    console.error('[CK] failed to load price map:', err)
+    return {}
+  }
 }
 
 export function getCKBuyPrice(ckMap, cardName, isFoil = false) {
