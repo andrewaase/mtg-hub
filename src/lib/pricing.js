@@ -133,7 +133,9 @@ export async function fetchUnknownDeckPrices(unknownCards, { onProgress } = {}) 
       )
       if (res.ok) {
         const data = await res.json()
-        const price = data.prices?.usd ? parseFloat(data.prices.usd) : null
+        const usd     = data.prices?.usd      ? parseFloat(data.prices.usd)      : null
+        const usdFoil = data.prices?.usd_foil ? parseFloat(data.prices.usd_foil) : null
+        const price   = usd ?? usdFoil ?? null // fall back to foil price when non-foil is unlisted
         if (price != null) {
           prices[name] = price
           setCachedPrice(name, price)

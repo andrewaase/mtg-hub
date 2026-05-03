@@ -461,6 +461,14 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
             // even though Scryfall returns the full "Delver of Secrets // Insectile Aberration".
             const frontName = card.name.split(' // ')[0]
             if (frontName !== card.name) types[frontName] = typeLine
+
+            // Pre-cache the image URL so the hand simulator shows cards immediately
+            // without needing individual per-card fetches when the modal opens.
+            const imgUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || null
+            if (imgUrl) {
+              if (!IMG_CACHE.has(card.name))  IMG_CACHE.set(card.name, imgUrl)
+              if (frontName !== card.name && !IMG_CACHE.has(frontName)) IMG_CACHE.set(frontName, imgUrl)
+            }
           }
           return types
         })
@@ -619,7 +627,9 @@ function SimCardImage({ name, width = 90, onClick, dimmed, style }) {
   const cached = IMG_CACHE.has(name) ? IMG_CACHE.get(name) : undefined
   const [img,      setImg]      = useState(cached)
   const [hoverPos, setHoverPos] = useState(null)
-  const fetchedRef = useRef(cached !== undefined)
+  // null in cache = previous fetch failed; treat as uncached so we retry.
+  // Only a real URL string counts as "already fetched".
+  const fetchedRef = useRef(typeof cached === 'string')
 
   useEffect(() => {
     if (fetchedRef.current) return
@@ -628,10 +638,10 @@ function SimCardImage({ name, width = 90, onClick, dimmed, style }) {
       .then(r => r.ok ? r.json() : null)
       .then(card => {
         const url = card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || null
-        IMG_CACHE.set(name, url)
+        if (url) IMG_CACHE.set(name, url) // only cache real URLs — failures stay retryable
         setImg(url)
       })
-      .catch(() => { IMG_CACHE.set(name, null) })
+      .catch(() => {}) // don't cache errors; next mount will retry
   }, [name])
 
   const height = Math.round(width * 1.4)
