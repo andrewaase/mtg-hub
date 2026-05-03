@@ -48,11 +48,12 @@ function collectionRowToCard(row) {
     name:         row.name,
     qty:          row.qty,
     condition:    row.condition,
-    setName:      row.set_name   ?? row.setName   ?? null,
-    img:          row.img        ?? null,
-    colors:       row.colors     ?? [],
-    price:        row.price      ?? null,
+    setName:      row.set_name      ?? row.setName      ?? null,
+    img:          row.img           ?? null,
+    colors:       row.colors        ?? [],
+    price:        row.price         ?? null,
     tcgplayerUrl: row.tcgplayer_url ?? row.tcgplayerUrl ?? null,
+    scryfallId:   row.scryfall_id   ?? row.scryfallId   ?? null,
   }
 }
 
@@ -94,6 +95,8 @@ export async function addCard(card, userId) {
         colors:        card.colors      ?? [],
         price:         card.price       ?? null,
         tcgplayer_url: card.tcgplayerUrl ?? null,
+        // scryfall_id only included when non-null — column must exist in table first
+        ...(card.scryfallId ? { scryfall_id: card.scryfallId } : {}),
       }).select().single()
     if (insertErr) {
       console.error('[db] collection insert error:', insertErr)
@@ -116,8 +119,9 @@ export async function addCard(card, userId) {
 // ── UPDATE COLLECTION CARD ───────────────────────────
 export async function updateCollectionCard(id, patch, userId) {
   const dbPatch = {}
-  if (patch.qty       !== undefined) dbPatch.qty       = patch.qty
-  if (patch.condition !== undefined) dbPatch.condition = patch.condition
+  if (patch.qty        !== undefined) dbPatch.qty         = patch.qty
+  if (patch.condition  !== undefined) dbPatch.condition   = patch.condition
+  if (patch.scryfallId != null)        dbPatch.scryfall_id = patch.scryfallId
   if (hasSupabase && userId && Object.keys(dbPatch).length > 0) {
     await supabase.from('collection').update(dbPatch).eq('id', id).eq('user_id', userId)
   }
@@ -153,6 +157,8 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
           colors:        card.colors        ?? [],
           price:         card.price         ?? null,
           tcgplayer_url: card.tcgplayerUrl  ?? null,
+          // scryfall_id only included when non-null — column must exist in table first
+          ...(card.scryfallId ? { scryfall_id: card.scryfallId } : {}),
         })
       }
     }

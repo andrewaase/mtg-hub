@@ -344,6 +344,7 @@ export default function CameraModal({
         isFoil,
         forSale:      options.forSale || false,
         tcgplayerUrl: snap.purchase_uris?.tcgplayer || null,
+        scryfallId:   snap.id || null,
       }
       const saved = await addCard(card, user?.id)
       setCollection(prev => {

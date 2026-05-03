@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
@@ -232,7 +232,7 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
       const colors = sf?.colors            || sf?.card_faces?.[0]?.colors            || []
       const price  = sf ? (parseFloat(sf.prices?.usd) || null) : null
       const setName = sf?.set_name || row.setName || null
-      return { name: row.name, qty: row.qty, condition: row.condition, setName, img, colors, price }
+      return { name: row.name, qty: row.qty, condition: row.condition, setName, img, colors, price, scryfallId: sf?.id ?? null }
     })
 
     // ── Bulk insert / update ──
@@ -701,6 +701,86 @@ export default function Collection({ collection, setCollection, user, openAddCar
     }))
   }, [collection.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── One-time migration: backfill scryfallId for existing collection cards ──
+  // Runs in the background after collection loads. Uses the Scryfall /cards/collection
+  // batch endpoint (75 per request) to look up Scryfall IDs by card name.
+  // A localStorage flag prevents it from running more than once per browser.
+  const migrationRunRef = useRef(false)
+  useEffect(() => {
+    if (collection.length === 0) return
+    if (migrationRunRef.current) return
+    if (localStorage.getItem('vs-scryfall-id-migration-v1')) return
+
+    const missing = collection.filter(c => !c.scryfallId)
+    if (missing.length === 0) {
+      localStorage.setItem('vs-scryfall-id-migration-v1', '1')
+      return
+    }
+
+    migrationRunRef.current = true
+    let cancelled = false
+
+    ;(async () => {
+      const updates = {} // collectionCardId → scryfallId string
+
+      for (let i = 0; i < missing.length; i += 75) {
+        if (cancelled) return
+        const batch = missing.slice(i, i + 75)
+        try {
+          const res = await fetch('https://api.scryfall.com/cards/collection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifiers: batch.map(c => ({ name: c.name })) }),
+          })
+          if (res.ok) {
+            const { data = [] } = await res.json()
+            for (const sfCard of data) {
+              // Match by name (one Scryfall card can correspond to multiple
+              // collection rows with the same name)
+              batch
+                .filter(c => c.name.toLowerCase() === sfCard.name.toLowerCase())
+                .forEach(c => { updates[String(c.id)] = sfCard.id })
+            }
+          }
+        } catch { /* skip batch on network error */ }
+        if (i + 75 < missing.length) await new Promise(r => setTimeout(r, 120))
+      }
+
+      if (cancelled) return
+
+      if (Object.keys(updates).length > 0) {
+        // Update React state
+        setCollection(prev => prev.map(c => {
+          const sfId = updates[String(c.id)]
+          return sfId ? { ...c, scryfallId: sfId } : c
+        }))
+
+        // Persist to Supabase (signed-in users)
+        if (user?.id) {
+          for (const [id, scryfallId] of Object.entries(updates)) {
+            updateCollectionCard(id, { scryfallId }, user.id).catch(() => {})
+          }
+        }
+
+        // Persist to localStorage (signed-out users)
+        if (!user) {
+          try {
+            const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
+            stored.collection = (stored.collection || []).map(c => {
+              const sfId = updates[String(c.id)]
+              return sfId ? { ...c, scryfallId: sfId } : c
+            })
+            localStorage.setItem('mtg-hub-v1', JSON.stringify(stored))
+          } catch { /* storage full */ }
+        }
+      }
+
+      localStorage.setItem('vs-scryfall-id-migration-v1', '1')
+    })()
+
+    return () => { cancelled = true }
+  }, [collection.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeFilterCount = [
     filterColors.length > 0,
     filterRarity != null,
@@ -1142,7 +1222,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
           filtered.forEach(card => {
             const market = parseFloat(card.price) || 0
             if (market < 1) return
-            const ckBuy = getCKBuyPrice(ckMap, card.name, card.isFoil)
+            const ckBuy = getCKBuyPrice(ckMap, card.name, card.isFoil, card.scryfallId)
             const signal = getSellSignal(ckBuy, market)
             if (!signal) return
             if (signal === 'strong') strongCount++
@@ -1246,7 +1326,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   {(() => {
                     const market = parseFloat(card.price) || 0
                     if (market < 1) return null
-                    const ckBuy = getCKBuyPrice(ckMap, card.name, card.isFoil)
+                    const ckBuy = getCKBuyPrice(ckMap, card.name, card.isFoil, card.scryfallId)
                     const signal = getSellSignal(ckBuy, market)
                     if (!signal) return null
                     return (
@@ -1286,7 +1366,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
             <SellCard
               key={card.id}
               card={card}
-              ckBuyPrice={Object.keys(ckMap).length > 0 ? getCKBuyPrice(ckMap, card.name, card.isFoil) : null}
+              ckBuyPrice={Object.keys(ckMap).length > 0 ? getCKBuyPrice(ckMap, card.name, card.isFoil, card.scryfallId) : null}
               onUpdatePrice={p => updateCard(card.id, { salePrice: p })}
               onUpdateQty={q  => updateCard(card.id, { sellQty: q })}
               onRemoveFromSell={() => updateCard(card.id, { forSale: false })}
