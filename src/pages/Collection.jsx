@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
-import { isEbayConnected, connectEbay, listCardOnEbay } from '../lib/ebay'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
 import SetTracker from '../components/SetTracker'
 import { getCKPriceMap, getCKBuyPrice, getSellSignal } from '../lib/cardkingdom'
@@ -655,7 +654,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [filterType,   setFilterType]   = useState(null)
   const [typeCache,    setTypeCache]    = useState({}) // name.toLowerCase() -> typeLine
   const [typesLoading, setTypesLoading] = useState(false)
-  const [listingId,    setListingId]    = useState(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [refreshProg,  setRefreshProg]  = useState(null)
   // tradeSelect removed — trade binder now uses forTrade flag on each card
@@ -674,8 +672,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
   useEffect(() => {
     getCKPriceMap().then(setCkMap).catch(() => {})
   }, [])
-
-  const ebayConnected = isEbayConnected()
 
   const activeFilterCount = [
     filterColors.length > 0,
@@ -763,12 +759,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
   function handleBackup() {
     exportData([], collection)
     showToast('Backup created')
-  }
-
-  async function handleList(card) {
-    setListingId(card.id)
-    await listCardOnEbay(card, showToast)
-    setListingId(null)
   }
 
   async function handleBulkRefresh() {
@@ -911,12 +901,6 @@ export default function Collection({ collection, setCollection, user, openAddCar
           </button>
         ))}
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
-          {ebayConnected
-            ? <span style={{ fontSize: '.7rem', color: 'var(--accent-green)', fontWeight: 600 }}>✓ eBay</span>
-            : <button className="btn btn-ghost btn-sm" onClick={connectEbay} style={{ fontSize: '.68rem' }}>🔗 eBay</button>
-          }
-        </div>
       </div>
 
       {/* ── Filter row (All + Sell views) ── */}
@@ -1256,27 +1240,19 @@ export default function Collection({ collection, setCollection, user, openAddCar
             borderRadius: 'var(--radius)', padding: '10px 14px',
             display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', fontSize: '.76rem', color: 'var(--text-muted)',
           }}>
-            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> opens the product page to list manually</span>
+            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> — opens the listing page</span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span>📦 <strong style={{ color: 'var(--text-secondary)' }}>eBay Auto-List</strong> creates a draft listing via API</span>
-            {!ebayConnected && (
-              <button className="btn btn-primary btn-sm" onClick={connectEbay} style={{ fontSize: '.68rem', marginLeft: 'auto' }}>
-                🔗 Connect eBay
-              </button>
-            )}
+            <span>💎 <strong style={{ color: 'var(--text-secondary)' }}>CK Buylist</strong> — sell directly to Card Kingdom</span>
           </div>
 
           {filtered.map(card => (
             <SellCard
               key={card.id}
               card={card}
-              ebayConnected={ebayConnected}
-              listing={listingId === card.id}
               ckBuyPrice={Object.keys(ckMap).length > 0 ? getCKBuyPrice(ckMap, card.name, card.isFoil) : null}
               onUpdatePrice={p => updateCard(card.id, { salePrice: p })}
               onUpdateQty={q  => updateCard(card.id, { sellQty: q })}
               onRemoveFromSell={() => updateCard(card.id, { forSale: false })}
-              onList={() => handleList({ ...card })}
             />
           ))}
         </div>
@@ -1304,7 +1280,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
 
 // ── Sell List row ─────────────────────────────────────────────────────────────
 
-function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, onRemoveFromSell, onList, ckBuyPrice }) {
+function SellCard({ card, onUpdatePrice, onUpdateQty, onRemoveFromSell, ckBuyPrice }) {
   const tcgUrl = getTCGPlayerLink(card.name)
   const suggested = suggestPrice(parseFloat(card.price) || 0)
 
@@ -1390,19 +1366,6 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
           >
             💎 CK ${ckBuyPrice.toFixed(2)} →
           </a>
-        )}
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={onList}
-          disabled={!ebayConnected || listing}
-          style={{ fontSize: '.68rem' }}
-        >
-          {listing ? '⏳…' : '📦 eBay'}
-        </button>
-        {!ebayConnected && (
-          <button className="btn btn-ghost btn-sm" onClick={connectEbay} style={{ fontSize: '.6rem', color: 'var(--text-muted)' }}>
-            Connect eBay
-          </button>
         )}
         <button
           className="btn btn-ghost btn-sm"

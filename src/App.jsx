@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, hasSupabase } from './lib/supabase'
 import { getMatches, getCollection, addCard, addMatch } from './lib/db'
-import { handleEbayCallback } from './lib/ebay'
 import { takeSnapshot } from './lib/priceHistory'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -120,17 +119,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  // eBay OAuth callback
-  useEffect(() => {
-    const result = handleEbayCallback()
-    if (result === 'connected') {
-      showToast('eBay account connected! ✓')
-      setPageState('collection')
-    } else if (result?.startsWith('error:')) {
-      const reason = result.split(':')[1]
-      showToast(`eBay connection failed (${reason}). Try again.`)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const showToast = useCallback((msg, duration = 3000) => {
     setToast(msg)

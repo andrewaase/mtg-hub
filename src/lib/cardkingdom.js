@@ -7,7 +7,7 @@ let _ckMap = null // in-memory session cache
 export async function getCKPriceMap() {
   if (_ckMap) return _ckMap
   try {
-    const res = await fetch('https://api.cardkingdom.com/api/pricelist')
+    const res = await fetch('/.netlify/functions/ck-prices')
     if (!res.ok) return {}
     const { data } = await res.json()
     const map = {}
