@@ -466,9 +466,11 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
 }
 
 function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
-  const [scryfallData, setScryfallData] = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [editQty,      setEditQty]      = useState(card.qty)
+  const [scryfallData,  setScryfallData]  = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [editQty,       setEditQty]       = useState(card.qty)
+  const [localForSale,  setLocalForSale]  = useState(!!card.forSale)
+  const [localForTrade, setLocalForTrade] = useState(!!card.forTrade)
 
   useEffect(() => {
     const url = card.scryfallId
@@ -590,9 +592,47 @@ function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
               <div style={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--accent-gold)' }}>${parseFloat(card.price).toFixed(2)}</div>
             )}
 
+            {/* ── Binder toggles ── */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button
+                onClick={() => {
+                  const next = !localForTrade
+                  setLocalForTrade(next)
+                  onUpdateCard?.(card.id, { forTrade: next })
+                }}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 8,
+                  border: `1.5px solid ${localForTrade ? 'var(--accent-teal)' : 'var(--border)'}`,
+                  background: localForTrade ? 'rgba(20,184,166,.12)' : 'var(--bg-secondary)',
+                  color: localForTrade ? 'var(--accent-teal)' : 'var(--text-secondary)',
+                  fontWeight: localForTrade ? 700 : 400, fontSize: '.78rem',
+                  cursor: 'pointer', transition: 'all .15s',
+                }}
+              >
+                {localForTrade ? '✓ Trade Binder' : '⇄ Trade Binder'}
+              </button>
+              <button
+                onClick={() => {
+                  const next = !localForSale
+                  setLocalForSale(next)
+                  onUpdateCard?.(card.id, { forSale: next })
+                }}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 8,
+                  border: `1.5px solid ${localForSale ? 'var(--accent-gold)' : 'var(--border)'}`,
+                  background: localForSale ? 'rgba(202,138,4,.12)' : 'var(--bg-secondary)',
+                  color: localForSale ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                  fontWeight: localForSale ? 700 : 400, fontSize: '.78rem',
+                  cursor: 'pointer', transition: 'all .15s',
+                }}
+              >
+                {localForSale ? '✓ Sell Binder' : '🏷️ Sell Binder'}
+              </button>
+            </div>
+
             <button
               onClick={() => { onRemove(card.id); onClose() }}
-              style={{ marginTop: 'auto', padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#f87171', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer', alignSelf: 'flex-start' }}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#f87171', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer', alignSelf: 'flex-start' }}
             >
               Remove from collection
             </button>
@@ -618,7 +658,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [listingId,    setListingId]    = useState(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [refreshProg,  setRefreshProg]  = useState(null)
-  const [tradeSelect,  setTradeSelect]  = useState(new Set())
+  // tradeSelect removed — trade binder now uses forTrade flag on each card
   const [ckMap,        setCkMap]        = useState({})
   const [selectedCard, setSelectedCard] = useState(null)
 
@@ -694,8 +734,9 @@ export default function Collection({ collection, setCollection, user, openAddCar
     const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
     stored.collection = next
     localStorage.setItem('mtg-hub-v1', JSON.stringify(stored))
-    // Persist qty / condition changes to Supabase
-    if (patch.qty !== undefined || patch.condition !== undefined) {
+    // Persist qty / condition / binder changes to Supabase
+    if (patch.qty !== undefined || patch.condition !== undefined ||
+        patch.forSale !== undefined || patch.forTrade !== undefined) {
       updateCollectionCard(id, patch, user?.id).catch(e => console.warn('[updateCard]', e))
     }
   }
@@ -754,16 +795,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
     setRefreshProg(null)
   }
 
-  // ── Trade ─────────────────────────────────────────────────────────────────
-  function toggleTradeSelect(id) {
-    setTradeSelect(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const tradeCards  = collection.filter(c => tradeSelect.has(c.id))
+  // ── Trade binder ──────────────────────────────────────────────────────────
+  const tradeCards  = collection.filter(c => c.forTrade)
   const tradeValue  = tradeCards.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
 
   function copyTradeList() {
@@ -805,9 +838,10 @@ export default function Collection({ collection, setCollection, user, openAddCar
     return base
   }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice, filterType, typeCache])
 
-  const total        = collection.reduce((s, c) => s + (c.qty || 1), 0)
-  const totalValue   = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
-  const forSaleCount = collection.filter(c => c.forSale).length
+  const total         = collection.reduce((s, c) => s + (c.qty || 1), 0)
+  const totalValue    = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
+  const forSaleCount  = collection.filter(c => c.forSale).length
+  const forTradeCount = tradeCards.length
 
   return (
     <div>
@@ -859,8 +893,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
         {[
           ['all',   `All (${collection.length})`],
           ['sell',  `🏷️ Sell${forSaleCount > 0 ? ` (${forSaleCount})` : ''}`],
-          ['trade', '⚖️ Trade'],
-          ['sets',  '🗺️ Sets'],
+          ['trade', `⚖️ Trade${forTradeCount > 0 ? ` (${forTradeCount})` : ''}`],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -1010,81 +1043,44 @@ export default function Collection({ collection, setCollection, user, openAddCar
         </div>
       )}
 
-      {/* ── Set Tracker ── */}
-      {view === 'sets' && (
-        <div style={{ marginTop: '20px' }}>
-          <SetTracker collection={collection} />
-        </div>
-      )}
-
-      {/* ── Trade Calculator ── */}
+      {/* ── Trade Binder ── */}
       {view === 'trade' && (
         <div style={{ marginTop: '16px' }}>
-          {tradeSelect.size > 0 && (
-            <div style={{
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              borderRadius: '12px', padding: '12px 16px', marginBottom: '16px',
-              display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Trade Value</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
-                  ${tradeValue.toFixed(2)}
-                </div>
-                <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>
-                  {tradeSelect.size} card{tradeSelect.size !== 1 ? 's' : ''} selected
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary btn-sm" onClick={copyTradeList}>📋 Copy List</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setTradeSelect(new Set())}>Clear</button>
-              </div>
+          {forTradeCount === 0 ? (
+            <div className="empty-state" style={{ padding: '60px 20px' }}>
+              <div className="empty-icon">⚖️</div>
+              <p>Trade binder is empty.<br />Click any card and tap <strong>Trade Binder</strong> to add it.</p>
+              <button className="btn btn-ghost" onClick={() => setView('all')} style={{ marginTop: '16px' }}>← All Cards</button>
             </div>
-          )}
-
-          {collection.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon">⚖️</div><p>Add cards to use the trade calculator.</p></div>
           ) : (
             <>
-              <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                Tap cards to add them to your trade pile.
+              {/* Summary bar */}
+              <div style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: '12px', padding: '12px 16px', marginBottom: '16px',
+                display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Trade Value</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
+                    ${tradeValue.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>
+                    {forTradeCount} card{forTradeCount !== 1 ? 's' : ''} in binder
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={copyTradeList}>📋 Copy List</button>
               </div>
-              <div className="collection-grid">
-                {collection.map(card => {
-                  const sel = tradeSelect.has(card.id)
-                  return (
-                    <div
-                      key={card.id}
-                      onClick={() => toggleTradeSelect(card.id)}
-                      style={{
-                        position: 'relative',
-                        background: sel ? 'rgba(201,168,76,.12)' : 'var(--bg-card)',
-                        border: `2px solid ${sel ? 'var(--accent-gold)' : 'var(--border)'}`,
-                        borderRadius: '12px', overflow: 'hidden', cursor: 'pointer',
-                        transition: 'all .15s', transform: sel ? 'translateY(-2px)' : 'none',
-                        boxShadow: sel ? '0 4px 16px rgba(201,168,76,.2)' : 'none',
-                      }}
-                    >
-                      {card.img && <img src={card.img} alt={card.name} style={{ width: '100%', display: 'block' }} />}
-                      <div style={{ padding: '6px 8px' }}>
-                        <div style={{ fontSize: '.74rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>{card.name}</div>
-                        {card.price != null && (
-                          <div style={{ fontSize: '.68rem', color: 'var(--accent-gold)', fontWeight: 700 }}>
-                            ${parseFloat(card.price).toFixed(2)}
-                          </div>
-                        )}
-                      </div>
-                      {sel && (
-                        <div style={{
-                          position: 'absolute', top: '6px', right: '6px',
-                          background: 'var(--accent-gold)', borderRadius: '50%',
-                          width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '.7rem', fontWeight: 800, color: '#1a1000',
-                        }}>✓</div>
-                      )}
-                    </div>
-                  )
-                })}
+
+              {/* Card rows */}
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {tradeCards.map(card => (
+                  <TradeCard
+                    key={card.id}
+                    card={card}
+                    onRemove={() => updateCard(card.id, { forTrade: false })}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -1109,7 +1105,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
       {view === 'sell' && filtered.length === 0 && !search && activeFilterCount === 0 && (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
           <div className="empty-icon">🏷️</div>
-          <p>No cards marked for sale yet.<br />Tap the 🏷️ on any card to list it.</p>
+          <p>Sell binder is empty.<br />Click any card and tap <strong>Sell Binder</strong> to add it.</p>
           <button className="btn btn-ghost" onClick={() => setView('all')} style={{ marginTop: '16px' }}>← All Cards</button>
         </div>
       )}
@@ -1276,6 +1272,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
               card={card}
               ebayConnected={ebayConnected}
               listing={listingId === card.id}
+              ckBuyPrice={Object.keys(ckMap).length > 0 ? getCKBuyPrice(ckMap, card.name, card.isFoil) : null}
               onUpdatePrice={p => updateCard(card.id, { salePrice: p })}
               onUpdateQty={q  => updateCard(card.id, { sellQty: q })}
               onRemoveFromSell={() => updateCard(card.id, { forSale: false })}
@@ -1307,7 +1304,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
 
 // ── Sell List row ─────────────────────────────────────────────────────────────
 
-function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, onRemoveFromSell, onList }) {
+function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, onRemoveFromSell, onList, ckBuyPrice }) {
   const tcgUrl = getTCGPlayerLink(card.name)
   const suggested = suggestPrice(parseFloat(card.price) || 0)
 
@@ -1335,6 +1332,12 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
             <span>Market: ${parseFloat(card.price).toFixed(2)}</span>
             {suggested != null && (
               <span style={{ color: 'var(--accent-teal)' }}>Suggested: ${suggested.toFixed(2)}</span>
+            )}
+            {ckBuyPrice != null && (
+              <span style={{ color: '#4ade80', fontWeight: 700 }}>
+                CK Buylist: ${ckBuyPrice.toFixed(2)}
+                {ckBuyPrice / (parseFloat(card.price) || Infinity) >= 0.75 && ' 🔥'}
+              </span>
             )}
           </div>
         )}
@@ -1377,6 +1380,17 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
         >
           🏪 TCGPlayer →
         </a>
+        {ckBuyPrice != null && (
+          <a
+            href={`https://www.cardkingdom.com/purchasing/mtg_singles?filter[search]=name&filter[name]=${encodeURIComponent(card.name)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: '.68rem', textAlign: 'center', textDecoration: 'none', display: 'block', color: '#4ade80', borderColor: 'rgba(74,222,128,.3)' }}
+          >
+            💎 CK ${ckBuyPrice.toFixed(2)} →
+          </a>
+        )}
         <button
           className="btn btn-primary btn-sm"
           onClick={onList}
@@ -1398,6 +1412,51 @@ function SellCard({ card, ebayConnected, listing, onUpdatePrice, onUpdateQty, on
           ✕
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Trade Binder row ──────────────────────────────────────────────────────────
+function TradeCard({ card, onRemove }) {
+  return (
+    <div style={{
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)', padding: '12px 14px',
+      display: 'grid',
+      gridTemplateColumns: 'auto 1fr auto auto',
+      alignItems: 'center', gap: '10px',
+    }}>
+      {card.img
+        ? <img src={card.img} alt={card.name} style={{ width: '42px', borderRadius: '4px', flexShrink: 0 }} />
+        : <div style={{ width: '42px', height: '60px', background: 'var(--bg-secondary)', borderRadius: '4px', flexShrink: 0 }} />
+      }
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: '.86rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{card.name}</div>
+        <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+          {card.setName} · <span style={{ color: 'var(--text-secondary)' }}>{card.condition || 'NM'}</span>
+          {card.isFoil && <span style={{ color: 'var(--accent-purple)', marginLeft: '4px' }}>✦ Foil</span>}
+        </div>
+        {card.qty > 1 && (
+          <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginTop: 1 }}>×{card.qty} copies</div>
+        )}
+      </div>
+      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--accent-gold)', flexShrink: 0 }}>
+        {card.price != null ? `$${parseFloat(card.price).toFixed(2)}` : '—'}
+      </div>
+      <button
+        onClick={onRemove}
+        title="Remove from trade binder"
+        style={{
+          background: 'none', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '6px 10px',
+          color: 'var(--text-muted)', cursor: 'pointer', fontSize: '.78rem',
+          flexShrink: 0, transition: 'color .15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+      >
+        ✕
+      </button>
     </div>
   )
 }
