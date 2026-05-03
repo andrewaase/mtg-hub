@@ -22,14 +22,17 @@ export async function getCKPriceMap() {
     for (const item of data) {
       const key = (item.name || '').toLowerCase().trim()
       if (!map[key]) map[key] = {}
-      const price = parseFloat(item.buy_price) || 0
+      // CK API uses price_buy / price_retail / is_foil (string 'true'/'false')
+      const buyPrice  = parseFloat(item.price_buy)    || 0
+      const sellPrice = parseFloat(item.price_retail) || 0
+      const isFoil    = item.is_foil === 'true' || item.is_foil === true
       // Use Math.max so a card with multiple printings keeps the best buylist price
-      if (item.foil) {
-        map[key].buyFoil  = Math.max(map[key].buyFoil  || 0, price)
-        map[key].sellFoil = Math.max(map[key].sellFoil || 0, parseFloat(item.sell_price) || 0)
+      if (isFoil) {
+        map[key].buyFoil  = Math.max(map[key].buyFoil  || 0, buyPrice)
+        map[key].sellFoil = Math.max(map[key].sellFoil || 0, sellPrice)
       } else {
-        map[key].buyNormal  = Math.max(map[key].buyNormal  || 0, price)
-        map[key].sellNormal = Math.max(map[key].sellNormal || 0, parseFloat(item.sell_price) || 0)
+        map[key].buyNormal  = Math.max(map[key].buyNormal  || 0, buyPrice)
+        map[key].sellNormal = Math.max(map[key].sellNormal || 0, sellPrice)
       }
     }
     _ckMap = map
