@@ -1,12 +1,16 @@
 // Fetches and caches Star City Games buylist prices.
-// Data comes from our Netlify proxy (/.netlify/functions/scg-prices)
-// which queries their Meilisearch API at search.starcitygames.com.
-// Only MTG singles (game_id=1, non-foil, is_buying=1) are included.
+// Data comes from /.netlify/functions/scg-prices which queries their Meilisearch API.
+// Only MTG non-foil base-printing (card_style_ids=[]) is_buying=1 singles are included.
+//
+// The price map has two levels of keys:
+//   "name|setName"  — exact printing match (preferred)
+//   "name"          — best price across all sets (fallback)
 
-let _scgMap = null // name-keyed map: cardName.toLowerCase() → { buyCash, buyTrade, hotlist }
+let _nameMap  = null // cardName.lower → {buyCash, buyTrade, hotlist}
+let _setMap   = null // "cardName.lower|setName.lower" → {buyCash, buyTrade, hotlist}
 
 export async function getSCGPriceMap() {
-  if (_scgMap) return _scgMap
+  if (_nameMap) return _nameMap // already loaded
   try {
     const res = await fetch('/.netlify/functions/scg-prices').catch(() => null)
     if (!res || !res.ok) return {}
@@ -14,39 +18,56 @@ export async function getSCGPriceMap() {
     const { data = [] } = await res.json()
     console.log(`[SCG] loaded ${data.length} entries`)
 
-    const map = {}
+    const nameMap = {}
+    const setMap  = {}
+
     for (const item of data) {
-      const key = (item.name || '').toLowerCase().trim()
-      // Keep the best (highest) cash buy price in case of duplicates
-      if (!map[key] || (item.buyCash || 0) > map[key].buyCash) {
-        map[key] = {
-          buyCash:  item.buyCash  || 0,
-          buyTrade: item.buyTrade || 0,
-          hotlist:  !!item.hotlist,
-        }
+      const nk  = (item.name    || '').toLowerCase().trim()
+      const sk  = `${nk}|${(item.setName || '').toLowerCase().trim()}`
+      const val = { buyCash: item.buyCash || 0, buyTrade: item.buyTrade || 0, hotlist: !!item.hotlist }
+
+      // Name + set (exact printing)
+      if (!setMap[sk] || val.buyCash > setMap[sk].buyCash) {
+        setMap[sk] = val
+      }
+      // Name-only fallback
+      if (!nameMap[nk] || val.buyCash > nameMap[nk].buyCash) {
+        nameMap[nk] = val
       }
     }
 
-    _scgMap = map
-    return _scgMap
+    _nameMap = nameMap
+    _setMap  = setMap
+    return _nameMap
   } catch (err) {
     console.error('[SCG] failed to load price map:', err)
     return {}
   }
 }
 
-// Returns the NM cash buy price or null if SCG isn't buying this card.
-export function getSCGBuyPrice(scgMap, cardName) {
-  const entry = scgMap[(cardName || '').toLowerCase().trim()]
+// Returns the NM cash buy price for this card, or null if SCG isn't buying it.
+// Tries name+setName first (exact printing), falls back to name-only.
+export function getSCGBuyPrice(nameMap, cardName, setName) {
+  if (_setMap && setName) {
+    const sk    = `${(cardName || '').toLowerCase().trim()}|${setName.toLowerCase().trim()}`
+    const exact = _setMap[sk]
+    if (exact && exact.buyCash > 0) return exact.buyCash
+  }
+  const entry = nameMap[(cardName || '').toLowerCase().trim()]
   return entry && entry.buyCash > 0 ? entry.buyCash : null
 }
 
-// True when SCG has marked this card as a hotlist item (premium buy).
-export function isSCGHotlist(scgMap, cardName) {
-  return !!scgMap[(cardName || '').toLowerCase().trim()]?.hotlist
+// True when SCG has this card on their hotlist (premium buy price).
+export function isSCGHotlist(nameMap, cardName, setName) {
+  if (_setMap && setName) {
+    const sk = `${(cardName || '').toLowerCase().trim()}|${setName.toLowerCase().trim()}`
+    if (_setMap[sk]) return !!_setMap[sk].hotlist
+  }
+  return !!nameMap[(cardName || '').toLowerCase().trim()]?.hotlist
 }
 
-// Deep-link into the SCG sell page searching for this card.
-export function getSCGBuylistLink(cardName) {
-  return `https://sellyourcards.starcitygames.com/?q=${encodeURIComponent(cardName)}`
+// Links to the SCG sell portal's MTG page — no URL-based card search is supported
+// since it's a client-side SPA, so we go straight to /mtg rather than the homepage.
+export function getSCGBuylistLink() {
+  return 'https://sellyourcards.starcitygames.com/mtg'
 }

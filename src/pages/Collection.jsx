@@ -1437,9 +1437,9 @@ export default function Collection({ collection, setCollection, user, openAddCar
               key={card.id}
               card={card}
               ckBuyPrice={Object.keys(ckMap).length > 0 ? getCKBuyPrice(ckMap, card.name, card.isFoil, card.scryfallId) : null}
-              abuBuyPrice={Object.keys(abuMap).length > 0 ? getABUBuyPrice(abuMap, card.name) : null}
-              scgBuyPrice={Object.keys(scgMap).length > 0 ? getSCGBuyPrice(scgMap, card.name) : null}
-              scgHotlist={Object.keys(scgMap).length > 0 ? isSCGHotlist(scgMap, card.name) : false}
+              abuBuyPrice={Object.keys(abuMap).length > 0 ? getABUBuyPrice(abuMap, card.name, card.setName) : null}
+              scgBuyPrice={Object.keys(scgMap).length > 0 ? getSCGBuyPrice(scgMap, card.name, card.setName) : null}
+              scgHotlist={Object.keys(scgMap).length > 0 ? isSCGHotlist(scgMap, card.name, card.setName) : false}
               onUpdatePrice={p => updateCard(card.id, { salePrice: p })}
               onUpdateQty={q  => updateCard(card.id, { sellQty: q })}
               onRemoveFromSell={() => updateCard(card.id, { forSale: false })}
@@ -1575,7 +1575,7 @@ function SellCard({ card, onUpdatePrice, onUpdateQty, onRemoveFromSell, ckBuyPri
         )}
         {scgBuyPrice != null && (
           <a
-            href={getSCGBuylistLink(card.name)}
+            href={getSCGBuylistLink()}
             target="_blank" rel="noopener noreferrer"
             className="btn btn-ghost btn-sm"
             style={{ fontSize: '.68rem', textAlign: 'center', textDecoration: 'none', display: 'block', color: scgHotlist ? '#f97316' : '#a78bfa', borderColor: scgHotlist ? 'rgba(249,115,22,.3)' : 'rgba(167,139,250,.3)' }}

@@ -1,12 +1,16 @@
 // Fetches and caches ABU Games buylist prices.
-// Data comes from our Netlify proxy (/.netlify/functions/abu-prices)
-// which queries their public Solr API at data.abugames.com.
-// Only NM non-foil cards with buy_price >= $1 are included.
+// Data comes from /.netlify/functions/abu-prices which queries their public Solr API.
+// Only NM non-foil base-printing cards with buy_price >= $1 are included.
+//
+// The price map has two levels of keys:
+//   "name|edition"  — exact printing match (preferred)
+//   "name"          — best price across all sets (fallback)
 
-let _abuMap = null // name-keyed map: cardName.toLowerCase() → { buyCash, buyTrade }
+let _nameMap    = null // cardName.lower → {buyCash, buyTrade}
+let _editionMap = null // "cardName.lower|edition.lower" → {buyCash, buyTrade}
 
 export async function getABUPriceMap() {
-  if (_abuMap) return _abuMap
+  if (_nameMap) return _nameMap // already loaded
   try {
     const res = await fetch('/.netlify/functions/abu-prices').catch(() => null)
     if (!res || !res.ok) return {}
@@ -14,35 +18,48 @@ export async function getABUPriceMap() {
     const { data = [] } = await res.json()
     console.log(`[ABU] loaded ${data.length} entries`)
 
-    const map = {}
+    const nameMap    = {}
+    const editionMap = {}
+
     for (const item of data) {
-      const key = (item.name || '').toLowerCase().trim()
-      // Keep the best (highest) cash buy price in case of duplicates
-      if (!map[key] || (item.buyCash || 0) > map[key].buyCash) {
-        map[key] = {
-          buyCash:  item.buyCash  || 0,
-          buyTrade: item.buyTrade || 0,
-        }
+      const nk  = (item.name    || '').toLowerCase().trim()
+      const ek  = `${nk}|${(item.edition || '').toLowerCase().trim()}`
+      const val = { buyCash: item.buyCash || 0, buyTrade: item.buyTrade || 0 }
+
+      // Name + edition (exact printing)
+      if (!editionMap[ek] || val.buyCash > editionMap[ek].buyCash) {
+        editionMap[ek] = val
+      }
+      // Name-only fallback (best across all sets)
+      if (!nameMap[nk] || val.buyCash > nameMap[nk].buyCash) {
+        nameMap[nk] = val
       }
     }
 
-    _abuMap = map
-    return _abuMap
+    _nameMap    = nameMap
+    _editionMap = editionMap
+    return _nameMap
   } catch (err) {
     console.error('[ABU] failed to load price map:', err)
     return {}
   }
 }
 
-// Returns the NM cash buy price or null if ABU isn't buying this card.
-export function getABUBuyPrice(abuMap, cardName) {
-  const entry = abuMap[(cardName || '').toLowerCase().trim()]
+// Returns the NM cash buy price for this card, or null if ABU isn't buying it.
+// Tries name+setName first (exact printing), falls back to name-only.
+export function getABUBuyPrice(nameMap, cardName, setName) {
+  if (_editionMap && setName) {
+    const ek    = `${(cardName || '').toLowerCase().trim()}|${setName.toLowerCase().trim()}`
+    const exact = _editionMap[ek]
+    if (exact && exact.buyCash > 0) return exact.buyCash
+  }
+  const entry = nameMap[(cardName || '').toLowerCase().trim()]
   return entry && entry.buyCash > 0 ? entry.buyCash : null
 }
 
 // Deep-link into the ABU buylist filtered to this card name.
+// ABU uses JSON-array encoded filter params: display_title=["Lightning Bolt"]
 export function getABUBuylistLink(cardName) {
-  // ABU uses JSON-array encoded filter params: display_title=["Lightning Bolt"]
   const encoded = encodeURIComponent(JSON.stringify([cardName]))
   return `https://www.abugames.com/buylist/magic-the-gathering/singles?display_title=${encoded}`
 }

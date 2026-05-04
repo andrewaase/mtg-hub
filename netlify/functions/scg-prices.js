@@ -1,8 +1,10 @@
 // netlify/functions/scg-prices.js
 // Proxies the Star City Games buylist API to avoid CORS.
 // The bearer token is the public key embedded in sellyourcards.starcitygames.com/js/app.js
-// Uses parallel page fetching to stay well within function timeout.
-// Cached in-memory for 1 hour per warm function instance.
+// Filters to base-printing only (card_style_ids = []) to avoid returning extended art /
+// borderless / showcase prices for standard cards.
+// Returns [{name, setName, buyCash, buyTrade, hotlist}] for name+set matching.
+// Uses parallel page fetching. Cached in-memory for 1 hour.
 
 const SCG_SEARCH = 'https://search.starcitygames.com/indexes/sell_list_products_v2/search'
 const SCG_BEARER = '93ea1c4b1d97ce79e8cb8b860a3b20b1493b2d3eb0fb647590409bf03bf2ffca'
@@ -20,7 +22,8 @@ function fetchPage(offset) {
       'Authorization': `Bearer ${SCG_BEARER}`,
     },
     body: JSON.stringify({
-      filter: 'is_buying = 1 AND game_id = 1 AND finish = 1',
+      // finish=1 = non-foil; card_style_ids IS EMPTY = base printing only
+      filter: 'is_buying = 1 AND game_id = 1 AND finish = 1 AND card_style_ids IS EMPTY',
       limit:  LIMIT,
       offset,
     }),
@@ -35,10 +38,11 @@ function hitsToData(hits) {
     const buyTrade  = nmVariant?.trade_price ?? 0
     if (buyCash <= 0) continue
     data.push({
-      name:     hit.name,
+      name:    hit.name,
+      setName: hit.set_name || '',
       buyCash,
       buyTrade,
-      hotlist:  !!hit.hotlist,
+      hotlist: !!hit.hotlist,
     })
   }
   return data
@@ -77,7 +81,7 @@ exports.handler = async () => {
     _cache    = body
     _cachedAt = Date.now()
 
-    console.log(`[SCG] fetched ${data.length} entries across ${pageCount} pages`)
+    console.log(`[SCG] fetched ${total} base-printing records → ${data.length} buying entries across ${pageCount} pages`)
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' },
