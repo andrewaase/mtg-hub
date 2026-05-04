@@ -49,6 +49,7 @@ function collectionRowToCard(row) {
     qty:          row.qty,
     condition:    row.condition,
     setName:      row.set_name      ?? row.setName      ?? null,
+    isFoil:       row.is_foil       ?? row.isFoil       ?? false,
     img:          row.img           ?? null,
     colors:       row.colors        ?? [],
     price:        row.price         ?? null,
@@ -95,8 +96,9 @@ export async function addCard(card, userId) {
         colors:        card.colors      ?? [],
         price:         card.price       ?? null,
         tcgplayer_url: card.tcgplayerUrl ?? null,
-        // scryfall_id only included when non-null — column must exist in table first
-        ...(card.scryfallId ? { scryfall_id: card.scryfallId } : {}),
+        // scryfall_id / is_foil only included when non-null — columns must exist in table first
+        ...(card.scryfallId     ? { scryfall_id: card.scryfallId }  : {}),
+        ...(card.isFoil != null ? { is_foil: !!card.isFoil }        : {}),
       }).select().single()
     if (insertErr) {
       console.error('[db] collection insert error:', insertErr)
@@ -157,8 +159,8 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
           colors:        card.colors        ?? [],
           price:         card.price         ?? null,
           tcgplayer_url: card.tcgplayerUrl  ?? null,
-          // scryfall_id only included when non-null — column must exist in table first
-          ...(card.scryfallId ? { scryfall_id: card.scryfallId } : {}),
+          ...(card.scryfallId     ? { scryfall_id: card.scryfallId } : {}),
+          ...(card.isFoil != null ? { is_foil: !!card.isFoil }       : {}),
         })
       }
     }
