@@ -136,6 +136,19 @@ export default function App() {
 
   // Load data, then take price snapshot + check wishlist alerts
   useEffect(() => {
+    // forSale / forTrade live in localStorage (not Supabase) — reapply them every time
+    // the collection is loaded fresh so they survive page refreshes.
+    function withBinders(cards) {
+      try {
+        const binders = JSON.parse(localStorage.getItem('mtg-hub-binders') || '{}')
+        if (Object.keys(binders).length === 0) return cards
+        return cards.map(card => {
+          const b = binders[String(card.id)]
+          return b ? { ...card, forSale: b.forSale ?? false, forTrade: b.forTrade ?? false } : card
+        })
+      } catch { return cards }
+    }
+
     async function load() {
       setLoading(true)
       const [m, c] = await Promise.all([getMatches(user?.id), getCollection(user?.id)])
@@ -151,7 +164,7 @@ export default function App() {
             if (c.length === 0 && lsCards.length > 0) {
               await Promise.all(lsCards.map(card => addCard(card, user.id)))
               const migrated = await getCollection(user.id)
-              setCollection(migrated)
+              setCollection(withBinders(migrated))
               setMatches(m.length === 0 && lsMatches.length > 0
                 ? await Promise.all(lsMatches.map(match => addMatch(match, user.id))).then(() => getMatches(user.id))
                 : m
@@ -168,7 +181,7 @@ export default function App() {
       }
 
       setMatches(m)
-      setCollection(c)
+      setCollection(withBinders(c))
       setLoading(false)
 
       // Daily portfolio snapshot (no-op if already taken today)

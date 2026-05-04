@@ -691,21 +691,23 @@ export default function Collection({ collection, setCollection, user, openAddCar
     getSCGPriceMap().then(setScgMap).catch(() => {})
   }, [])
 
-  // Restore forSale / forTrade flags from dedicated localStorage binder store.
-  // Runs whenever collection.length changes (initial load, card add/remove).
-  // Length-dep avoids re-firing after our own setCollection call below.
+  // Safety-net: re-apply binder flags if a card was added mid-session (length increases)
+  // and didn't arrive with forSale/forTrade already set.
+  // The primary restore happens in App.jsx → withBinders() on every load.
   useEffect(() => {
     if (collection.length === 0) return
     const binders = readBinders()
     if (Object.keys(binders).length === 0) return
+    // Only patch cards that are missing their flags (avoids no-op re-renders)
+    const needsPatch = collection.some(c => {
+      const b = binders[String(c.id)]
+      return b && ((!c.forSale && b.forSale) || (!c.forTrade && b.forTrade))
+    })
+    if (!needsPatch) return
     setCollection(prev => prev.map(c => {
       const b = binders[String(c.id)]
       if (!b) return c
-      return {
-        ...c,
-        forSale:  b.forSale  ?? !!c.forSale,
-        forTrade: b.forTrade ?? !!c.forTrade,
-      }
+      return { ...c, forSale: b.forSale ?? !!c.forSale, forTrade: b.forTrade ?? !!c.forTrade }
     }))
   }, [collection.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
