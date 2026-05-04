@@ -3,6 +3,8 @@ import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../l
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
 import { getCKPriceMap, getCKBuyPrice, getSellSignal } from '../lib/cardkingdom'
+import { getABUPriceMap, getABUBuyPrice, getABUBuylistLink } from '../lib/abugames'
+import { getSCGPriceMap, getSCGBuyPrice, isSCGHotlist, getSCGBuylistLink } from '../lib/starcitygames'
 
 const COLOR_OPTIONS = [
   { id: 'W', label: '☀️ White' },
@@ -668,6 +670,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [refreshProg,  setRefreshProg]  = useState(null)
   // tradeSelect removed — trade binder now uses forTrade flag on each card
   const [ckMap,        setCkMap]        = useState({})
+  const [abuMap,       setAbuMap]       = useState({})
+  const [scgMap,       setScgMap]       = useState({})
   const [selectedCard, setSelectedCard] = useState(null)
 
   // ── Filter state ──
@@ -677,10 +681,14 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [filterFoil,      setFilterFoil]      = useState(null)   // 'foil' | 'nonfoil' | null
   const [filterMinPrice,  setFilterMinPrice]  = useState('')
   const [filterMaxPrice,  setFilterMaxPrice]  = useState('')
+  const [filterSignal,    setFilterSignal]    = useState(null)   // null | 'good' | 'strong'
+  const [sortBy,          setSortBy]          = useState('name_asc')
 
-  // Load CK prices in background on mount
+  // Load buylist price maps in background on mount
   useEffect(() => {
     getCKPriceMap().then(setCkMap).catch(() => {})
+    getABUPriceMap().then(setAbuMap).catch(() => {})
+    getSCGPriceMap().then(setScgMap).catch(() => {})
   }, [])
 
   // Restore forSale / forTrade flags from dedicated localStorage binder store.
@@ -789,6 +797,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
     filterType != null,
     filterMinPrice !== '',
     filterMaxPrice !== '',
+    filterSignal != null,
   ].filter(Boolean).length
 
   function clearFilters() {
@@ -799,6 +808,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
     setFilterType(null)
     setFilterMinPrice('')
     setFilterMaxPrice('')
+    setFilterSignal(null)
   }
 
   // Lazy-fetch card types from Scryfall when type filter is activated
@@ -942,8 +952,23 @@ export default function Collection({ collection, setCollection, user, openAddCar
         return tl.includes(filterType)
       })
     }
-    return base
-  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice, filterType, typeCache])
+    if (filterSignal && Object.keys(ckMap).length > 0) {
+      base = base.filter(c => {
+        const market = parseFloat(c.price) || 0
+        if (market < 1) return false
+        const ckBuy = getCKBuyPrice(ckMap, c.name, c.isFoil, c.scryfallId)
+        return getSellSignal(ckBuy, market) === filterSignal
+      })
+    }
+    // ── Sort ──
+    const sorted = [...base]
+    if (sortBy === 'name_asc')  sorted.sort((a, b) => a.name.localeCompare(b.name))
+    if (sortBy === 'name_desc') sorted.sort((a, b) => b.name.localeCompare(a.name))
+    if (sortBy === 'price_desc') sorted.sort((a, b) => (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0))
+    if (sortBy === 'price_asc')  sorted.sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0))
+    if (sortBy === 'qty_desc')   sorted.sort((a, b) => (b.qty || 1) - (a.qty || 1))
+    return sorted
+  }, [collection, view, search, filterColors, filterRarity, filterCondition, filterFoil, filterMinPrice, filterMaxPrice, filterType, typeCache, filterSignal, sortBy, ckMap])
 
   const total         = collection.reduce((s, c) => s + (c.qty || 1), 0)
   const totalValue    = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
@@ -1023,7 +1048,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
       {/* ── Filter row (All + Sell views) ── */}
       {(view === 'all' || view === 'sell') && (
         <div style={{ marginTop: '12px', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: showFilters ? '12px' : '0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: showFilters ? '12px' : '0', flexWrap: 'wrap' }}>
             <button
               onClick={() => setShowFilters(f => !f)}
               style={{
@@ -1057,6 +1082,22 @@ export default function Collection({ collection, setCollection, user, openAddCar
                 Clear all
               </button>
             )}
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              style={{
+                background: 'var(--bg-secondary)', border: '1.5px solid var(--border)',
+                borderRadius: '99px', color: 'var(--text-secondary)',
+                padding: '5px 10px', fontSize: '.73rem', cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="name_asc">A → Z</option>
+              <option value="name_desc">Z → A</option>
+              <option value="price_desc">Price ↓</option>
+              <option value="price_asc">Price ↑</option>
+              <option value="qty_desc">Qty ↓</option>
+            </select>
             <span style={{ marginLeft: 'auto', fontSize: '.72rem', color: 'var(--text-muted)' }}>
               {filtered.length} result{filtered.length !== 1 ? 's' : ''}
             </span>
@@ -1139,6 +1180,19 @@ export default function Collection({ collection, setCollection, user, openAddCar
                   </div>
                 </div>
               </div>
+
+              {/* Sell Signal */}
+              {Object.keys(ckMap).length > 0 && (
+                <div>
+                  <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>CK Sell Signal</div>
+                  <ChipRow
+                    options={['strong', 'good']}
+                    value={filterSignal}
+                    onChange={setFilterSignal}
+                    labelFn={v => v === 'strong' ? '🔥 Strong (≥80%)' : '💰 Good (≥65%)'}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1247,22 +1301,34 @@ export default function Collection({ collection, setCollection, user, openAddCar
               }}>
                 <span style={{ fontWeight: 800 }}>💰 Sell Signals</span>
                 {strongCount > 0 && (
-                  <span style={{
-                    background: '#16a34a', color: '#fff',
-                    borderRadius: '4px', padding: '1px 7px',
-                    fontSize: '.68rem', fontWeight: 800,
-                  }}>
+                  <button
+                    onClick={() => setFilterSignal(f => f === 'strong' ? null : 'strong')}
+                    style={{
+                      background: filterSignal === 'strong' ? '#15803d' : '#16a34a',
+                      color: '#fff', borderRadius: '4px', padding: '1px 7px',
+                      fontSize: '.68rem', fontWeight: 800, border: 'none', cursor: 'pointer',
+                      outline: filterSignal === 'strong' ? '2px solid #4ade80' : 'none',
+                      outlineOffset: '1px', transition: 'outline .1s',
+                    }}
+                    title="Filter to Strong sell signals"
+                  >
                     🔥 {strongCount} Strong
-                  </span>
+                  </button>
                 )}
                 {goodCount > 0 && (
-                  <span style={{
-                    background: '#ca8a04', color: '#fff',
-                    borderRadius: '4px', padding: '1px 7px',
-                    fontSize: '.68rem', fontWeight: 800,
-                  }}>
+                  <button
+                    onClick={() => setFilterSignal(f => f === 'good' ? null : 'good')}
+                    style={{
+                      background: filterSignal === 'good' ? '#a16207' : '#ca8a04',
+                      color: '#fff', borderRadius: '4px', padding: '1px 7px',
+                      fontSize: '.68rem', fontWeight: 800, border: 'none', cursor: 'pointer',
+                      outline: filterSignal === 'good' ? '2px solid #fde047' : 'none',
+                      outlineOffset: '1px', transition: 'outline .1s',
+                    }}
+                    title="Filter to Good sell signals"
+                  >
                     💰 {goodCount} Good
-                  </span>
+                  </button>
                 )}
                 <span style={{ marginLeft: 'auto', color: 'var(--accent-gold)', fontWeight: 700 }}>
                   CK cash: ${totalCKCash.toFixed(2)}
@@ -1355,11 +1421,15 @@ export default function Collection({ collection, setCollection, user, openAddCar
           <div style={{
             background: 'var(--bg-secondary)', border: '1px solid var(--border)',
             borderRadius: 'var(--radius)', padding: '10px 14px',
-            display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', fontSize: '.76rem', color: 'var(--text-muted)',
+            display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', fontSize: '.72rem', color: 'var(--text-muted)',
           }}>
-            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> — opens the listing page</span>
+            <span>🏪 <strong style={{ color: 'var(--text-secondary)' }}>TCGPlayer</strong> — list for sale</span>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span>💎 <strong style={{ color: 'var(--text-secondary)' }}>CK Buylist</strong> — sell directly to Card Kingdom</span>
+            <span>💎 <strong style={{ color: '#4ade80' }}>CK</strong> — Card Kingdom buylist</span>
+            <span style={{ color: 'var(--border)' }}>|</span>
+            <span>🏰 <strong style={{ color: '#60a5fa' }}>ABU</strong> — ABU Games buylist</span>
+            <span style={{ color: 'var(--border)' }}>|</span>
+            <span>⭐ <strong style={{ color: '#a78bfa' }}>SCG</strong> — Star City Games buylist {Object.keys(scgMap).length === 0 && <span style={{ opacity: .5 }}>(loading…)</span>}</span>
           </div>
 
           {filtered.map(card => (
@@ -1367,6 +1437,9 @@ export default function Collection({ collection, setCollection, user, openAddCar
               key={card.id}
               card={card}
               ckBuyPrice={Object.keys(ckMap).length > 0 ? getCKBuyPrice(ckMap, card.name, card.isFoil, card.scryfallId) : null}
+              abuBuyPrice={Object.keys(abuMap).length > 0 ? getABUBuyPrice(abuMap, card.name) : null}
+              scgBuyPrice={Object.keys(scgMap).length > 0 ? getSCGBuyPrice(scgMap, card.name) : null}
+              scgHotlist={Object.keys(scgMap).length > 0 ? isSCGHotlist(scgMap, card.name) : false}
               onUpdatePrice={p => updateCard(card.id, { salePrice: p })}
               onUpdateQty={q  => updateCard(card.id, { sellQty: q })}
               onRemoveFromSell={() => updateCard(card.id, { forSale: false })}
@@ -1397,9 +1470,17 @@ export default function Collection({ collection, setCollection, user, openAddCar
 
 // ── Sell List row ─────────────────────────────────────────────────────────────
 
-function SellCard({ card, onUpdatePrice, onUpdateQty, onRemoveFromSell, ckBuyPrice }) {
-  const tcgUrl = getTCGPlayerLink(card.name)
+function SellCard({ card, onUpdatePrice, onUpdateQty, onRemoveFromSell, ckBuyPrice, abuBuyPrice, scgBuyPrice, scgHotlist }) {
+  const tcgUrl   = getTCGPlayerLink(card.name)
   const suggested = suggestPrice(parseFloat(card.price) || 0)
+  const market    = parseFloat(card.price) || 0
+
+  // Best buylist offer across all venues
+  const buylistOffers = [
+    ckBuyPrice  != null ? { label: 'CK',  price: ckBuyPrice,  hot: ckBuyPrice / (market || Infinity) >= 0.75 } : null,
+    abuBuyPrice != null ? { label: 'ABU', price: abuBuyPrice, hot: abuBuyPrice / (market || Infinity) >= 0.75 } : null,
+    scgBuyPrice != null ? { label: 'SCG', price: scgBuyPrice, hot: scgHotlist || scgBuyPrice / (market || Infinity) >= 0.75 } : null,
+  ].filter(Boolean)
 
   return (
     <div style={{
@@ -1422,16 +1503,15 @@ function SellCard({ card, onUpdatePrice, onUpdateQty, onRemoveFromSell, ckBuyPri
         </div>
         {card.price != null && (
           <div style={{ fontSize: '.7rem', color: 'var(--accent-gold)', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span>Market: ${parseFloat(card.price).toFixed(2)}</span>
+            <span>Market: ${market.toFixed(2)}</span>
             {suggested != null && (
               <span style={{ color: 'var(--accent-teal)' }}>Suggested: ${suggested.toFixed(2)}</span>
             )}
-            {ckBuyPrice != null && (
-              <span style={{ color: '#4ade80', fontWeight: 700 }}>
-                CK Buylist: ${ckBuyPrice.toFixed(2)}
-                {ckBuyPrice / (parseFloat(card.price) || Infinity) >= 0.75 && ' 🔥'}
+            {buylistOffers.map(o => (
+              <span key={o.label} style={{ color: '#4ade80', fontWeight: 700 }}>
+                {o.label}: ${o.price.toFixed(2)}{o.hot ? ' 🔥' : ''}
               </span>
-            )}
+            ))}
           </div>
         )}
       </div>
@@ -1476,12 +1556,31 @@ function SellCard({ card, onUpdatePrice, onUpdateQty, onRemoveFromSell, ckBuyPri
         {ckBuyPrice != null && (
           <a
             href={`https://www.cardkingdom.com/purchasing/mtg_singles?filter[search]=name&filter[name]=${encodeURIComponent(card.name)}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            target="_blank" rel="noopener noreferrer"
             className="btn btn-ghost btn-sm"
             style={{ fontSize: '.68rem', textAlign: 'center', textDecoration: 'none', display: 'block', color: '#4ade80', borderColor: 'rgba(74,222,128,.3)' }}
           >
             💎 CK ${ckBuyPrice.toFixed(2)} →
+          </a>
+        )}
+        {abuBuyPrice != null && (
+          <a
+            href={getABUBuylistLink(card.name)}
+            target="_blank" rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: '.68rem', textAlign: 'center', textDecoration: 'none', display: 'block', color: '#60a5fa', borderColor: 'rgba(96,165,250,.3)' }}
+          >
+            🏰 ABU ${abuBuyPrice.toFixed(2)} →
+          </a>
+        )}
+        {scgBuyPrice != null && (
+          <a
+            href={getSCGBuylistLink(card.name)}
+            target="_blank" rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: '.68rem', textAlign: 'center', textDecoration: 'none', display: 'block', color: scgHotlist ? '#f97316' : '#a78bfa', borderColor: scgHotlist ? 'rgba(249,115,22,.3)' : 'rgba(167,139,250,.3)' }}
+          >
+            {scgHotlist ? '🔥' : '⭐'} SCG ${scgBuyPrice.toFixed(2)} →
           </a>
         )}
         <button
