@@ -46,15 +46,15 @@ export async function getABUPriceMap() {
 }
 
 // Returns the NM cash buy price for this card, or null if ABU isn't buying it.
-// Tries name+setName first (exact printing), falls back to name-only.
+// Requires an exact name+setName match — no name-only fallback to avoid returning
+// the wrong price (e.g. Beta price) for common printings of multi-edition cards.
 export function getABUBuyPrice(nameMap, cardName, setName) {
   if (_editionMap && setName) {
     const ek    = `${(cardName || '').toLowerCase().trim()}|${setName.toLowerCase().trim()}`
     const exact = _editionMap[ek]
     if (exact && exact.buyCash > 0) return exact.buyCash
   }
-  const entry = nameMap[(cardName || '').toLowerCase().trim()]
-  return entry && entry.buyCash > 0 ? entry.buyCash : null
+  return null
 }
 
 // Deep-link into the ABU buylist filtered to this card name.

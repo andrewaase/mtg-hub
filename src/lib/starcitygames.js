@@ -46,24 +46,25 @@ export async function getSCGPriceMap() {
 }
 
 // Returns the NM cash buy price for this card, or null if SCG isn't buying it.
-// Tries name+setName first (exact printing), falls back to name-only.
+// Requires an exact name+setName match — no name-only fallback to avoid returning
+// the wrong price for common printings of multi-edition cards.
 export function getSCGBuyPrice(nameMap, cardName, setName) {
   if (_setMap && setName) {
     const sk    = `${(cardName || '').toLowerCase().trim()}|${setName.toLowerCase().trim()}`
     const exact = _setMap[sk]
     if (exact && exact.buyCash > 0) return exact.buyCash
   }
-  const entry = nameMap[(cardName || '').toLowerCase().trim()]
-  return entry && entry.buyCash > 0 ? entry.buyCash : null
+  return null
 }
 
 // True when SCG has this card on their hotlist (premium buy price).
+// Requires an exact name+setName match — no name-only fallback.
 export function isSCGHotlist(nameMap, cardName, setName) {
   if (_setMap && setName) {
     const sk = `${(cardName || '').toLowerCase().trim()}|${setName.toLowerCase().trim()}`
     if (_setMap[sk]) return !!_setMap[sk].hotlist
   }
-  return !!nameMap[(cardName || '').toLowerCase().trim()]?.hotlist
+  return false
 }
 
 // Links to the SCG sell portal's MTG page — no URL-based card search is supported
