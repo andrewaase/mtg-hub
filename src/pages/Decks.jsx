@@ -410,15 +410,19 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
   // ── Vendor cart builders ──────────────────────────────────────────────────
 
   // TCGPlayer: POST to store.tcgplayer.com/massentry with pipe-delimited card list.
-  // This auto-fills their mass entry page — no clipboard paste needed.
-  // Add your TCGPlayer affiliate partner code to TCG_PARTNER below when you have one.
-  const TCG_PARTNER = ''  // e.g. 'VaultedSingles' — get yours at tcgplayer.com/affiliates
-  function openTCGPlayer() {
+  // Auto-fills their mass entry page. Also copies to clipboard as backup.
+  // Impact publisher ID 7200332 is passed via ?partner= — TCGPlayer's old partner
+  // param may honor it for affiliate attribution; if not, the auto-fill still works.
+  // Deep-link through Impact first (sets tracking cookie), then POST fills the cart.
+  const TCG_IMPACT_URL = 'https://partner.tcgplayer.com/c/7200332/1780961/21018'
+  async function openTCGPlayer() {
     const cardList = allDeckCards.map(c => `${c.qty} ${c.name}`).join('||')
-    const partnerParam = TCG_PARTNER ? `?partner=${TCG_PARTNER}&utm_campaign=affiliate&utm_medium=${TCG_PARTNER}&utm_source=${TCG_PARTNER}` : ''
+    // Copy to clipboard as fallback in case auto-fill doesn't land
+    try { await navigator.clipboard.writeText(buildDecklistText()) } catch { /* ok */ }
+    // Submit form POST — pre-fills the mass entry page with the full deck
     const form   = document.createElement('form')
     form.method  = 'POST'
-    form.action  = `https://store.tcgplayer.com/massentry${partnerParam}`
+    form.action  = 'https://store.tcgplayer.com/massentry?partner=7200332&utm_source=vaultedsingles&utm_medium=affiliate&utm_campaign=buyDeck'
     form.target  = '_blank'
     form.style.display = 'none'
     const input  = document.createElement('input')
@@ -429,7 +433,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
     document.body.appendChild(form)
     form.submit()
     document.body.removeChild(form)
-    showToast('✓ Deck sent to TCGPlayer mass entry!')
+    showToast('✓ Deck sent to TCGPlayer!')
     setShowBuyMenu(false)
   }
 
