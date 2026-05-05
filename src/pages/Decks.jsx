@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { getDecks, saveDeck, deleteDeck } from '../lib/db'
+import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
 import { getDeckValueSync, fetchUnknownDeckPrices } from '../lib/pricing'
 import ImportDeckModal from '../modals/ImportDeckModal'
@@ -104,6 +104,8 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
       <DeckDetail
         deck={selected}
         collection={collection}
+        user={user}
+        showToast={showToast}
         onBack={() => setSelected(null)}
         onEdit={() => { setEditDeck(selected); setShowImport(true) }}
         onDelete={() => handleDelete(selected)}
@@ -375,7 +377,7 @@ function DeckSection({ title, cards, highlight, cardValues, openCardSearch }) {
 }
 
 // ── Deck detail view ──────────────────────────────────────────────────────────
-function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck, openCardSearch }) {
+function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelete, onCopyArena, copied, showModal, onModalClose, onModalSave, editDeck, openCardSearch }) {
   const { main, side } = countCards(deck)
   const isCmdr   = isCommanderFormat(deck.format)
   const fmt      = FORMAT_COLORS[deck.format] || { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' }
@@ -384,6 +386,85 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
 
   // ── Hand simulator ────────────────────────────────────────────────────────
   const [showSimulator, setShowSimulator] = useState(false)
+
+  // ── Buy deck / Add to collection ──────────────────────────────────────────
+  const [addingToCollection, setAddingToCollection] = useState(false)
+  const [addCollProg,        setAddCollProg]        = useState(null)  // {done, total}
+  const [showBuyMenu,        setShowBuyMenu]        = useState(false)
+
+  // Flat deduplicated card list from the whole deck (main + side + commander)
+  const allDeckCards = useMemo(() => {
+    const map = {}
+    for (const card of [...mainboard, ...sideboard]) {
+      map[card.name] = (map[card.name] || 0) + card.qty
+    }
+    if (deck.commander) map[deck.commander] = Math.max(map[deck.commander] || 0, 1)
+    return Object.entries(map).map(([name, qty]) => ({ name, qty }))
+  }, [mainboard, sideboard, deck.commander])
+
+  // "qty CardName" per line — compatible with TCGPlayer mass entry
+  function buildDecklistText() {
+    return allDeckCards.map(c => `${c.qty} ${c.name}`).join('\n')
+  }
+
+  async function copyAndOpen(url, toastMsg) {
+    try { await navigator.clipboard.writeText(buildDecklistText()) } catch { /* clipboard blocked */ }
+    window.open(url, '_blank', 'noopener')
+    showToast(toastMsg)
+    setShowBuyMenu(false)
+  }
+
+  async function handleAddToCollection() {
+    if (addingToCollection) return
+    const cards = allDeckCards
+    if (cards.length === 0) return
+    setAddingToCollection(true)
+    setAddCollProg({ done: 0, total: cards.length })
+
+    // Batch-fetch Scryfall data (75 per request)
+    const sfMap = {}
+    for (let i = 0; i < cards.length; i += 75) {
+      const batch = cards.slice(i, i + 75)
+      try {
+        const res  = await fetch('https://api.scryfall.com/cards/collection', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ identifiers: batch.map(c => ({ name: c.name })) }),
+        })
+        const json = await res.json()
+        for (const card of json.data || []) {
+          sfMap[card.name.toLowerCase()] = card
+        }
+      } catch { /* continue without enrichment for this batch */ }
+      if (i + 75 < cards.length) await new Promise(r => setTimeout(r, 100))
+    }
+
+    // Build enriched card objects matching the bulkAddCards schema
+    const enriched = cards.map(c => {
+      const sf = sfMap[c.name.toLowerCase()]
+      return {
+        name:      c.name,
+        qty:       c.qty,
+        condition: 'NM',
+        setName:   sf?.set_name    || null,
+        img:       sf?.image_uris?.small || sf?.card_faces?.[0]?.image_uris?.small || null,
+        colors:    sf?.colors      || sf?.card_faces?.[0]?.colors || [],
+        price:     sf ? (parseFloat(sf.prices?.usd) || null) : null,
+        scryfallId: sf?.id         || null,
+      }
+    })
+
+    try {
+      await bulkAddCards(enriched, user?.id, {
+        onProgress: (done, total) => setAddCollProg({ done, total }),
+      })
+      showToast(`✓ ${enriched.length} card${enriched.length !== 1 ? 's' : ''} added to your collection`)
+    } catch (err) {
+      showToast(`Failed to add cards: ${err.message}`)
+    }
+    setAddingToCollection(false)
+    setAddCollProg(null)
+  }
 
   // ── Budget tracker ────────────────────────────────────────────────────────
   const [deckValue,   setDeckValue]   = useState(null)
@@ -529,6 +610,75 @@ function DeckDetail({ deck, collection, onBack, onEdit, onDelete, onCopyArena, c
           <button className={`btn btn-sm ${copied ? 'btn-ghost' : 'btn-ghost'}`} onClick={onCopyArena}>
             {copied ? '✓ Copied!' : '📋 Copy for Arena'}
           </button>
+
+          {/* Buy deck dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowBuyMenu(v => !v)}
+              style={{ color: '#4ade80' }}
+            >
+              🛒 Buy Deck ▾
+            </button>
+            {showBuyMenu && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                  onClick={() => setShowBuyMenu(false)}
+                />
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: '10px', padding: '6px', zIndex: 50,
+                  minWidth: '190px', boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+                  display: 'flex', flexDirection: 'column', gap: '4px',
+                }}>
+                  <button
+                    onClick={() => copyAndOpen(
+                      'https://www.tcgplayer.com/massentry',
+                      '✓ Decklist copied — paste it into TCGPlayer Mass Entry!'
+                    )}
+                    style={{
+                      background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.25)',
+                      borderRadius: '7px', padding: '8px 12px', cursor: 'pointer',
+                      color: '#4ade80', fontWeight: 700, fontSize: '.78rem', textAlign: 'left',
+                    }}
+                  >
+                    🛒 Shop on TCGPlayer
+                  </button>
+                  <button
+                    onClick={() => copyAndOpen(
+                      'https://manapool.com/?ref=vaultedsingles',
+                      '✓ Decklist copied — browse ManaPool to build your cart!'
+                    )}
+                    style={{
+                      background: 'rgba(56,189,248,.1)', border: '1px solid rgba(56,189,248,.25)',
+                      borderRadius: '7px', padding: '8px 12px', cursor: 'pointer',
+                      color: '#38bdf8', fontWeight: 700, fontSize: '.78rem', textAlign: 'left',
+                    }}
+                  >
+                    🌊 Shop on ManaPool
+                  </button>
+                  <div style={{ fontSize: '.66rem', color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
+                    Decklist copied to clipboard — paste on the vendor site.
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Add to collection */}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleAddToCollection}
+            disabled={addingToCollection}
+            style={{ color: '#c9a84c' }}
+          >
+            {addingToCollection
+              ? `📦 Adding… ${addCollProg ? `${addCollProg.done}/${addCollProg.total}` : ''}`
+              : '📦 Add to Collection'}
+          </button>
+
           <button className="btn btn-ghost btn-sm" onClick={onEdit}>✏️ Edit</button>
           <button className="btn btn-ghost btn-sm" style={{ color: '#ef5350' }} onClick={onDelete}>🗑️ Delete</button>
         </div>
