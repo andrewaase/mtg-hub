@@ -433,23 +433,6 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
     setShowBuyMenu(false)
   }
 
-  // Card Kingdom: GET URL with ?c= param — pre-populates their deck builder cart.
-  // Format: qty+Card+Name (no separator; qty number is the delimiter).
-  // Add your CK affiliate partner code to CK_PARTNER below when you have one.
-  const CK_PARTNER = ''  // e.g. 'VaultedSingles' — apply at cardkingdom.com/affiliates
-  function openCardKingdom() {
-    const c = allDeckCards
-      .map(card => encodeURIComponent(`${card.qty} ${card.name}`).replace(/%20/g, '+'))
-      .join('')
-    const partnerParam = CK_PARTNER ? `&partner=${CK_PARTNER}&partner_args=deck` : ''
-    window.open(
-      `https://www.cardkingdom.com/builder?c=${c}${partnerParam}`,
-      '_blank', 'noopener'
-    )
-    showToast('✓ Deck sent to Card Kingdom!')
-    setShowBuyMenu(false)
-  }
-
   // ManaPool: no URL pre-fill supported — copy list to clipboard and land on add-deck page.
   // The ?ref= affiliate cookie is set on landing.
   async function openManaPool() {
@@ -689,16 +672,6 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
                     🛒 Shop on TCGPlayer
                   </button>
                   <button
-                    onClick={openCardKingdom}
-                    style={{
-                      background: 'rgba(255,199,0,.08)', border: '1px solid rgba(255,199,0,.25)',
-                      borderRadius: '7px', padding: '8px 12px', cursor: 'pointer',
-                      color: '#ffc700', fontWeight: 700, fontSize: '.78rem', textAlign: 'left',
-                    }}
-                  >
-                    🏰 Shop on Card Kingdom
-                  </button>
-                  <button
                     onClick={openManaPool}
                     style={{
                       background: 'rgba(56,189,248,.1)', border: '1px solid rgba(56,189,248,.25)',
@@ -709,7 +682,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
                     🌊 Shop on ManaPool
                   </button>
                   <div style={{ fontSize: '.66rem', color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
-                    TCGPlayer &amp; Card Kingdom open pre-filled. ManaPool needs a paste.
+                    TCGPlayer opens pre-filled. ManaPool needs a paste.
                   </div>
                 </div>
               </>
