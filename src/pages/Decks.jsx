@@ -409,11 +409,14 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
 
   // ── Vendor cart builders ──────────────────────────────────────────────────
 
-  // TCGPlayer: copy decklist to clipboard and open mass entry page.
-  // User clicks, pastes, and submits — simple and reliable.
+  // TCGPlayer: copy decklist to clipboard and open mass entry page via Impact affiliate link.
+  // The ?u= param deep-links through the affiliate tracker to the mass entry page,
+  // setting the tracking cookie so any purchase credits the affiliate account.
+  const TCG_MASSENTRY = 'https://partner.tcgplayer.com/c/7200332/1780961/21018'
+    + '?u=' + encodeURIComponent('https://www.tcgplayer.com/massentry')
   async function openTCGPlayer() {
     try { await navigator.clipboard.writeText(buildDecklistText()) } catch { /* ok */ }
-    window.open('https://www.tcgplayer.com/massentry', '_blank', 'noopener')
+    window.open(TCG_MASSENTRY, '_blank', 'noopener')
     showToast('✓ Decklist copied — paste it into TCGPlayer Mass Entry!')
     setShowBuyMenu(false)
   }
