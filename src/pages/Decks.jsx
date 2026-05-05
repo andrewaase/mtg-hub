@@ -402,15 +402,60 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
     return Object.entries(map).map(([name, qty]) => ({ name, qty }))
   }, [mainboard, sideboard, deck.commander])
 
-  // "qty CardName" per line — compatible with TCGPlayer mass entry
+  // "qty CardName" per line — plain text for pasting
   function buildDecklistText() {
     return allDeckCards.map(c => `${c.qty} ${c.name}`).join('\n')
   }
 
-  async function copyAndOpen(url, toastMsg) {
+  // ── Vendor cart builders ──────────────────────────────────────────────────
+
+  // TCGPlayer: POST to store.tcgplayer.com/massentry with pipe-delimited card list.
+  // This auto-fills their mass entry page — no clipboard paste needed.
+  // Add your TCGPlayer affiliate partner code to TCG_PARTNER below when you have one.
+  const TCG_PARTNER = ''  // e.g. 'VaultedSingles' — get yours at tcgplayer.com/affiliates
+  function openTCGPlayer() {
+    const cardList = allDeckCards.map(c => `${c.qty} ${c.name}`).join('||')
+    const partnerParam = TCG_PARTNER ? `?partner=${TCG_PARTNER}&utm_campaign=affiliate&utm_medium=${TCG_PARTNER}&utm_source=${TCG_PARTNER}` : ''
+    const form   = document.createElement('form')
+    form.method  = 'POST'
+    form.action  = `https://store.tcgplayer.com/massentry${partnerParam}`
+    form.target  = '_blank'
+    form.style.display = 'none'
+    const input  = document.createElement('input')
+    input.type   = 'hidden'
+    input.name   = 'c'
+    input.value  = cardList
+    form.appendChild(input)
+    document.body.appendChild(form)
+    form.submit()
+    document.body.removeChild(form)
+    showToast('✓ Deck sent to TCGPlayer mass entry!')
+    setShowBuyMenu(false)
+  }
+
+  // Card Kingdom: GET URL with ?c= param — pre-populates their deck builder cart.
+  // Format: qty+Card+Name (no separator; qty number is the delimiter).
+  // Add your CK affiliate partner code to CK_PARTNER below when you have one.
+  const CK_PARTNER = ''  // e.g. 'VaultedSingles' — apply at cardkingdom.com/affiliates
+  function openCardKingdom() {
+    const c = allDeckCards
+      .map(card => encodeURIComponent(`${card.qty} ${card.name}`).replace(/%20/g, '+'))
+      .join('')
+    const partnerParam = CK_PARTNER ? `&partner=${CK_PARTNER}&partner_args=deck` : ''
+    window.open(
+      `https://www.cardkingdom.com/builder?c=${c}${partnerParam}`,
+      '_blank', 'noopener'
+    )
+    showToast('✓ Deck sent to Card Kingdom!')
+    setShowBuyMenu(false)
+  }
+
+  // ManaPool: no URL pre-fill supported — copy list to clipboard and land on add-deck page.
+  // The ?ref= affiliate cookie is set on landing.
+  async function openManaPool() {
     try { await navigator.clipboard.writeText(buildDecklistText()) } catch { /* clipboard blocked */ }
-    window.open(url, '_blank', 'noopener')
-    showToast(toastMsg)
+    window.open('https://manapool.com/add-deck?ref=vaultedsingles', '_blank', 'noopener')
+    showToast('✓ Decklist copied — paste it into ManaPool!')
     setShowBuyMenu(false)
   }
 
@@ -634,10 +679,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
                   display: 'flex', flexDirection: 'column', gap: '4px',
                 }}>
                   <button
-                    onClick={() => copyAndOpen(
-                      'https://www.tcgplayer.com/massentry',
-                      '✓ Decklist copied — paste it into TCGPlayer Mass Entry!'
-                    )}
+                    onClick={openTCGPlayer}
                     style={{
                       background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.25)',
                       borderRadius: '7px', padding: '8px 12px', cursor: 'pointer',
@@ -647,10 +689,17 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
                     🛒 Shop on TCGPlayer
                   </button>
                   <button
-                    onClick={() => copyAndOpen(
-                      'https://manapool.com/?ref=vaultedsingles',
-                      '✓ Decklist copied — browse ManaPool to build your cart!'
-                    )}
+                    onClick={openCardKingdom}
+                    style={{
+                      background: 'rgba(255,199,0,.08)', border: '1px solid rgba(255,199,0,.25)',
+                      borderRadius: '7px', padding: '8px 12px', cursor: 'pointer',
+                      color: '#ffc700', fontWeight: 700, fontSize: '.78rem', textAlign: 'left',
+                    }}
+                  >
+                    🏰 Shop on Card Kingdom
+                  </button>
+                  <button
+                    onClick={openManaPool}
                     style={{
                       background: 'rgba(56,189,248,.1)', border: '1px solid rgba(56,189,248,.25)',
                       borderRadius: '7px', padding: '8px 12px', cursor: 'pointer',
@@ -660,7 +709,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
                     🌊 Shop on ManaPool
                   </button>
                   <div style={{ fontSize: '.66rem', color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
-                    Decklist copied to clipboard — paste on the vendor site.
+                    TCGPlayer &amp; Card Kingdom open pre-filled. ManaPool needs a paste.
                   </div>
                 </div>
               </>
