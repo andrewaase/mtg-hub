@@ -2,6 +2,7 @@ import { useId, useState, useEffect } from 'react'
 import logoSvg from '../assets/vaulted_singles_logo.svg'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
+import { getManaPoolLink } from '../lib/manapool'
 import { getSnapshots, getGainersLosers, getVelocity } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 
@@ -293,6 +294,21 @@ function TournamentWidget({ collection, setPage }) {
                     title="Buy on TCGPlayer"
                   >
                     🛒
+                  </a>
+                  <a
+                    href={getManaPoolLink({ name: card.name })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      background: 'rgba(56,189,248,.12)', color: '#38bdf8',
+                      borderRadius: '4px', padding: '2px 7px',
+                      fontSize: '.68rem', fontWeight: 700, flexShrink: 0,
+                      textDecoration: 'none', lineHeight: 1.6,
+                    }}
+                    title="Buy on ManaPool"
+                  >
+                    🌊
                   </a>
                   <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>›</span>
                 </div>

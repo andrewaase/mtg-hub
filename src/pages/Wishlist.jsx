@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { searchScryfall, getCardDetails } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
+import { getManaPoolLink } from '../lib/manapool'
 import { getCardPriceHistory } from '../lib/priceHistory'
 import SparklineChart from '../components/SparklineChart'
 import { getWishlist, addWishlistItem, updateWishlistItem, removeWishlistItem } from '../lib/db'
@@ -279,9 +280,10 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
     || item.img
 
   // Real TCGPlayer product URL from Scryfall purchase_uris
-  const tcgLink = getTCGPlayerLink(
+  const tcgLink      = getTCGPlayerLink(
     scryfallData?.purchase_uris?.tcgplayer || item.tcgUrl || item.name
   )
+  const manaPoolLink = getManaPoolLink(scryfallData || { name: item.name })
 
   const atTarget  = item.targetPrice != null && item.currentPrice != null && item.currentPrice <= item.targetPrice
   const hasPrice  = item.currentPrice != null
@@ -418,6 +420,18 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
             >
               🛒 Buy on TCGPlayer
             </a>
+            <a
+              href={manaPoolLink}
+              target="_blank" rel="noopener noreferrer"
+              style={{
+                display: 'inline-block', padding: '6px 14px',
+                background: 'rgba(56,189,248,.10)', color: '#38bdf8',
+                border: '1px solid rgba(56,189,248,.25)', borderRadius: '8px',
+                fontSize: '.75rem', fontWeight: 700, textDecoration: 'none',
+              }}
+            >
+              🌊 ManaPool
+            </a>
           </div>
         </div>
       </div>
@@ -472,6 +486,19 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
               }}
             >
               🛒 Buy on TCGPlayer
+            </a>
+            <a
+              href={manaPoolLink}
+              target="_blank" rel="noopener noreferrer"
+              onClick={() => setShowPreview(false)}
+              style={{
+                flex: 1, minWidth: 140, padding: '9px 14px',
+                background: 'rgba(56,189,248,.12)', color: '#38bdf8',
+                border: '1px solid rgba(56,189,248,.3)', borderRadius: 10,
+                fontSize: '.78rem', fontWeight: 700, textDecoration: 'none', textAlign: 'center',
+              }}
+            >
+              🌊 Buy on ManaPool
             </a>
           </div>
 

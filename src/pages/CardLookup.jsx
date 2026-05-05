@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { searchScryfall, getCardDetails, getAllPrintings } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
+import { getManaPoolLink } from '../lib/manapool'
 import { supabase, hasSupabase } from '../lib/supabase'
 import { addWishlistItem } from '../lib/db'
 
@@ -263,6 +264,19 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
           }}
         >
           🛒 Buy on TCGPlayer
+        </a>
+        <a
+          href={getManaPoolLink(card)}
+          target="_blank" rel="noopener noreferrer"
+          style={{
+            display: 'block', width: '100%', padding: '13px',
+            background: '#0f2a3a', color: '#38bdf8',
+            border: '1px solid #1e4a6a', borderRadius: '12px',
+            fontWeight: 700, fontSize: '.9rem', cursor: 'pointer',
+            textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
+          }}
+        >
+          🌊 Buy on ManaPool
         </a>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { removeCard, exportData, bulkAddCards, updateCollectionCard } from '../lib/db'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
+import { getManaPoolLink } from '../lib/manapool'
 import { bulkRefreshPrices, suggestPrice } from '../lib/pricing'
 import { getCKPriceMap, getCKBuyPrice, getSellSignal } from '../lib/cardkingdom'
 import { getABUPriceMap, getABUBuyPrice, getABUBuylistLink } from '../lib/abugames'
@@ -1374,22 +1375,38 @@ export default function Collection({ collection, setCollection, user, openAddCar
                     🏷️
                   </button>
                   <button className="col-card-remove" onClick={(e) => { e.stopPropagation(); handleRemove(card.id) }}>✕</button>
-                  <a
-                    href={getTCGPlayerLink(card.tcgplayerUrl || card.name)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Buy on TCGPlayer"
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                      position: 'absolute', bottom: '6px', right: '6px',
-                      background: 'rgba(74,222,128,.15)', color: '#4ade80',
-                      borderRadius: '4px', padding: '2px 5px',
-                      fontSize: '.6rem', fontWeight: 700, textDecoration: 'none',
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    🛒
-                  </a>
+                  <div style={{ position: 'absolute', bottom: '6px', right: '6px', display: 'flex', gap: '3px' }}>
+                    <a
+                      href={getTCGPlayerLink(card.tcgplayerUrl || card.name)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Buy on TCGPlayer"
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        background: 'rgba(74,222,128,.15)', color: '#4ade80',
+                        borderRadius: '4px', padding: '2px 5px',
+                        fontSize: '.6rem', fontWeight: 700, textDecoration: 'none',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      🛒
+                    </a>
+                    <a
+                      href={getManaPoolLink({ name: card.name })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Buy on ManaPool"
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        background: 'rgba(56,189,248,.15)', color: '#38bdf8',
+                        borderRadius: '4px', padding: '2px 5px',
+                        fontSize: '.6rem', fontWeight: 700, textDecoration: 'none',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      🌊
+                    </a>
+                  </div>
 
                   {(() => {
                     const market = parseFloat(card.price) || 0
