@@ -409,31 +409,12 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
 
   // ── Vendor cart builders ──────────────────────────────────────────────────
 
-  // TCGPlayer: POST to store.tcgplayer.com/massentry with pipe-delimited card list.
-  // Auto-fills their mass entry page. Also copies to clipboard as backup.
-  // Impact publisher ID 7200332 is passed via ?partner= — TCGPlayer's old partner
-  // param may honor it for affiliate attribution; if not, the auto-fill still works.
-  // Deep-link through Impact first (sets tracking cookie), then POST fills the cart.
-  const TCG_IMPACT_URL = 'https://partner.tcgplayer.com/c/7200332/1780961/21018'
+  // TCGPlayer: copy decklist to clipboard and open mass entry page.
+  // User clicks, pastes, and submits — simple and reliable.
   async function openTCGPlayer() {
-    const cardList = allDeckCards.map(c => `${c.qty} ${c.name}`).join('||')
-    // Copy to clipboard as fallback in case auto-fill doesn't land
     try { await navigator.clipboard.writeText(buildDecklistText()) } catch { /* ok */ }
-    // Submit form POST — pre-fills the mass entry page with the full deck
-    const form   = document.createElement('form')
-    form.method  = 'POST'
-    form.action  = 'https://store.tcgplayer.com/massentry?partner=7200332&utm_source=vaultedsingles&utm_medium=affiliate&utm_campaign=buyDeck'
-    form.target  = '_blank'
-    form.style.display = 'none'
-    const input  = document.createElement('input')
-    input.type   = 'hidden'
-    input.name   = 'c'
-    input.value  = cardList
-    form.appendChild(input)
-    document.body.appendChild(form)
-    form.submit()
-    document.body.removeChild(form)
-    showToast('✓ Deck sent to TCGPlayer!')
+    window.open('https://www.tcgplayer.com/massentry', '_blank', 'noopener')
+    showToast('✓ Decklist copied — paste it into TCGPlayer Mass Entry!')
     setShowBuyMenu(false)
   }
 
