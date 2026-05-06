@@ -439,16 +439,16 @@ async function clientFetchTop8(format) {
   return archetypes
 }
 
-function getWeekStart() {
+function getWeekStart(offsetWeeks = 0) {
   const d   = new Date()
   const day = d.getUTCDay()
   const diff = day === 0 ? -6 : 1 - day
-  d.setUTCDate(d.getUTCDate() + diff)
+  d.setUTCDate(d.getUTCDate() + diff - offsetWeeks * 7)
   return d.toISOString().slice(0, 10)
 }
 
-async function runClientIngest() {
-  const week = getWeekStart()
+async function runClientIngest(offsetWeeks = 0) {
+  const week = getWeekStart(offsetWeeks)
   const cardSnapshots      = []
   const archetypeSnapshots = []
 
@@ -484,6 +484,7 @@ function SpikePredictor() {
   const [spikeLoading,  setSpikeLoading]  = useState(false)
   const [spikeError,    setSpikeError]    = useState(null)
   const [ingestStatus,  setIngestStatus]  = useState(null) // 'ingesting' | 'done' | 'error'
+  const [seedingPrev,   setSeedingPrev]   = useState(false)
 
   // On mount: check if Supabase has a fresh snapshot. If not, ingest from browser.
   useEffect(() => {
@@ -521,6 +522,16 @@ function SpikePredictor() {
       setSpikeLoading(false)
     }
   }, [])
+
+  // Seed last week's snapshot so spike predictor has two data points to compare
+  const handleSeedPrevWeek = useCallback(async () => {
+    setSeedingPrev(true)
+    try {
+      await runClientIngest(1)
+      await fetchSpikes(spikeFormat)
+    } catch { /* non-fatal */ }
+    setSeedingPrev(false)
+  }, [spikeFormat, fetchSpikes])
 
   // Re-fetch spikes after ingest completes
   useEffect(() => {
@@ -578,8 +589,29 @@ function SpikePredictor() {
         <div style={{ borderRadius: 10, padding: '32px 20px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}>🌱</div>
           <div style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 6 }}>Building the dataset</div>
-          <div style={{ color: '#92400e', fontSize: '.82rem', maxWidth: 340, margin: '0 auto' }}>
-            The spike predictor needs at least two weekly snapshots to compare. Visit this tab again next week — a new snapshot saves automatically each time you load this page.
+          <div style={{ color: '#92400e', fontSize: '.82rem', maxWidth: 340, margin: '0 auto', marginBottom: 18 }}>
+            The spike predictor needs at least two weekly snapshots to compare. A new snapshot saves automatically each week — or seed last week's data now to unlock signals immediately.
+          </div>
+          <button
+            onClick={handleSeedPrevWeek}
+            disabled={seedingPrev}
+            style={{
+              padding: '9px 22px', borderRadius: 8,
+              background: seedingPrev ? 'rgba(251,191,36,.1)' : 'rgba(251,191,36,.18)',
+              border: '1px solid rgba(251,191,36,.4)',
+              color: seedingPrev ? '#92400e' : '#fbbf24',
+              fontWeight: 700, fontSize: '.82rem', cursor: seedingPrev ? 'not-allowed' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              transition: 'all 0.15s',
+            }}
+          >
+            <span style={{ display: 'inline-block', animation: seedingPrev ? 'spin 1s linear infinite' : 'none' }}>
+              {seedingPrev ? '⟳' : '⏮'}
+            </span>
+            {seedingPrev ? 'Seeding last week…' : 'Seed last week\'s snapshot'}
+          </button>
+          <div style={{ color: '#64748b', fontSize: '.7rem', marginTop: 10 }}>
+            Seeds {getWeekStart(1)} baseline — signals appear immediately after
           </div>
         </div>
       )}
