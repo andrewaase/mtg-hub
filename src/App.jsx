@@ -24,6 +24,7 @@ import Decks from './pages/Decks'
 import Wishlist from './pages/Wishlist'
 import Store from './pages/Store'
 import About from './pages/About'
+import MetaTracker from './pages/MetaTracker'
 
 const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'about', 'admin']
 
@@ -252,6 +253,7 @@ export default function App() {
               {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} />}
               {page === 'about'     && <About />}
               {page === 'admin'     && <AdminPanel user={user} />}
+              {page === 'meta'      && <MetaTracker />}
             </>
           )}
         </div>
