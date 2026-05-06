@@ -320,11 +320,100 @@ function SpikeCard({ spike }) {
   )
 }
 
+// ── Client-side ingest helpers ──────────────────────────────────────────────
+// MTGGoldfish blocks server-side requests from cloud IPs, so we fetch from
+// the browser and POST the data to our save endpoint.
+
+const INGEST_FORMATS = ['modern', 'standard', 'pioneer', 'legacy', 'pauper']
+
+async function clientFetchGoldfish(format) {
+  // We call our own tournament-meta proxy (which handles the scrape)
+  const res = await fetch(`/.netlify/functions/tournament-meta?format=${format}`)
+  if (!res.ok) return []
+  const json = await res.json()
+  return json.cards || []
+}
+
+async function clientFetchTop8(format) {
+  const res = await fetch(`/.netlify/functions/metagame?format=${format}&window=2weeks`)
+  if (!res.ok) return []
+  const json = await res.json()
+  const archetypes = []
+  for (const cat of json.categories || []) {
+    for (const arch of cat.archetypes || []) {
+      archetypes.push({ name: arch.name, category: cat.name, pct: arch.pct, trend: arch.trend || 'stable' })
+    }
+  }
+  return archetypes
+}
+
+function getWeekStart() {
+  const d   = new Date()
+  const day = d.getUTCDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setUTCDate(d.getUTCDate() + diff)
+  return d.toISOString().slice(0, 10)
+}
+
+async function runClientIngest() {
+  const week = getWeekStart()
+  const cardSnapshots      = []
+  const archetypeSnapshots = []
+
+  for (const format of INGEST_FORMATS) {
+    const [cards, archetypes] = await Promise.all([
+      clientFetchGoldfish(format),
+      clientFetchTop8(format),
+    ])
+    for (const c of cards) {
+      cardSnapshots.push({ card_name: c.name, format, week, pct_of_decks: c.pct, price: c.price, source: 'mtggoldfish' })
+    }
+    for (const a of archetypes) {
+      archetypeSnapshots.push({ archetype_name: a.name, category: a.category, format, week, pct: a.pct, trend: a.trend, source: 'mtgtop8' })
+    }
+    await new Promise(r => setTimeout(r, 200))
+  }
+
+  if (cardSnapshots.length === 0 && archetypeSnapshots.length === 0) return { ok: false, reason: 'no data fetched' }
+
+  const res = await fetch('/.netlify/functions/ingest-meta', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ cardSnapshots, archetypeSnapshots }),
+  })
+  return res.json()
+}
+
+// ── SpikePredictor component ────────────────────────────────────────────────
+
 function SpikePredictor() {
   const [spikeFormat,   setSpikeFormat]   = useState('all')
   const [spikeData,     setSpikeData]     = useState(null)
   const [spikeLoading,  setSpikeLoading]  = useState(false)
   const [spikeError,    setSpikeError]    = useState(null)
+  const [ingestStatus,  setIngestStatus]  = useState(null) // 'ingesting' | 'done' | 'error'
+
+  // On mount: check if Supabase has a fresh snapshot. If not, ingest from browser.
+  useEffect(() => {
+    async function checkAndIngest() {
+      try {
+        const res  = await fetch('/.netlify/functions/ingest-meta')
+        const json = await res.json()
+        const { latestWeek, currentWeek } = json
+        // Ingest if never ingested, or snapshot is more than 6 days old
+        const needsIngest = !latestWeek || latestWeek < currentWeek
+        if (needsIngest) {
+          setIngestStatus('ingesting')
+          await runClientIngest()
+          setIngestStatus('done')
+        }
+      } catch {
+        // ingest failure is non-fatal — spike predictor just shows noData state
+        setIngestStatus('error')
+      }
+    }
+    checkAndIngest()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSpikes = useCallback(async (fmt) => {
     setSpikeLoading(true)
@@ -340,6 +429,11 @@ function SpikePredictor() {
       setSpikeLoading(false)
     }
   }, [])
+
+  // Re-fetch spikes after ingest completes
+  useEffect(() => {
+    if (ingestStatus === 'done') fetchSpikes(spikeFormat)
+  }, [ingestStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchSpikes(spikeFormat) }, [spikeFormat, fetchSpikes])
 
@@ -365,6 +459,13 @@ function SpikePredictor() {
         ))}
       </div>
 
+      {ingestStatus === 'ingesting' && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', fontSize: '.78rem', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+          Building this week's snapshot from MTGGoldfish…
+        </div>
+      )}
+
       {spikeLoading && (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#4ade80' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>📈</div>
@@ -386,7 +487,7 @@ function SpikePredictor() {
           <div style={{ fontSize: 36, marginBottom: 10 }}>🌱</div>
           <div style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 6 }}>Building the dataset</div>
           <div style={{ color: '#92400e', fontSize: '.82rem', maxWidth: 340, margin: '0 auto' }}>
-            The spike predictor needs at least two weekly snapshots to compare. Check back after the first Sunday snapshot runs, or trigger <code style={{ color: '#fbbf24' }}>ingest-meta</code> manually in Netlify.
+            The spike predictor needs at least two weekly snapshots to compare. Visit this tab again next week — a new snapshot saves automatically each time you load this page.
           </div>
         </div>
       )}
