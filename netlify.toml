@@ -10,6 +10,10 @@
 [functions."update-prices"]
   schedule = "0 8 * * *"
 
+# Snapshot MTGGoldfish + MTGTop8 data for spike predictor every Sunday at 6am UTC
+[functions."ingest-meta"]
+  schedule = "0 6 * * 0"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

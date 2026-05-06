@@ -217,9 +217,234 @@ function CategorySection({ cat, source }) {
   )
 }
 
+// ── Spike Predictor sub-component ──────────────────────────────────────────
+
+const SIGNAL_STYLE = {
+  buy:      { bg: 'rgba(34,197,94,.12)',  border: '#22c55e44', text: '#4ade80', label: '🚀 Buy Window',  dot: '#22c55e' },
+  watch:    { bg: 'rgba(251,191,36,.10)', border: '#fbbf2444', text: '#fbbf24', label: '👀 Watch',       dot: '#fbbf24' },
+  dropping: { bg: 'rgba(239,68,68,.10)',  border: '#ef444444', text: '#f87171', label: '📉 Dropping',    dot: '#ef4444' },
+}
+
+function SpikeCard({ spike }) {
+  const s        = SIGNAL_STYLE[spike.signal] || SIGNAL_STYLE.watch
+  const pctUp    = spike.pct_delta > 0
+  const priceUp  = spike.price_delta != null && spike.price_delta > 0
+  const tcgLink  = `https://partner.tcgplayer.com/c/7200332/1780961/21018?u=${encodeURIComponent(`https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(spike.card_name)}`)}`
+
+  return (
+    <div style={{
+      background: s.bg,
+      border:     `1px solid ${s.border}`,
+      borderRadius: 10,
+      padding:    '12px 14px',
+      display:    'flex',
+      flexDirection: 'column',
+      gap:        8,
+    }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '.88rem', color: '#f1f5f9', lineHeight: 1.2 }}>
+            {spike.card_name}
+          </div>
+          <div style={{ fontSize: '.68rem', color: '#64748b', marginTop: 2, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            {spike.format}
+          </div>
+        </div>
+        <span style={{
+          flexShrink: 0,
+          fontSize: '.65rem', fontWeight: 700, letterSpacing: '.06em',
+          color: s.text, background: s.bg,
+          border: `1px solid ${s.border}`,
+          borderRadius: 20, padding: '2px 8px',
+        }}>
+          {s.label}
+        </span>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        {/* Play rate */}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '.62rem', color: '#64748b', marginBottom: 2 }}>Play Rate</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontSize: '.95rem', fontWeight: 700, color: '#f8fafc' }}>
+              {spike.pct_now}%
+            </span>
+            <span style={{ fontSize: '.72rem', color: pctUp ? '#4ade80' : '#f87171', fontWeight: 600 }}>
+              {pctUp ? '▲' : '▼'}{Math.abs(spike.pct_delta)}pp
+            </span>
+          </div>
+          <div style={{ fontSize: '.62rem', color: '#475569' }}>was {spike.pct_prev}%</div>
+        </div>
+
+        {/* Price */}
+        {spike.price_now != null && (
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '.62rem', color: '#64748b', marginBottom: 2 }}>Price</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+              <span style={{ fontSize: '.95rem', fontWeight: 700, color: '#f8fafc' }}>
+                ${spike.price_now.toFixed(2)}
+              </span>
+              {spike.price_delta != null && (
+                <span style={{ fontSize: '.72rem', color: priceUp ? '#fb923c' : '#4ade80', fontWeight: 600 }}>
+                  {priceUp ? '▲' : '▼'}${Math.abs(spike.price_delta).toFixed(2)}
+                </span>
+              )}
+            </div>
+            {spike.price_prev != null && (
+              <div style={{ fontSize: '.62rem', color: '#475569' }}>was ${spike.price_prev.toFixed(2)}</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Buy link */}
+      {spike.signal !== 'dropping' && (
+        <a
+          href={tcgLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'block', textAlign: 'center',
+            background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.2)',
+            borderRadius: 6, padding: '5px 0',
+            color: '#4ade80', fontWeight: 700, fontSize: '.72rem',
+            textDecoration: 'none',
+          }}
+        >
+          🛒 Buy on TCGPlayer
+        </a>
+      )}
+    </div>
+  )
+}
+
+function SpikePredictor() {
+  const [spikeFormat,   setSpikeFormat]   = useState('all')
+  const [spikeData,     setSpikeData]     = useState(null)
+  const [spikeLoading,  setSpikeLoading]  = useState(false)
+  const [spikeError,    setSpikeError]    = useState(null)
+
+  const fetchSpikes = useCallback(async (fmt) => {
+    setSpikeLoading(true)
+    setSpikeError(null)
+    try {
+      const res  = await fetch(`/.netlify/functions/spike-predictor?format=${fmt}&limit=40`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      setSpikeData(json)
+    } catch (e) {
+      setSpikeError(e.message)
+    } finally {
+      setSpikeLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchSpikes(spikeFormat) }, [spikeFormat, fetchSpikes])
+
+  const buys     = spikeData?.spikes?.filter(s => s.signal === 'buy')     || []
+  const watches  = spikeData?.spikes?.filter(s => s.signal === 'watch')   || []
+  const dropping = spikeData?.spikes?.filter(s => s.signal === 'dropping') || []
+
+  return (
+    <div>
+      {/* Format filter */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        {[{ id: 'all', label: 'All Formats' }, ...FORMATS].map(f => (
+          <button key={f.id} onClick={() => setSpikeFormat(f.id)} style={{
+            flexShrink: 0, padding: '6px 14px', borderRadius: 20,
+            border: spikeFormat === f.id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.12)',
+            background: spikeFormat === f.id ? 'rgba(34,197,94,.15)' : 'rgba(255,255,255,0.05)',
+            color: spikeFormat === f.id ? '#4ade80' : '#94a3b8',
+            fontWeight: spikeFormat === f.id ? 700 : 500,
+            fontSize: '0.80rem', cursor: 'pointer',
+          }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {spikeLoading && (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#4ade80' }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>📈</div>
+          <div style={{ fontWeight: 600 }}>Analysing play rate trends…</div>
+        </div>
+      )}
+
+      {!spikeLoading && spikeError && (
+        <div style={{ borderRadius: 10, padding: 20, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', textAlign: 'center' }}>
+          <div style={{ color: '#fca5a5', fontWeight: 600, marginBottom: 8 }}>⚠️ {spikeError}</div>
+          <button onClick={() => fetchSpikes(spikeFormat)} style={{ padding: '7px 18px', borderRadius: 8, background: '#1d4ed8', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '.82rem' }}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!spikeLoading && !spikeError && spikeData?.noData && (
+        <div style={{ borderRadius: 10, padding: '32px 20px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', textAlign: 'center' }}>
+          <div style={{ fontSize: 36, marginBottom: 10 }}>🌱</div>
+          <div style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 6 }}>Building the dataset</div>
+          <div style={{ color: '#92400e', fontSize: '.82rem', maxWidth: 340, margin: '0 auto' }}>
+            The spike predictor needs at least two weekly snapshots to compare. Check back after the first Sunday snapshot runs, or trigger <code style={{ color: '#fbbf24' }}>ingest-meta</code> manually in Netlify.
+          </div>
+        </div>
+      )}
+
+      {!spikeLoading && !spikeError && spikeData && !spikeData.noData && (
+        <>
+          <div style={{ fontSize: '.72rem', color: '#475569', marginBottom: 14 }}>
+            Week of {spikeData.week} vs {spikeData.prevWeek} · {spikeData.total} signal{spikeData.total !== 1 ? 's' : ''} detected
+          </div>
+
+          {buys.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#4ade80', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                🚀 Buy Window — Play rate rising, price hasn't moved yet
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                {buys.map(s => <SpikeCard key={`${s.card_name}|${s.format}`} spike={s} />)}
+              </div>
+            </div>
+          )}
+
+          {watches.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#fbbf24', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                👀 Watch — Trending up, price starting to follow
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                {watches.map(s => <SpikeCard key={`${s.card_name}|${s.format}`} spike={s} />)}
+              </div>
+            </div>
+          )}
+
+          {dropping.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#f87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                📉 Dropping — Play rate declining
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                {dropping.map(s => <SpikeCard key={`${s.card_name}|${s.format}`} spike={s} />)}
+              </div>
+            </div>
+          )}
+
+          {buys.length === 0 && watches.length === 0 && dropping.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#475569' }}>
+              No significant movements this week.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function MetaTracker() {
+  const [activeTab,   setActiveTab]   = useState('meta')   // 'meta' | 'spikes'
   const [format,      setFormat]      = useState('modern')
   const [timeWindow,  setTimeWindow]  = useState('2weeks')
   const [data,        setData]        = useState(null)
@@ -316,6 +541,31 @@ export default function MetaTracker() {
           </button>
         </div>
       </div>
+
+      {/* ── Main tab switcher ── */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {[
+          { id: 'meta',   label: '⚔️ Metagame' },
+          { id: 'spikes', label: '📈 Spike Predictor' },
+        ].map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+            padding: '8px 18px', borderRadius: 20,
+            border: activeTab === t.id ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.12)',
+            background: activeTab === t.id ? '#1d4ed8' : 'rgba(255,255,255,0.05)',
+            color: activeTab === t.id ? '#fff' : '#94a3b8',
+            fontWeight: activeTab === t.id ? 700 : 500,
+            fontSize: '0.84rem', cursor: 'pointer', transition: 'all 0.15s',
+          }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Spike Predictor tab ── */}
+      {activeTab === 'spikes' && <SpikePredictor />}
+
+      {/* ── Metagame tab ── */}
+      {activeTab === 'meta' && <>
 
       {/* ── Format tabs ── */}
       <div style={{
@@ -427,6 +677,9 @@ export default function MetaTracker() {
           )}
         </>
       )}
+
+      {/* close metagame tab wrapper */}
+      </>}
 
       <style>{`
         @keyframes spin    { to { transform: rotate(360deg); } }
