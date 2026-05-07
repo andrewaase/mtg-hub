@@ -1,5 +1,5 @@
 import { useId, useState, useEffect } from 'react'
-import logoSvg from '../assets/vaulted_singles_logo.svg'
+import logoPng from '../assets/vaulted_singles_logo.png'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getSnapshots, getGainersLosers, getVelocity } from '../lib/priceHistory'
@@ -231,7 +231,7 @@ function TournamentWidget({ collection, setPage }) {
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.8rem' }}>Loading…</div>
-        ) : error || top10.length === 0 ? (
+        ) : error || cards.length === 0 ? (
           <div style={{ padding: '20px 16px', color: 'var(--text-muted)', fontSize: '.8rem', textAlign: 'center' }}>
             Could not load tournament data
           </div>
@@ -386,9 +386,16 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
           padding: '12px 16px',
           display: 'flex', alignItems: 'center', gap: '12px',
         }}>
-          <img src={logoSvg} alt="Vaulted Singles" style={{ width: '40px', height: 'auto', flexShrink: 0 }} />
+          <img
+            src={logoPng}
+            alt="Vaulted Singles"
+            style={{
+              width: '72px', height: 'auto', flexShrink: 0,
+              filter: 'invert(1) sepia(0.6) saturate(4) hue-rotate(10deg)',
+              mixBlendMode: 'screen',
+            }}
+          />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '.95rem', color: 'var(--accent-gold)', letterSpacing: '.5px' }}>VAULTED SINGLES</div>
             <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Scan a card to start building your vault.</div>
           </div>
           <button onClick={() => setPage?.('collection')} style={{ padding: '6px 14px', borderRadius: '99px', background: 'var(--accent-gold)', color: '#1a1000', border: 'none', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer', flexShrink: 0 }}>

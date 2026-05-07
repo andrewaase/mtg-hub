@@ -1,5 +1,5 @@
 import { hasSupabase } from '../lib/supabase'
-import logoSvg from '../assets/vaulted_singles_logo.svg'
+import logoPng from '../assets/vaulted_singles_logo.png'
 
 const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
 
@@ -38,9 +38,15 @@ export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen,
   return (
     <div id="sidebar" className={sidebarOpen ? 'mobile-open' : ''}>
       <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 16px' }}>
-        <img src={logoSvg} alt="Vaulted Singles" style={{ width: '100px', height: 'auto', marginBottom: '8px' }} />
-        <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>VAULTED</div>
-        <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '.65rem', color: '#8b5ea4', letterSpacing: '3px', marginTop: '1px' }}>SINGLES</div>
+        <img
+          src={logoPng}
+          alt="Vaulted Singles"
+          style={{
+            width: '140px', height: 'auto',
+            filter: 'invert(1) sepia(0.6) saturate(4) hue-rotate(10deg)',
+            mixBlendMode: 'screen',
+          }}
+        />
       </div>
 
       {['Main', 'Resources', 'Tools', 'Social', 'Admin'].map(section => {
