@@ -1,5 +1,5 @@
 import { hasSupabase } from '../lib/supabase'
-import logoSvg from '../assets/vaulted_singles_logo.svg'
+import logoPng from '../assets/vaulted_singles_logo.png'
 
 export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClick, onLogoClick }) {
   return (
@@ -11,29 +11,17 @@ export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClic
         {/* Logo + wordmark — tapping goes to dashboard */}
         <div
           onClick={onLogoClick}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', userSelect: 'none', cursor: 'pointer' }}
         >
           <img
-            src={logoSvg}
+            src={logoPng}
             alt="Vaulted Singles"
-            style={{ height: '32px', width: 'auto', display: 'block' }}
+            style={{
+              height: '40px', width: 'auto', display: 'block',
+              filter: 'invert(1) sepia(0.6) saturate(4) hue-rotate(10deg)',
+              mixBlendMode: 'screen',
+            }}
           />
-          <div style={{ lineHeight: 1 }}>
-            <div style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontWeight: 700,
-              fontSize: '.88rem',
-              color: 'var(--accent-gold)',
-              letterSpacing: '.5px',
-            }}>VAULTED</div>
-            <div style={{
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              fontSize: '.6rem',
-              color: '#8b5ea4',
-              letterSpacing: '2px',
-              marginTop: '1px',
-            }}>SINGLES</div>
-          </div>
         </div>
       </div>
 
