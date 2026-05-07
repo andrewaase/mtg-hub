@@ -11,7 +11,7 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
   const rightItems = [
     { id: 'cards', icon: '🔍', label: 'Lookup' },
     { id: 'decks', icon: '🃏', label: 'Decks' },
-    { id: 'meta',  icon: '📈', label: 'Meta' },
+    { id: 'news',  icon: '📰', label: 'News' },
   ]
 
   return (
