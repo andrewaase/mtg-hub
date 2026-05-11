@@ -22,9 +22,15 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Missing Supabase env vars' }) }
   }
 
-  const params   = event.queryStringParameters || {}
-  const format   = (params.format || 'all').toLowerCase()
-  const limit    = Math.min(parseInt(params.limit || '30', 10), 100)
+  const VALID_FORMATS = ['all', 'standard', 'modern', 'pioneer', 'legacy', 'pauper', 'vintage']
+
+  const params = event.queryStringParameters || {}
+  const format = (params.format || 'all').toLowerCase()
+  if (!VALID_FORMATS.includes(format)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid format parameter' }) }
+  }
+  const parsedLimit = parseInt(params.limit || '30', 10)
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 30
 
   const thisWeek = getWeekStart(0)
   const lastWeek = getWeekStart(1)
@@ -150,6 +156,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[spike-predictor]', err)
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
+    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }
