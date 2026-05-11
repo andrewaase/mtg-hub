@@ -4,17 +4,16 @@ const { corsHeaders } = require('./_cors')
 // Returns a JSON object with keys: store_listings, orders, order_items,
 // collection, matches, and exported_at.
 
-const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
+  const ADMIN_EMAIL  = process.env.ADMIN_EMAIL
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
 
-  if (!SUPABASE_URL || !SERVICE_KEY) {
+  if (!SUPABASE_URL || !SERVICE_KEY || !ADMIN_EMAIL) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 

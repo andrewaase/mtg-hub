@@ -271,7 +271,7 @@ exports.handler = async (event) => {
           headers: { 'Authorization': `Bearer ${RESEND_KEY_ADMIN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             from:    'Vaulted Singles <orders@vaultedsingles.com>',
-            to:      ['mtgvaultedsingles@gmail.com'],
+            to:      [process.env.ADMIN_EMAIL || 'mtgvaultedsingles@gmail.com'],
             subject: `🛒 New Order — $${(pi.amount / 100).toFixed(2)} from ${meta.customer_name || meta.customer_email}`,
             text:    `New order received!\n\nCustomer: ${meta.customer_name} <${meta.customer_email}>\nShip to: ${meta.shipping_line1}, ${meta.shipping_city}, ${meta.shipping_state} ${meta.shipping_zip}\n\nItems:\n${adminItemList}\n\nTotal: $${(pi.amount / 100).toFixed(2)}\nOrder ID: ${order.id}`,
           }),

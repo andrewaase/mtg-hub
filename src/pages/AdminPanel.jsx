@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { upsertStoreListing } from '../lib/db'
 
-const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

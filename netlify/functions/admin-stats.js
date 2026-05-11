@@ -9,17 +9,16 @@ const { corsHeaders } = require('./_cors')
 //   3. If email matches ADMIN_EMAIL → fetch all stats and return them
 //   4. Otherwise → 403
 
-const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
+  const ADMIN_EMAIL  = process.env.ADMIN_EMAIL
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
 
-  if (!SUPABASE_URL || !SERVICE_KEY) {
+  if (!SUPABASE_URL || !SERVICE_KEY || !ADMIN_EMAIL) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 

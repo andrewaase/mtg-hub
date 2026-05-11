@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { addCard, upsertStoreListing } from '../lib/db'
 import { supabase } from '../lib/supabase'
 
-const ADMIN_EMAIL = 'mtgvaultedsingles@gmail.com'
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
 
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
