@@ -1,10 +1,7 @@
 import { hasSupabase } from '../lib/supabase'
 import logoPng from '../assets/vaulted_singles_logo.png'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
-
-export default function Sidebar({ page, setPage, user, onAuthClick, sidebarOpen, setSidebarOpen }) {
-  const isAdmin = user?.email === ADMIN_EMAIL
+export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sidebarOpen, setSidebarOpen }) {
 
   const navItems = [
     { id: 'dashboard',  icon: '🏠', label: 'Dashboard',        section: 'Main'      },

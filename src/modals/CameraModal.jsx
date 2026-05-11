@@ -2,8 +2,6 @@ import { useRef, useState, useEffect } from 'react'
 import { addCard, upsertStoreListing } from '../lib/db'
 import { supabase } from '../lib/supabase'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
-
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,7 +155,7 @@ function Chip({ children, active, onClick, disabled }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CameraModal({
-  onClose, showToast, user, collection, setCollection, openAddCard, setPage
+  onClose, showToast, user, isAdmin, collection, setCollection, openAddCard, setPage
 }) {
   const scanningRef   = useRef(false)
   const frozenRef     = useRef(false)
@@ -356,7 +354,7 @@ export default function CameraModal({
       })
 
       // If "Add & List" and user is admin, upsert a store listing
-      if (options.forSale && user?.email === ADMIN_EMAIL) {
+      if (options.forSale && isAdmin) {
         const { merged } = await upsertStoreListing({
           name:        snap.name,
           set_name:    snap.set_name || null,
@@ -482,7 +480,7 @@ export default function CameraModal({
               cursor: 'pointer', fontSize: '1.1rem', backdropFilter: 'blur(8px)',
             }}>{torchOn ? '🔦' : '💡'}</button>
           )}
-          {user?.email === ADMIN_EMAIL && (
+          {isAdmin && (
             <button
               onClick={() => setStoreMode(p => !p)}
               title={storeMode ? 'Store Mode ON — tap to switch to Collection' : 'Switch to Store Mode'}

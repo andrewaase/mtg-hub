@@ -74,6 +74,7 @@ export default function App() {
   const [prefillCard, setPrefillCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   // Deck modal nav-block: prevents accidental navigation while deck editor is open
   const deckModalOpenRef = useRef(false)
   const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
@@ -133,6 +134,25 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
     return () => subscription.unsubscribe()
   }, [])
+
+  // Server-side admin verification — runs whenever the logged-in user changes
+  useEffect(() => {
+    if (!user || !hasSupabase) { setIsAdmin(false); return }
+    let cancelled = false
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled || !session?.access_token) { setIsAdmin(false); return }
+      try {
+        const res = await fetch('/.netlify/functions/is-admin', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` },
+        })
+        const { isAdmin: result } = await res.json()
+        if (!cancelled) setIsAdmin(!!result)
+      } catch {
+        if (!cancelled) setIsAdmin(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [user])
 
   // Load data, then take price snapshot + check wishlist alerts
   useEffect(() => {
@@ -220,7 +240,7 @@ export default function App() {
   }, [])
 
   const pageProps = {
-    user, matches, setMatches, collection, setCollection, showToast, setPage,
+    user, isAdmin, matches, setMatches, collection, setCollection, showToast, setPage,
     openLogMatch: () => setShowLogMatch(true),
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
     openCamera: () => setShowCamera(true),
@@ -232,7 +252,7 @@ export default function App() {
 
   return (
     <div id="app">
-      <Sidebar page={page} setPage={setPage} user={user} onAuthClick={() => setShowAuth(true)} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <Sidebar page={page} setPage={setPage} user={user} isAdmin={isAdmin} onAuthClick={() => setShowAuth(true)} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div id="overlay" className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
       <div id="main">
         <TopBar page={page} user={user} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} />
@@ -251,7 +271,7 @@ export default function App() {
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
               {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} />}
               {page === 'about'     && <About />}
-              {page === 'admin'     && <AdminPanel user={user} />}
+              {page === 'admin'     && <AdminPanel user={user} isAdmin={isAdmin} />}
             </>
           )}
         </div>

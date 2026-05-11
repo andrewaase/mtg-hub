@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { upsertStoreListing } from '../lib/db'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -194,7 +193,7 @@ function UserTable({ users }) {
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
                       {u.email}
                     </span>
-                    {u.email === ADMIN_EMAIL && (
+                    {u.is_admin && (
                       <span style={{ fontSize: '0.6rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>
                         ADMIN
                       </span>
@@ -1469,7 +1468,7 @@ const TABS = [
   { id: 'settings',  label: '⚙️ Settings'  },
 ]
 
-export default function AdminPanel({ user }) {
+export default function AdminPanel({ user, isAdmin }) {
   const [tab,           setTab]           = useState('overview')
   const [data,          setData]          = useState(null)
   const [loading,       setLoading]       = useState(false)
@@ -1477,8 +1476,8 @@ export default function AdminPanel({ user }) {
   const [lastFetched,   setLastFetched]   = useState(null)
   const [exporting,     setExporting]     = useState(false)
 
-  // Guard: only the admin can see this page
-  if (!user || user.email !== ADMIN_EMAIL) {
+  // Guard: only the admin can see this page (isAdmin is server-verified in App.jsx)
+  if (!user || !isAdmin) {
     return (
       <div style={{ padding: '60px 20px', textAlign: 'center', color: '#475569' }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>

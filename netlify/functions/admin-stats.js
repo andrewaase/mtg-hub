@@ -115,6 +115,7 @@ exports.handler = async (event) => {
       uniqueCards:     collectionByUser[u.id] || 0,
       totalCards:      cardQtyByUser[u.id]    || 0,
       matchCount:      matchesByUser[u.id]    || 0,
+      is_admin:        u.email === ADMIN_EMAIL,
     })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
     // Signup counts over last 30 days (day buckets)
