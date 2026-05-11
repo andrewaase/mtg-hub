@@ -18,3 +18,31 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# ── Security headers ──────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Prevent the site from being embedded in iframes on other domains (clickjacking)
+    X-Frame-Options = "DENY"
+
+    # Stop browsers from MIME-sniffing responses away from the declared content-type
+    X-Content-Type-Options = "nosniff"
+
+    # Only send the origin (no path/query) in the Referer header on cross-origin requests
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Restrict which browser features this site can use.
+    # camera=(self) is required for the card-scan modal.
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(self)"
+
+    # Content Security Policy — explicitly allow every external resource the app uses:
+    #   script-src  : our own bundle + Stripe.js (loaded by @stripe/stripe-js)
+    #   style-src   : our own styles + 'unsafe-inline' (required for React inline styles)
+    #   img-src     : our own assets, base64 data URIs, and any HTTPS image (card art, thumbnails)
+    #   connect-src : Supabase REST + realtime WS, Scryfall API, Stripe API, our own functions
+    #   frame-src   : Stripe payment iframe
+    #   object-src  : blocked entirely (no Flash / plugins)
+    #   base-uri    : locked to self (prevents base-tag injection attacks)
+    #   form-action : locked to self (prevents form hijacking)
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.scryfall.com https://svgs.scryfall.io https://api.stripe.com https://js.stripe.com; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';"
