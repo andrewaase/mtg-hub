@@ -1,4 +1,5 @@
 // netlify/functions/export-data.js
+const { corsHeaders } = require('./_cors')
 // Admin-only: exports all Supabase tables as a single JSON blob for backup.
 // Returns a JSON object with keys: store_listings, orders, order_items,
 // collection, matches, and exported_at.
@@ -91,10 +92,10 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type':                'application/json',
-        'Content-Disposition':         `attachment; filename="vaulted-singles-backup-${new Date().toISOString().slice(0,10)}.json"`,
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control':               'no-store',
+        'Content-Type':        'application/json',
+        'Content-Disposition': `attachment; filename="vaulted-singles-backup-${new Date().toISOString().slice(0,10)}.json"`,
+        ...corsHeaders(event),
+        'Cache-Control':       'no-store',
       },
       body: JSON.stringify(backup, null, 2),
     }

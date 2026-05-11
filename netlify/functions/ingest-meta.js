@@ -1,4 +1,5 @@
 // netlify/functions/ingest-meta.js
+const { corsHeaders } = require('./_cors')
 //
 // TWO modes:
 //
@@ -32,8 +33,8 @@ exports.handler = async (event) => {
   }
 
   const headers = {
-    'Content-Type':                'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/json',
+    ...corsHeaders(event),
   }
 
   // ── GET: return latest stored week ──────────────────────────────────────

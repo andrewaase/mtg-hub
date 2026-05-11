@@ -1,4 +1,5 @@
 // netlify/functions/update-prices.js
+const { corsHeaders } = require('./_cors')
 // Syncs store listing prices with current Scryfall market data.
 //
 // Triggered two ways:
@@ -66,7 +67,7 @@ exports.handler = async (event) => {
     console.log('[update-prices] No listings with Scryfall IDs — nothing to sync')
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
       body: JSON.stringify({ updated: 0, skipped: 0, total: 0, message: 'No listings linked to Scryfall yet' }),
     }
   }
@@ -208,7 +209,7 @@ exports.handler = async (event) => {
   console.log('[update-prices]', summary)
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
     body: JSON.stringify(summary),
   }
 }

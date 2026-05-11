@@ -1,4 +1,5 @@
 // netlify/functions/admin-stats.js
+const { corsHeaders } = require('./_cors')
 // Returns aggregated admin stats for the Vaulted Singles control panel.
 // Protected — only responds to requests from the hardcoded admin email.
 //
@@ -146,9 +147,9 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type':                'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control':               'no-store',
+        'Content-Type': 'application/json',
+        ...corsHeaders(event),
+        'Cache-Control': 'no-store',
       },
       body: JSON.stringify({ totals, users, signupsByDay }),
     }

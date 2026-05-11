@@ -1,4 +1,5 @@
 // Proxies MTGGoldfish format staples data.
+const { corsHeaders } = require('./_cors')
 // Usage: /.netlify/functions/tournament-meta?format=standard
 // Returns: { format, cards: [{name, pct, price}], updatedAt }
 
@@ -61,7 +62,7 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders(event),
         'Cache-Control': 'public, max-age=3600',
       },
       body: JSON.stringify({ format, cards: unique, updatedAt: new Date().toISOString() }),

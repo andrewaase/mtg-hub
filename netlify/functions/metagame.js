@@ -1,4 +1,5 @@
 // netlify/functions/metagame.js
+const { corsHeaders } = require('./_cors')
 // Attempts to scrape MTGTop8 for live metagame data.
 // If the request is blocked (common – AWS IPs are frequently blocked),
 // returns curated community-estimate fallback data tagged source:'curated'.
@@ -331,7 +332,7 @@ exports.handler = async (event) => {
           const nonEmpty = categories.filter(c => c.archetypes.length > 0)
           return {
             statusCode: 200,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=1800' },
+            headers: { 'Content-Type': 'application/json', ...corsHeaders(event), 'Cache-Control': 'public, max-age=1800' },
             body: JSON.stringify({ format, window: win, source: 'live', totalDecks, categories: nonEmpty, updatedAt: new Date().toISOString() }),
           }
         }
@@ -348,7 +349,7 @@ exports.handler = async (event) => {
   }
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=600' },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(event), 'Cache-Control': 'public, max-age=600' },
     body: JSON.stringify(fallback),
   }
 }

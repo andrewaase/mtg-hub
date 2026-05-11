@@ -1,4 +1,5 @@
 // netlify/functions/spike-predictor.js
+const { corsHeaders } = require('./_cors')
 // Queries Supabase meta_card_snapshots for the last two weekly snapshots,
 // computes week-over-week play-rate and price deltas, and returns cards
 // where play rate is rising but price hasn't fully followed yet.
@@ -71,7 +72,7 @@ exports.handler = async (event) => {
     if (current.length === 0) {
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
         body: JSON.stringify({ week: resolvedThisWeek, prevWeek: resolvedLastWeek, spikes: [], noData: true }),
       }
     }
@@ -143,9 +144,9 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type':                'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control':               'public, max-age=3600',
+        'Content-Type': 'application/json',
+        ...corsHeaders(event),
+        'Cache-Control': 'public, max-age=3600',
       },
       body: JSON.stringify({
         week:     resolvedThisWeek,
