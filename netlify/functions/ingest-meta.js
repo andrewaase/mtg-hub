@@ -52,7 +52,8 @@ exports.handler = async (event) => {
         body: JSON.stringify({ latestWeek, currentWeek: getWeekStart() }),
       }
     } catch (err) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) }
+      console.error('[ingest-meta]', err)
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
     }
   }
 

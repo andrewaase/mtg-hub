@@ -31,6 +31,7 @@ exports.handler = async () => {
       body,
     }
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
+    console.error('[ck-prices]', err)
+    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

@@ -124,6 +124,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[create-payment-intent]', err)
-    return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Internal error' }) }
+    return { statusCode: 500, body: JSON.stringify({ error: 'Payment processing failed' }) }
   }
 }

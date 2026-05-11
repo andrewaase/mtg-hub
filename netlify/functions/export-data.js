@@ -100,6 +100,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[export-data]', err)
-    return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Export failed' }) }
+    return { statusCode: 500, body: JSON.stringify({ error: 'Export failed' }) }
   }
 }

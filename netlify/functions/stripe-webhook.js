@@ -146,7 +146,7 @@ exports.handler = async (event) => {
     stripeEvent = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET)
   } catch (err) {
     console.error('[stripe-webhook] Signature verification failed:', err.message)
-    return { statusCode: 400, body: `Webhook error: ${err.message}` }
+    return { statusCode: 400, body: 'Webhook verification failed' }
   }
 
   // ── Only handle successful payments ──────────────────────────────────────────
