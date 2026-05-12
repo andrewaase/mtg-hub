@@ -44,6 +44,13 @@ const STEPS = [
     icon:  '🃏',
     title: 'Hand Simulator & Solitaire',
     body:  "Open any deck and hit Simulate Hand to draw a 7-card opening hand. Mulligan as many times as you want to test consistency. Use Deck Solitaire to play through your early turns and see how your deck goldfishes before taking it to a real match.",
+    cta:   'Next: Buy a Deck',
+  },
+  {
+    page:  'decks',
+    icon:  '🛍️',
+    title: 'Buy the Whole Deck',
+    body:  "Don't own the cards yet? Click any Buy Deck button and we'll build you an optimized cart with every card you're missing — sourced directly from the Vaulted Singles store. One click to go from decklist to checkout.",
     cta:   'Next: Wishlist',
   },
   {
