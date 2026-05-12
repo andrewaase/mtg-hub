@@ -63,12 +63,13 @@ export default function OnboardingTutorial({ setPage, onDone }) {
   const isLast  = step === STEPS.length - 1
 
   const advance = () => {
-    // Navigate the app to the relevant page
-    setPage(current.page)
-
     if (isLast) {
+      // Navigate to the last step's page before finishing
+      setPage(current.page)
       finish()
     } else {
+      const next = STEPS[step + 1]
+      setPage(next.page)   // go to the page the NEXT step is about
       setStep(s => s + 1)
     }
   }
@@ -98,10 +99,10 @@ export default function OnboardingTutorial({ setPage, onDone }) {
       }}
     >
       <div style={{
-        background: 'var(--card-bg)',
+        background: '#1a1a1e',
         border: '1px solid rgba(201,168,76,.4)',
         borderRadius: '16px',
-        boxShadow: '0 8px 32px rgba(0,0,0,.5)',
+        boxShadow: '0 8px 40px rgba(0,0,0,.8)',
         overflow: 'hidden',
       }}>
         {/* Gold accent bar */}
@@ -115,7 +116,7 @@ export default function OnboardingTutorial({ setPage, onDone }) {
               style={{
                 width: i === step ? '18px' : '6px', height: '6px', borderRadius: '99px',
                 transition: 'width .2s, background .2s',
-                background: i === step ? 'var(--accent-gold)' : i < step ? 'rgba(201,168,76,.4)' : 'var(--border)',
+                background: i === step ? '#c9a84c' : i < step ? 'rgba(201,168,76,.4)' : 'rgba(255,255,255,.15)',
               }}
             />
           ))}
@@ -125,12 +126,12 @@ export default function OnboardingTutorial({ setPage, onDone }) {
         <div style={{ padding: '16px 18px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{ fontSize: '1.6rem' }}>{current.icon}</span>
-            <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--text-primary)' }}>
+            <div style={{ fontWeight: 700, fontSize: '.95rem', color: '#f1f5f9' }}>
               {current.title}
             </div>
           </div>
           <p style={{
-            fontSize: '.82rem', color: 'var(--text-muted)', lineHeight: 1.6,
+            fontSize: '.82rem', color: '#94a3b8', lineHeight: 1.6,
             margin: '0 0 16px',
           }}>
             {current.body}
@@ -141,7 +142,7 @@ export default function OnboardingTutorial({ setPage, onDone }) {
               onClick={skip}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: '.75rem', color: 'var(--text-muted)', padding: '6px 0',
+                fontSize: '.75rem', color: '#64748b', padding: '6px 0',
                 flexShrink: 0,
               }}
             >
