@@ -168,6 +168,17 @@ exports.handler = async (event) => {
     const items = JSON.parse(meta.items || '[]')
     if (!items.length) throw new Error('No items in metadata')
 
+    // ── 0. Idempotency check — skip if this payment was already processed ────
+    const dupRes  = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?stripe_payment_intent=eq.${pi.id}&select=id&limit=1`,
+      { headers: adminHeaders }
+    )
+    const dupRows = await dupRes.json()
+    if (Array.isArray(dupRows) && dupRows.length > 0) {
+      console.log(`[stripe-webhook] PI ${pi.id} already processed (order ${dupRows[0].id}) — skipping duplicate`)
+      return { statusCode: 200, body: JSON.stringify({ received: true, duplicate: true }) }
+    }
+
     // ── 1. Create order ─────────────────────────────────────────────────────
     const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
       method: 'POST',
