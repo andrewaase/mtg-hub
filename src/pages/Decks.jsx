@@ -4,6 +4,7 @@ import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
 import { getDeckValueSync, fetchUnknownDeckPrices } from '../lib/pricing'
 import ImportDeckModal from '../modals/ImportDeckModal'
+import UpgradeModal from '../components/UpgradeModal'
 
 const FORMAT_ALL = 'All'
 
@@ -31,7 +32,7 @@ function getTypeBucket(typeLine) {
 const IMG_CACHE = new Map()
 
 // ── Main Decks page ───────────────────────────────────────────────────────────
-export default function Decks({ user, collection, showToast, setDeckModalOpen, openCardSearch }) {
+export default function Decks({ user, collection, showToast, setDeckModalOpen, openCardSearch, membership, setPage }) {
   const [decks, setDecks]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [selected, setSelected]     = useState(null)
@@ -40,6 +41,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   const [formatFilter, setFormatFilter] = useState(FORMAT_ALL)
   const [activeTab, setActiveTab]   = useState('my')
   const [copied, setCopied]         = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   useEffect(() => {
     getDecks(user?.id).then(d => { setDecks(d); setLoading(false) })
@@ -144,7 +146,16 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
         <div style={{ flex: 1 }} />
         {activeTab === 'my' && (
           <button className="btn btn-primary btn-sm" style={{ alignSelf: 'center', marginRight: '16px', fontSize: '.78rem' }}
-            onClick={() => { setEditDeck(null); setShowImport(true) }}>+ New</button>
+            onClick={() => {
+              const deckLimit = membership?.deckLimit ?? 10
+              const isPro     = membership?.isPro ?? false
+              if (!isPro && decks.length >= deckLimit) {
+                setShowUpgrade(true)
+                return
+              }
+              setEditDeck(null)
+              setShowImport(true)
+            }}>+ New</button>
         )}
       </div>
 
@@ -206,6 +217,13 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
           existingDeck={editDeck}
           onClose={() => { setShowImport(false); setEditDeck(null) }}
           onSave={handleSave}
+        />
+      )}
+      {showUpgrade && (
+        <UpgradeModal
+          reason="deck"
+          onClose={() => setShowUpgrade(false)}
+          setPage={setPage}
         />
       )}
     </div>

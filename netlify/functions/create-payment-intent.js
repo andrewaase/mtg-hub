@@ -102,24 +102,44 @@ exports.handler = async (event) => {
       `Order Total: $${total.toFixed(2)}`,
     ].join('\n')
 
+    // Optionally extract the logged-in user's ID from the auth header.
+    // This is used by the webhook to credit free months on $20+ purchases.
+    let buyerUserId = null
+    try {
+      const authHeader = (event.headers || {})['authorization'] || ''
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+      if (token) {
+        const uRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${token}` },
+        })
+        if (uRes.ok) {
+          const u = await uRes.json()
+          buyerUserId = u.id || null
+        }
+      }
+    } catch { /* non-critical */ }
+
     // Create PaymentIntent — store all fulfillment data in metadata
+    const piMeta = {
+      items:            JSON.stringify(items.map(i => ({ id: i.id, qty: i.qty || 1 }))),
+      customer_name:    (shipping.name  || '').slice(0, 500),
+      customer_email:   (shipping.email || '').slice(0, 500),
+      shipping_line1:   (shipping.line1 || '').slice(0, 500),
+      shipping_city:    (shipping.city  || '').slice(0, 500),
+      shipping_state:   (shipping.state || '').slice(0, 500),
+      shipping_zip:     (shipping.zip   || '').slice(0, 500),
+      shipping_country: (shipping.country || 'US').slice(0, 500),
+      subtotal:         subtotal.toFixed(2),
+      shipping_cost:    shippingFlat.toFixed(2),
+    }
+    if (buyerUserId) piMeta.user_id = buyerUserId
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount:        Math.round(total * 100), // cents
       currency:      'usd',
       description,
       receipt_email: shipping.email,
-      metadata: {
-        items:            JSON.stringify(items.map(i => ({ id: i.id, qty: i.qty || 1 }))),
-        customer_name:    (shipping.name  || '').slice(0, 500),
-        customer_email:   (shipping.email || '').slice(0, 500),
-        shipping_line1:   (shipping.line1 || '').slice(0, 500),
-        shipping_city:    (shipping.city  || '').slice(0, 500),
-        shipping_state:   (shipping.state || '').slice(0, 500),
-        shipping_zip:     (shipping.zip   || '').slice(0, 500),
-        shipping_country: (shipping.country || 'US').slice(0, 500),
-        subtotal:         subtotal.toFixed(2),
-        shipping_cost:    shippingFlat.toFixed(2),
-      },
+      metadata:      piMeta,
     })
 
     return {

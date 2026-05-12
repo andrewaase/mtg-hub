@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { addCard, upsertStoreListing } from '../lib/db'
 import { supabase } from '../lib/supabase'
+import UpgradeModal from '../components/UpgradeModal'
 
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
@@ -155,13 +156,14 @@ function Chip({ children, active, onClick, disabled }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CameraModal({
-  onClose, showToast, user, isAdmin, collection, setCollection, openAddCard, setPage
+  onClose, showToast, user, isAdmin, collection, setCollection, openAddCard, setPage, membership
 }) {
   const scanningRef   = useRef(false)
   const frozenRef     = useRef(false)
   const prevThumbRef  = useRef(null)
   const stableRef     = useRef(0)
   const STABLE_NEEDED = 2
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   const videoRef  = useRef(null)
   const streamRef = useRef(null)
@@ -277,6 +279,14 @@ export default function CameraModal({
       })
 
       if (!res.ok) {
+        // 429 = daily scan limit reached
+        if (res.status === 429) {
+          frozenRef.current = true
+          setShowUpgrade(true)
+          setScanStatus('ready')
+          scanningRef.current = false
+          return
+        }
         // Try to surface a human-readable error from the function body
         let msg = `Scan service error (${res.status})`
         try {
@@ -860,7 +870,13 @@ export default function CameraModal({
                 {cameraError ? 'Camera unavailable' : 'Ready to scan'}
               </div>
               <div style={{ fontSize: '.68rem', color: 'rgba(255,255,255,0.4)' }}>
-                {cameraError ? cameraError : 'Hold card steady within the frame'}
+                {cameraError
+                  ? cameraError
+                  : membership?.isPro
+                  ? 'Unlimited scans · Pro'
+                  : membership?.loaded
+                  ? `${membership.scansLeft ?? '?'} scans remaining today`
+                  : 'Hold card steady within the frame'}
               </div>
             </div>
             <button
@@ -881,6 +897,14 @@ export default function CameraModal({
           to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
+
+      {showUpgrade && (
+        <UpgradeModal
+          reason="scan"
+          onClose={() => { setShowUpgrade(false); handleClose() }}
+          setPage={(p) => { handleClose(); setPage?.(p) }}
+        />
+      )}
     </div>
   )
 }

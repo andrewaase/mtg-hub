@@ -24,8 +24,11 @@ import Decks from './pages/Decks'
 import Wishlist from './pages/Wishlist'
 import Store from './pages/Store'
 import About from './pages/About'
+import Membership from './pages/Membership'
+import OnboardingTutorial from './components/OnboardingTutorial'
+import { useMembership } from './hooks/useMembership'
 
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'about', 'admin']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin']
 
 const PAGE_TITLES = {
   dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
@@ -39,6 +42,7 @@ const PAGE_TITLES = {
   decks:      'My Decks | Vaulted Singles',
   wishlist:   'Wishlist | Vaulted Singles',
   store:      'Buy MTG Singles | Vaulted Singles Card Shop',
+  membership: 'Pro Membership | Vaulted Singles',
   about:      'About | Vaulted Singles',
   admin:      'Control Center | Vaulted Singles',
 }
@@ -50,6 +54,7 @@ const PAGE_DESCRIPTIONS = {
   cards:      'Look up any Magic: The Gathering card — prices, rulings, set info, and format legality.',
   decks:      'Build and manage your MTG decks with format-staple suggestions and card lookups.',
   wishlist:   'Track cards you want and set price alerts for your MTG wishlist.',
+  membership: 'Upgrade to Vaulted Singles Pro for unlimited card scans, unlimited decks, and the hand simulator.',
   about:      'Learn about Vaulted Singles — an MTG singles store and collection tracker built by a Magic player, for Magic players.',
   log:        'Log your Magic: The Gathering matches and track your win rates by deck and format.',
   stats:      'Detailed stats and charts for your Magic: The Gathering match history.',
@@ -76,6 +81,11 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [authPrompt, setAuthPrompt] = useState(null)
+  // Membership status
+  const membership = useMembership(user)
+  // Onboarding tutorial — shown once after first sign-up
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
   // Deck modal nav-block: prevents accidental navigation while deck editor is open
   const deckModalOpenRef = useRef(false)
   const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
@@ -135,6 +145,17 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
     return () => subscription.unsubscribe()
   }, [])
+
+  // Show onboarding tutorial once per new user (after sign-up / first sign-in)
+  useEffect(() => {
+    if (!user) return
+    const key = `vs-onboarding-done-${user.id}`
+    if (!localStorage.getItem(key)) {
+      // Small delay so the app has time to load before showing the tutorial
+      const t = setTimeout(() => setShowOnboarding(true), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [user])
 
   // Server-side admin verification — runs whenever the logged-in user changes
   useEffect(() => {
@@ -242,6 +263,7 @@ export default function App() {
 
   const pageProps = {
     user, isAdmin, matches, setMatches, collection, setCollection, showToast, setPage,
+    membership,
     openLogMatch: () => setShowLogMatch(true),
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
     openCamera: () => {
@@ -249,6 +271,11 @@ export default function App() {
         setAuthPrompt({ icon: '📷', title: 'Scan cards with your camera', body: 'Create a free account to scan cards and add them to your collection instantly.' })
         setShowAuth(true)
         return
+      }
+      if (membership.loaded && !membership.canScan) {
+        setAuthPrompt(null)
+        // UpgradeModal is shown from CameraModal — pass the info via showToast for now;
+        // the modal itself will gate on membership.canScan
       }
       setShowCamera(true)
     },
@@ -277,9 +304,10 @@ export default function App() {
               {page === 'friends'    && <Friends {...pageProps} />}
               {page === 'decks'      && <Decks {...pageProps} />}
               {page === 'wishlist'   && <Wishlist {...pageProps} />}
-              {page === 'store'     && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} />}
-              {page === 'about'     && <About />}
-              {page === 'admin'     && <AdminPanel user={user} isAdmin={isAdmin} />}
+              {page === 'store'      && <Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} />}
+              {page === 'membership' && <Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} />}
+              {page === 'about'      && <About />}
+              {page === 'admin'      && <AdminPanel user={user} isAdmin={isAdmin} />}
             </>
           )}
         </div>
@@ -292,6 +320,15 @@ export default function App() {
       {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}
       {decklistDeck && <DecklistModal deck={decklistDeck} onClose={() => setDecklistDeck(null)} setPage={setPage} />}
       {toast && <Toast msg={toast} />}
+      {showOnboarding && (
+        <OnboardingTutorial
+          setPage={setPage}
+          onDone={() => {
+            setShowOnboarding(false)
+            if (user) localStorage.setItem(`vs-onboarding-done-${user.id}`, '1')
+          }}
+        />
+      )}
     </div>
   )
 }

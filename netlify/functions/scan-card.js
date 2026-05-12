@@ -1,5 +1,6 @@
 // netlify/functions/scan-card.js
 // Accepts a base64 JPEG of a MTG card and returns name + set code + collector number via Claude Vision.
+// Free users are limited to FREE_SCAN_LIMIT scans per day (midnight reset). Pro users have no limit.
 const { corsHeaders } = require('./_cors')
 
 // ~5 MB of base64 ≈ ~3.75 MB actual image — well above any real card scan
@@ -7,6 +8,8 @@ const MAX_BASE64_CHARS = 5 * 1024 * 1024
 
 // Valid base64 prefixes for JPEG, PNG, and WebP magic bytes
 const VALID_IMAGE_PREFIXES = ['/9j/', 'iVBOR', 'UklGR']
+
+const FREE_SCAN_LIMIT = 100
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -30,13 +33,61 @@ exports.handler = async (event) => {
   if (!userJwt) {
     return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Authentication required' }) }
   }
+
+  const adminHeaders = {
+    apikey:         SERVICE_KEY,
+    Authorization:  `Bearer ${SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  }
+
+  let userId
   try {
     const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
     })
     if (!verifyRes.ok) throw new Error('invalid token')
+    const userData = await verifyRes.json()
+    userId = userData.id
   } catch {
     return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
+  }
+
+  // ── Check membership tier & daily scan limit ─────────────────────────────────
+  const profileRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
+    { headers: adminHeaders }
+  )
+  const profiles = await profileRes.json()
+  const profile  = Array.isArray(profiles) ? profiles[0] : null
+  let tier = profile?.membership_tier || 'free'
+
+  // Treat expired pro as free
+  if (tier === 'pro' && profile?.membership_end && new Date(profile.membership_end) < new Date()) {
+    tier = 'free'
+  }
+
+  if (tier !== 'pro') {
+    // Count today's scans
+    const today = new Date().toISOString().slice(0, 10)
+    const scanCountRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/scan_logs?user_id=eq.${userId}&scan_date=eq.${today}&select=id`,
+      { headers: adminHeaders }
+    )
+    const scanRows   = await scanCountRes.json()
+    const scansToday = Array.isArray(scanRows) ? scanRows.length : 0
+
+    if (scansToday >= FREE_SCAN_LIMIT) {
+      return {
+        statusCode: 429,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
+        body: JSON.stringify({
+          error:      'Daily scan limit reached',
+          limit:      FREE_SCAN_LIMIT,
+          scansToday,
+          upgradeRequired: true,
+        }),
+      }
+    }
   }
 
   let image
@@ -110,6 +161,14 @@ If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"colle
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/, '')
       .trim()
+
+    // Log this scan in scan_logs (fire-and-forget — don't block the response)
+    const today = new Date().toISOString().slice(0, 10)
+    fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
+      method:  'POST',
+      headers: { ...adminHeaders, Prefer: 'return=minimal' },
+      body:    JSON.stringify({ user_id: userId, scan_date: today }),
+    }).catch(e => console.error('[scan-card] scan_log insert failed:', e.message))
 
     // Helper to return a parsed result
     function makeResult(parsed) {

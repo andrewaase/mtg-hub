@@ -167,20 +167,53 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: 'Webhook verification failed' }
   }
 
-  // ── Only handle successful payments ──────────────────────────────────────────
-  if (stripeEvent.type !== 'payment_intent.succeeded') {
-    return { statusCode: 200, body: JSON.stringify({ received: true }) }
-  }
-
-  const pi   = stripeEvent.data.object
-  const meta = pi.metadata || {}
-
   const adminHeaders = {
     apikey:         SERVICE_KEY,
     Authorization:  `Bearer ${SERVICE_KEY}`,
     'Content-Type': 'application/json',
     Prefer:         'return=representation',
   }
+
+  // ── Subscription events ───────────────────────────────────────────────────────
+  if (
+    stripeEvent.type === 'customer.subscription.created' ||
+    stripeEvent.type === 'customer.subscription.updated' ||
+    stripeEvent.type === 'customer.subscription.deleted'
+  ) {
+    const sub    = stripeEvent.data.object
+    const userId = sub.metadata?.supabase_user_id
+
+    if (!userId) {
+      console.warn('[stripe-webhook] Subscription event missing supabase_user_id metadata')
+      return { statusCode: 200, body: JSON.stringify({ received: true }) }
+    }
+
+    const isActive = sub.status === 'active' || sub.status === 'trialing'
+    const tier     = isActive ? 'pro' : 'free'
+    const membershipEnd = isActive && sub.current_period_end
+      ? new Date(sub.current_period_end * 1000).toISOString()
+      : null
+
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method:  'PATCH',
+      headers: adminHeaders,
+      body:    JSON.stringify({
+        membership_tier:          tier,
+        membership_end:           membershipEnd,
+        stripe_subscription_id:   sub.id,
+      }),
+    })
+    console.log(`[stripe-webhook] User ${userId} membership → ${tier} (sub ${sub.id})`)
+    return { statusCode: 200, body: JSON.stringify({ received: true }) }
+  }
+
+  // ── Only handle successful payments beyond this point ────────────────────────
+  if (stripeEvent.type !== 'payment_intent.succeeded') {
+    return { statusCode: 200, body: JSON.stringify({ received: true }) }
+  }
+
+  const pi   = stripeEvent.data.object
+  const meta = pi.metadata || {}
 
   try {
     const items = JSON.parse(meta.items || '[]')
@@ -311,6 +344,31 @@ exports.handler = async (event) => {
         })
       } catch (adminEmailErr) {
         console.error('[stripe-webhook] Admin notification failed:', adminEmailErr.message)
+      }
+    }
+
+    // ── 7. Free month for $20+ orders (logged-in buyers only) ────────────────
+    const buyerUserId = meta.user_id || null
+    const orderTotal  = pi.amount / 100
+    if (buyerUserId && orderTotal >= 20) {
+      try {
+        // Atomically increment free_months_remaining via RPC
+        // Fallback: fetch current value and PATCH
+        const pmRes  = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?id=eq.${buyerUserId}&select=free_months_remaining`,
+          { headers: adminHeaders }
+        )
+        const pmRows = await pmRes.json()
+        const current = pmRows?.[0]?.free_months_remaining ?? 0
+        const earned  = Math.floor(orderTotal / 20) // 1 month per $20 spent
+        await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${buyerUserId}`, {
+          method:  'PATCH',
+          headers: adminHeaders,
+          body:    JSON.stringify({ free_months_remaining: current + earned }),
+        })
+        console.log(`[stripe-webhook] Credited ${earned} free month(s) to user ${buyerUserId}`)
+      } catch (fmErr) {
+        console.error('[stripe-webhook] Free month credit failed:', fmErr.message)
       }
     }
 

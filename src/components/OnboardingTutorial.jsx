@@ -1,0 +1,166 @@
+// src/components/OnboardingTutorial.jsx
+// Step-by-step guided tour for new users shown after first sign-up.
+// Walks through: Dashboard → Card Lookup → Collection → Decks → Wishlist → Match Log → Store
+import { useState } from 'react'
+
+const STEPS = [
+  {
+    page:  'dashboard',
+    icon:  '🏠',
+    title: 'Welcome to Vaulted Singles!',
+    body:  "This is your Dashboard — a quick overview of your collection value, recent price changes, and format staples. It updates automatically as you add cards.",
+    cta:   'Next: Find Cards',
+  },
+  {
+    page:  'cards',
+    icon:  '🔍',
+    title: 'Look Up Any Card',
+    body:  'Search for any Magic card to see current prices, set info, rulings, and format legality. Click "Add to Collection" or "Buy" right from the card detail view.',
+    cta:   'Next: My Collection',
+  },
+  {
+    page:  'collection',
+    icon:  '📦',
+    title: 'Build Your Collection',
+    body:  'Add cards manually or scan them with your camera. Your collection value is tracked daily so you can watch it grow over time.',
+    cta:   'Next: My Decks',
+  },
+  {
+    page:  'decks',
+    icon:  '📚',
+    title: 'Build & Track Decks',
+    body:  'Import a decklist from Arena, MTGO, or Moxfield — or build one from scratch. Vaulted Singles automatically values your deck and highlights cards you already own.',
+    cta:   'Next: Wishlist',
+  },
+  {
+    page:  'wishlist',
+    icon:  '⭐',
+    title: 'Track Cards You Want',
+    body:  "Add cards to your Wishlist and set a target price. You'll get an alert on your dashboard when a card drops to your target.",
+    cta:   'Next: Match Log',
+  },
+  {
+    page:  'log',
+    icon:  '🎮',
+    title: 'Log Your Matches',
+    body:  "Track wins and losses by deck and format. Head to the Stats page to see your win rates, best matchups, and performance over time.",
+    cta:   'Next: The Store',
+  },
+  {
+    page:  'store',
+    icon:  '🛒',
+    title: 'Buy Singles From Us',
+    body:  "Browse our store for NM and graded MTG singles at fair, daily-updated prices. Every $20 you spend earns you a free month of Pro!",
+    cta:   "Let's go! 🚀",
+  },
+]
+
+export default function OnboardingTutorial({ setPage, onDone }) {
+  const [step, setStep]       = useState(0)
+  const [exiting, setExiting] = useState(false)
+
+  const current = STEPS[step]
+  const isLast  = step === STEPS.length - 1
+
+  const advance = () => {
+    // Navigate the app to the relevant page
+    setPage(current.page)
+
+    if (isLast) {
+      finish()
+    } else {
+      setStep(s => s + 1)
+    }
+  }
+
+  const finish = () => {
+    setExiting(true)
+    setTimeout(() => {
+      localStorage.setItem('vs-onboarding-done', '1')
+      onDone?.()
+    }, 300)
+  }
+
+  const skip = () => {
+    localStorage.setItem('vs-onboarding-done', '1')
+    onDone?.()
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', bottom: '80px', right: '20px', zIndex: 1200,
+        width: '320px',
+        opacity: exiting ? 0 : 1,
+        transform: exiting ? 'translateY(12px)' : 'translateY(0)',
+        transition: 'opacity .3s, transform .3s',
+        pointerEvents: exiting ? 'none' : 'auto',
+      }}
+    >
+      <div style={{
+        background: 'var(--card-bg)',
+        border: '1px solid rgba(201,168,76,.4)',
+        borderRadius: '16px',
+        boxShadow: '0 8px 32px rgba(0,0,0,.5)',
+        overflow: 'hidden',
+      }}>
+        {/* Gold accent bar */}
+        <div style={{ height: '3px', background: 'linear-gradient(90deg, var(--accent-gold), #f59e0b)' }} />
+
+        {/* Progress dots */}
+        <div style={{ display: 'flex', gap: '5px', padding: '14px 16px 0', justifyContent: 'center' }}>
+          {STEPS.map((_, i) => (
+            <div
+              key={i}
+              style={{
+                width: i === step ? '18px' : '6px', height: '6px', borderRadius: '99px',
+                transition: 'width .2s, background .2s',
+                background: i === step ? 'var(--accent-gold)' : i < step ? 'rgba(201,168,76,.4)' : 'var(--border)',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '16px 18px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '1.6rem' }}>{current.icon}</span>
+            <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--text-primary)' }}>
+              {current.title}
+            </div>
+          </div>
+          <p style={{
+            fontSize: '.82rem', color: 'var(--text-muted)', lineHeight: 1.6,
+            margin: '0 0 16px',
+          }}>
+            {current.body}
+          </p>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={skip}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: '.75rem', color: 'var(--text-muted)', padding: '6px 0',
+                flexShrink: 0,
+              }}
+            >
+              Skip tour
+            </button>
+            <div style={{ flex: 1 }} />
+            <button
+              className="btn btn-primary"
+              style={{
+                fontSize: '.8rem', padding: '7px 16px',
+                background: 'var(--accent-gold)', color: '#1a1000', fontWeight: 700,
+              }}
+              onClick={advance}
+            >
+              {current.cta}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
