@@ -18,7 +18,7 @@ export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClic
             alt="Vaulted Singles"
             style={{
               height: '40px', width: 'auto', display: 'block',
-              filter: 'invert(1) sepia(0.6) saturate(4) hue-rotate(10deg)',
+              filter: 'invert(1) sepia(1) hue-rotate(12deg) saturate(3) brightness(0.82)',
               mixBlendMode: 'screen',
             }}
           />

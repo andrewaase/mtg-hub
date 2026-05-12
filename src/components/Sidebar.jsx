@@ -41,7 +41,7 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
           alt="Vaulted Singles"
           style={{
             width: '140px', height: 'auto',
-            filter: 'invert(1) sepia(0.6) saturate(4) hue-rotate(10deg)',
+            filter: 'invert(1) sepia(1) hue-rotate(12deg) saturate(3) brightness(0.82)',
             mixBlendMode: 'screen',
           }}
         />
