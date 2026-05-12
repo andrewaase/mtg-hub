@@ -50,7 +50,7 @@ const STEPS = [
     page:  'decks',
     icon:  '🛍️',
     title: 'Buy the Whole Deck',
-    body:  "Don't own the cards yet? Click any Buy Deck button and we'll build you an optimized cart with every card you're missing — sourced directly from the Vaulted Singles store. One click to go from decklist to checkout.",
+    body:  "Don't own the cards yet? Click any Buy Deck button and we'll build you an optimized cart with every card you're missing — sourced from TCGplayer or ManaPool. One click to go from decklist to checkout.",
     cta:   'Next: Wishlist',
   },
   {
