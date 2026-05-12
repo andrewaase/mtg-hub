@@ -340,7 +340,7 @@ function TournamentWidget({ collection, setPage }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function Dashboard({ matches, collection, openLogMatch, setPage }) {
+export default function Dashboard({ matches, collection, openLogMatch, setPage, onStartTutorial }) {
   const winRate = calculateWinRate(matches)
   const streak  = calculateStreak(matches)
 
@@ -576,6 +576,21 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage }
           </div>
         </div>
       )}
+
+      {/* ── Restart tutorial ── */}
+      <div style={{ textAlign: 'center', padding: '28px 16px 8px' }}>
+        <button
+          onClick={onStartTutorial}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '.75rem', color: 'var(--text-muted)',
+            textDecoration: 'underline', textDecorationStyle: 'dotted',
+            textUnderlineOffset: '3px',
+          }}
+        >
+          🧭 Restart app tour
+        </button>
+      </div>
 
     </div>
   )

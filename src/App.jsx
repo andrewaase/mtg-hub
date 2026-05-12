@@ -279,6 +279,10 @@ export default function App() {
       }
       setShowCamera(true)
     },
+    onStartTutorial: () => {
+      if (user) localStorage.removeItem(`vs-onboarding-done-${user.id}`)
+      setShowOnboarding(true)
+    },
     openDecklist: (deck) => setDecklistDeck(deck),
     setDeckModalOpen,
     openCardSearch,
