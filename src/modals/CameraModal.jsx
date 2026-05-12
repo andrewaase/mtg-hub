@@ -266,9 +266,13 @@ export default function CameraModal({
 
     try {
       const image = captureCardImage(video)
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/.netlify/functions/scan-card', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ image }),
       })
 

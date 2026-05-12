@@ -16,12 +16,27 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
-    }
+  const apiKey      = process.env.ANTHROPIC_API_KEY
+  const SUPABASE_URL = process.env.VITE_SUPABASE_URL
+  const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
+
+  if (!apiKey || !SUPABASE_URL || !SERVICE_KEY) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
+  }
+
+  // Require a logged-in user — prevents anonymous API quota drain
+  const authHeader = (event.headers || {})['authorization'] || ''
+  const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
+  if (!userJwt) {
+    return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Authentication required' }) }
+  }
+  try {
+    const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
+    })
+    if (!verifyRes.ok) throw new Error('invalid token')
+  } catch {
+    return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
   }
 
   let image

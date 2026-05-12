@@ -7,7 +7,7 @@
 // Uses parallel page fetching. Cached in-memory for 1 hour.
 
 const SCG_SEARCH = 'https://search.starcitygames.com/indexes/sell_list_products_v2/search'
-const SCG_BEARER = '93ea1c4b1d97ce79e8cb8b860a3b20b1493b2d3eb0fb647590409bf03bf2ffca'
+const SCG_BEARER = process.env.SCG_BEARER_TOKEN || '93ea1c4b1d97ce79e8cb8b860a3b20b1493b2d3eb0fb647590409bf03bf2ffca'
 const LIMIT = 1000
 
 let _cache    = null
