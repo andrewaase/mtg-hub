@@ -546,7 +546,9 @@ function SearchView({ onBack, onCardSelect }) {
 export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch }) {
   const [view, setView]           = useState('home') // 'home' | 'search' | 'set' | 'card'
   const [sets, setSets]           = useState([])
+  const [secretLairs, setSecretLairs] = useState([])
   const [setsLoading, setSetsLoad] = useState(true)
+  const [setSearch, setSetSearch] = useState('')
   const [selectedSet, setSelSet]  = useState(null)
   const [cardDetail, setCardDetail] = useState(null)
   const [printings, setPrintings]  = useState([])
@@ -574,17 +576,31 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
     }
   }, [initialSearch]) // eslint-disable-line
 
-  // Load MTG paper sets
+  // Load MTG paper sets — all of them
   useEffect(() => {
     setSetsLoad(true)
     fetch('https://api.scryfall.com/sets')
       .then(r => r.json())
       .then(data => {
-        const valid = ['expansion', 'core', 'masters', 'draft_innovation', 'commander', 'duel_deck']
-        const paper = (data.data || [])
-          .filter(s => valid.includes(s.set_type) && !s.digital && s.card_count >= 10)
-          .slice(0, 40)
-        setSets(paper)
+        const all = data.data || []
+
+        // Main paper sets: broad type list covers every physical product line
+        const MAIN_TYPES = new Set([
+          'expansion', 'core', 'masters', 'draft_innovation',
+          'commander', 'duel_deck', 'funny', 'starter', 'box',
+          'from_the_vault', 'spellbook', 'planechase', 'archenemy',
+          'memorabilia',
+        ])
+        const mainSets = all.filter(s =>
+          MAIN_TYPES.has(s.set_type) && !s.digital && s.card_count >= 1
+        )
+        setSets(mainSets)
+
+        // Secret Lairs: parent set code 'sld' or the SLD set itself
+        const slSets = all.filter(s =>
+          !s.digital && (s.code === 'sld' || s.parent_set_code === 'sld')
+        ).sort((a, b) => (b.released_at || '').localeCompare(a.released_at || ''))
+        setSecretLairs(slSets)
       })
       .catch(() => {})
       .finally(() => setSetsLoad(false))
@@ -694,36 +710,102 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
 
       {/* Sets list */}
       <div style={{ marginTop: '24px' }}>
-        <div style={{ padding: '0 16px 8px', fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: MUTED }}>
-          Recent expansions
+
+        {/* Set search */}
+        <div style={{ padding: '0 16px 12px' }}>
+          <input
+            value={setSearch}
+            onChange={e => setSetSearch(e.target.value)}
+            placeholder="Search sets…"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: '#111', border: '1px solid #222',
+              borderRadius: '8px', padding: '9px 14px',
+              color: '#e0e0e0', fontSize: '.85rem', outline: 'none',
+            }}
+          />
         </div>
 
         {setsLoading ? (
           <div style={{ padding: '32px', textAlign: 'center', color: MUTED, fontSize: '.82rem' }}>Loading sets…</div>
-        ) : (
-          <div style={{ borderTop: `1px solid ${DIVID}` }}>
-            {sets.map(set => (
-              <div
-                key={set.code}
-                onClick={() => openSet(set)}
-                style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', borderBottom: `1px solid #0f0f0f`, cursor: 'pointer', transition: 'background .1s' }}
-                onMouseEnter={e => e.currentTarget.style.background = ROW}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <SetIcon uri={set.icon_svg_uri} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: '#e0e0e0', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {set.name}
-                  </div>
-                  <div style={{ fontSize: '.68rem', color: MUTED, marginTop: '1px' }}>
-                    {set.card_count} cards · {set.released_at?.slice(0, 4)}
-                  </div>
+        ) : (() => {
+          const q = setSearch.toLowerCase()
+          const filtered     = sets.filter(s => !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
+          const filteredSL   = secretLairs.filter(s => !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
+
+          // Group main sets by type bucket
+          const TYPE_GROUPS = [
+            { label: 'Expansions & Core Sets',   types: new Set(['expansion', 'core']) },
+            { label: 'Commander',                 types: new Set(['commander']) },
+            { label: 'Masters & Draft Innovation',types: new Set(['masters', 'draft_innovation']) },
+            { label: 'Supplemental & Special',    types: new Set(['duel_deck', 'box', 'from_the_vault', 'spellbook', 'planechase', 'archenemy', 'memorabilia', 'starter']) },
+            { label: 'Un-Sets & Funny',           types: new Set(['funny']) },
+          ]
+
+          const SetRow = ({ set }) => (
+            <div
+              key={set.code}
+              onClick={() => openSet(set)}
+              style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', borderBottom: `1px solid #0f0f0f`, cursor: 'pointer', transition: 'background .1s' }}
+              onMouseEnter={e => e.currentTarget.style.background = ROW}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <SetIcon uri={set.icon_svg_uri} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#e0e0e0', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {set.name}
                 </div>
-                <span style={{ color: '#333', fontSize: '1.1rem', lineHeight: 1, flexShrink: 0 }}>›</span>
+                <div style={{ fontSize: '.68rem', color: MUTED, marginTop: '1px' }}>
+                  {set.card_count} cards · {set.released_at?.slice(0, 4)}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+              <span style={{ color: '#333', fontSize: '1.1rem', lineHeight: 1, flexShrink: 0 }}>›</span>
+            </div>
+          )
+
+          const SectionHeader = ({ label, count }) => (
+            <div style={{ padding: '12px 16px 6px', fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#444', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{label}</span>
+              <span style={{ color: '#333' }}>{count}</span>
+            </div>
+          )
+
+          if (q) {
+            // Search mode: flat list across all groups + secret lairs
+            const all = [...filtered, ...filteredSL]
+            return (
+              <div style={{ borderTop: `1px solid ${DIVID}` }}>
+                {all.length === 0
+                  ? <div style={{ padding: '24px', textAlign: 'center', color: MUTED, fontSize: '.82rem' }}>No sets found</div>
+                  : all.map(set => <SetRow key={set.code} set={set} />)
+                }
+              </div>
+            )
+          }
+
+          return (
+            <div style={{ borderTop: `1px solid ${DIVID}` }}>
+              {TYPE_GROUPS.map(({ label, types }) => {
+                const group = filtered.filter(s => types.has(s.set_type))
+                if (group.length === 0) return null
+                return (
+                  <div key={label}>
+                    <SectionHeader label={label} count={group.length} />
+                    {group.map(set => <SetRow key={set.code} set={set} />)}
+                  </div>
+                )
+              })}
+
+              {/* Secret Lairs */}
+              {filteredSL.length > 0 && (
+                <div>
+                  <SectionHeader label="✦ Secret Lairs" count={filteredSL.length} />
+                  {filteredSL.map(set => <SetRow key={set.code} set={set} />)}
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
