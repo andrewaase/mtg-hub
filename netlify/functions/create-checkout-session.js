@@ -5,6 +5,8 @@
 const { corsHeaders } = require('./_cors')
 
 const VALID_PRICE_IDS = new Set([
+  'price_1TW5PM3vsGfrYNehY1OmZnFZ', // $2.99/month
+  'price_1TW5PM3vsGfrYNehCP3u9HTL', // $24.99/year
   process.env.STRIPE_MONTHLY_PRICE_ID,
   process.env.STRIPE_ANNUAL_PRICE_ID,
 ].filter(Boolean))

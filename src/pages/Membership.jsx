@@ -4,8 +4,8 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const MONTHLY_PRICE_ID = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID
-const ANNUAL_PRICE_ID  = import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID
+const MONTHLY_PRICE_ID = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_1TW5PM3vsGfrYNehY1OmZnFZ'
+const ANNUAL_PRICE_ID  = import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID  || 'price_1TW5PM3vsGfrYNehCP3u9HTL'
 
 export default function Membership({ user, showToast, membership, onMembershipChange }) {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'annual'
