@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, hasSupabase } from './lib/supabase'
-import { getMatches, getCollection, addCard, addMatch } from './lib/db'
+import { getMatches, getCollection, addCard, addMatch, getWishlist } from './lib/db'
 import { takeSnapshot } from './lib/priceHistory'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -26,6 +26,7 @@ import Store from './pages/Store'
 import About from './pages/About'
 import Membership from './pages/Membership'
 import OnboardingTutorial from './components/OnboardingTutorial'
+import { CollectionSkeleton, DecksSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
 
 const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin']
@@ -70,6 +71,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [matches, setMatches] = useState([])
   const [collection, setCollection] = useState([])
+  const [wishlist, setWishlist] = useState([])
   const [toast, setToast] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const [showLogMatch, setShowLogMatch] = useState(false)
@@ -119,6 +121,57 @@ export default function App() {
     document.body.style.overflow = sidebarOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    function handleKeyDown(e) {
+      // '/' key — focus the search input on any page that has one
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault()
+        const input = document.querySelector('input[type="search"], input[placeholder*="earch"], input[placeholder*="earch"]')
+          || document.querySelector('input[type="text"]')
+        input?.focus()
+        return
+      }
+      // 'Escape' key — close open modals
+      if (e.key === 'Escape') {
+        if (showAuth)     { setShowAuth(false);     setAuthPrompt(null) }
+        if (showLogMatch) { setShowLogMatch(false) }
+        if (showAddCard)  { setShowAddCard(false) }
+        if (showCamera)   { setShowCamera(false) }
+        if (sidebarOpen)  { setSidebarOpen(false) }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showAuth, showLogMatch, showAddCard, showCamera, sidebarOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Mobile swipe-right to go back ─────────────────────────────────────────
+  useEffect(() => {
+    let touchStartX = 0
+    let touchStartY = 0
+
+    function onTouchStart(e) {
+      touchStartX = e.touches[0].clientX
+      touchStartY = e.touches[0].clientY
+    }
+
+    function onTouchEnd(e) {
+      const dx = e.changedTouches[0].clientX - touchStartX
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY)
+      // Only fire on a left-edge swipe (start ≤ 32px) that is clearly horizontal
+      if (touchStartX <= 32 && dx > 60 && dy < 60) {
+        window.history.back()
+      }
+    }
+
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [])
 
   // Browser back/forward
   useEffect(() => {
@@ -193,7 +246,7 @@ export default function App() {
 
     async function load() {
       setLoading(true)
-      const [m, c] = await Promise.all([getMatches(user?.id), getCollection(user?.id)])
+      const [m, c, w] = await Promise.all([getMatches(user?.id), getCollection(user?.id), getWishlist(user?.id)])
 
       // Auto-migrate localStorage data → Supabase on first sign-in
       if (user && hasSupabase) {
@@ -224,6 +277,7 @@ export default function App() {
 
       setMatches(m)
       setCollection(withBinders(c))
+      setWishlist(w || [])
       setLoading(false)
 
       // Daily portfolio snapshot (no-op if already taken today)
@@ -262,7 +316,7 @@ export default function App() {
   }, [])
 
   const pageProps = {
-    user, isAdmin, matches, setMatches, collection, setCollection, showToast, setPage,
+    user, isAdmin, matches, setMatches, collection, setCollection, wishlist, setWishlist, showToast, setPage,
     membership,
     openLogMatch: () => setShowLogMatch(true),
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
@@ -296,7 +350,12 @@ export default function App() {
       <div id="main">
         <TopBar page={page} user={user} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} />
         <div id="content">
-          {!loading && (
+          {loading ? (
+            /* Show a contextual skeleton while data loads */
+            page === 'collection' ? <CollectionSkeleton /> :
+            page === 'decks'      ? <DecksSkeleton />      :
+            null
+          ) : (
             <>
               {page === 'dashboard'  && <Dashboard {...pageProps} />}
               {page === 'log'        && <MatchLog {...pageProps} />}

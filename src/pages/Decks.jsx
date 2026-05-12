@@ -290,6 +290,120 @@ function DeckArtTile({ deck, collection, onClick, onEdit, onDelete }) {
   )
 }
 
+// ── Deck stats bar: mana curve + color identity ───────────────────────────────
+const COLOR_META = {
+  W: { label: 'White',     color: '#f9fafb', bg: 'rgba(249,250,251,.18)' },
+  U: { label: 'Blue',      color: '#60a5fa', bg: 'rgba(96,165,250,.22)'  },
+  B: { label: 'Black',     color: '#a78bfa', bg: 'rgba(167,139,250,.22)' },
+  R: { label: 'Red',       color: '#f87171', bg: 'rgba(248,113,113,.22)' },
+  G: { label: 'Green',     color: '#4ade80', bg: 'rgba(74,222,128,.22)'  },
+  C: { label: 'Colorless', color: '#94a3b8', bg: 'rgba(148,163,184,.18)' },
+}
+
+function DeckStatsBar({ mainboard, cardStats, cardTypes }) {
+  // ── Mana curve ────────────────────────────────────────────────────────────
+  const cmcBuckets = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 } // 6 = "6+"
+  for (const card of mainboard) {
+    if (/\bLand\b/.test(cardTypes[card.name] || '')) continue // skip lands
+    const cmc = Math.min(6, Math.floor(cardStats[card.name]?.cmc ?? 0))
+    cmcBuckets[cmc] = (cmcBuckets[cmc] || 0) + (card.qty || 1)
+  }
+  const maxCmc   = Math.max(1, ...Object.values(cmcBuckets))
+  const cmcTotal = Object.values(cmcBuckets).reduce((s, v) => s + v, 0)
+
+  // ── Color identity ────────────────────────────────────────────────────────
+  const colorCounts = { W: 0, U: 0, B: 0, R: 0, G: 0 }
+  let colorlessCount = 0
+  for (const card of mainboard) {
+    const colors = cardStats[card.name]?.colors || []
+    const qty    = card.qty || 1
+    if (colors.length === 0) { colorlessCount += qty; continue }
+    for (const c of colors) {
+      if (colorCounts[c] !== undefined) colorCounts[c] += qty
+    }
+  }
+  const colorEntries = Object.entries(colorCounts).filter(([, v]) => v > 0)
+  if (colorlessCount > 0) colorEntries.push(['C', colorlessCount])
+  const maxColor = Math.max(1, ...colorEntries.map(([, v]) => v))
+
+  const CMC_LABELS = ['0', '1', '2', '3', '4', '5', '6+']
+
+  return (
+    <div style={{
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
+      borderRadius: '12px', padding: '14px 16px', marginBottom: '20px',
+    }}>
+      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+
+        {/* Mana Curve */}
+        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+          <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Mana Curve {cmcTotal > 0 && <span style={{ fontWeight: 400, opacity: .7 }}>({cmcTotal} non-land)</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '60px' }}>
+            {CMC_LABELS.map((label, i) => {
+              const count = cmcBuckets[i] || 0
+              const pct   = count / maxCmc
+              return (
+                <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                  {count > 0 && (
+                    <div style={{ fontSize: '.55rem', color: 'var(--text-muted)', lineHeight: 1 }}>{count}</div>
+                  )}
+                  <div style={{
+                    width: '100%', borderRadius: '3px 3px 0 0',
+                    height: `${Math.max(pct * 48, count > 0 ? 4 : 0)}px`,
+                    background: count > 0
+                      ? `linear-gradient(180deg, #c9a84c, #f59e0b)`
+                      : 'var(--bg-secondary)',
+                    transition: 'height .3s',
+                  }} />
+                  <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', marginTop: '2px' }}>{label}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Divider */}
+        {colorEntries.length > 0 && (
+          <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch', flexShrink: 0 }} />
+        )}
+
+        {/* Color Identity */}
+        {colorEntries.length > 0 && (
+          <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+            <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+              Color Identity
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {colorEntries.sort((a, b) => b[1] - a[1]).map(([col, count]) => {
+                const meta = COLOR_META[col] || COLOR_META.C
+                const pct  = count / maxColor
+                return (
+                  <div key={col} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '.68rem', color: meta.color, width: '14px', textAlign: 'center', flexShrink: 0, fontWeight: 700 }}>{col}</div>
+                    <div style={{ flex: 1, height: '10px', borderRadius: '99px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: '99px',
+                        width: `${pct * 100}%`,
+                        background: meta.color,
+                        opacity: .85,
+                        transition: 'width .4s',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', width: '20px', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
 // ── Card row with hover preview ───────────────────────────────────────────────
 function CardRow({ card, cardValues, isLast, openCardSearch }) {
   const [previewImg, setPreviewImg] = useState(null)
@@ -541,8 +655,9 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
     }
   }, [deckValue]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Card type grouping ────────────────────────────────────────────────────
+  // ── Card type grouping + stats (CMC, colors) ─────────────────────────────
   const [cardTypes,    setCardTypes]    = useState({})
+  const [cardStats,    setCardStats]    = useState({})   // { [name]: { cmc, colors } }
   const [typesLoading, setTypesLoading] = useState(true)
 
   useEffect(() => {
@@ -567,6 +682,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
         .then(r => r.ok ? r.json() : { data: [] })
         .then(({ data = [] }) => {
           const types = {}
+          const stats = {}
           for (const card of data) {
             // For DFCs the type_line is "Creature — X // Planeswalker — Y".
             // Use only the front face so the card goes in the right bucket.
@@ -577,6 +693,11 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
             const frontName = card.name.split(' // ')[0]
             if (frontName !== card.name) types[frontName] = typeLine
 
+            // Store CMC + color identity for mana curve / color charts
+            const cardData = { cmc: card.cmc ?? 0, colors: card.color_identity || [] }
+            stats[card.name] = cardData
+            if (frontName !== card.name) stats[frontName] = cardData
+
             // Pre-cache the image URL so the hand simulator shows cards immediately
             // without needing individual per-card fetches when the modal opens.
             const imgUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || null
@@ -585,14 +706,15 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
               if (frontName !== card.name && !IMG_CACHE.has(frontName)) IMG_CACHE.set(frontName, imgUrl)
             }
           }
-          return types
+          return { types, stats }
         })
-        .catch(() => ({}))
+        .catch(() => ({ types: {}, stats: {} }))
       )
     }
 
     Promise.all(promises).then(results => {
-      setCardTypes(Object.assign({}, ...results))
+      setCardTypes(Object.assign({}, ...results.map(r => r.types)))
+      setCardStats(Object.assign({}, ...results.map(r => r.stats)))
       setTypesLoading(false)
     })
   }, [deck.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -738,6 +860,11 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
             </div>
           )}
         </div>
+      )}
+
+      {/* Deck stats: mana curve + color identity */}
+      {!typesLoading && Object.keys(cardStats).length > 0 && (
+        <DeckStatsBar mainboard={mainboard} cardStats={cardStats} cardTypes={cardTypes} />
       )}
 
       {/* Card grid */}

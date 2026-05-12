@@ -662,6 +662,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
   const [search,       setSearch]       = useState('')
   const [showFilters,  setShowFilters]  = useState(false)
   const [showBulk,     setShowBulk]     = useState(false)
+  const [showInsurance, setShowInsurance] = useState(false)
 
   // Card type filter with lazy Scryfall fetch
   const [filterType,   setFilterType]   = useState(null)
@@ -1004,6 +1005,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
         </button>
         <button className="btn btn-ghost" onClick={handleExport} title="Export CSV">⬇️</button>
         <button className="btn btn-ghost" onClick={handleBackup} title="Backup JSON">💾</button>
+        <button className="btn btn-ghost" onClick={() => setShowInsurance(true)} title="Insurance / Print Report" style={{ fontSize: '.78rem' }}>🖨️</button>
         <span style={{ marginLeft: 'auto', fontSize: '.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {total} cards
           {totalValue > 0 && (
@@ -1483,7 +1485,142 @@ export default function Collection({ collection, setCollection, user, openAddCar
           showToast={showToast}
         />
       )}
+      {showInsurance && (
+        <InsuranceModal collection={collection} onClose={() => setShowInsurance(false)} />
+      )}
     </div>
+  )
+}
+
+// ── Insurance / Print Report Modal ───────────────────────────────────────────
+
+function InsuranceModal({ collection, onClose }) {
+  const totalValue = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
+  const totalCards = collection.reduce((s, c) => s + (c.qty || 1), 0)
+  const today      = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  // Top 20 most valuable cards
+  const topCards = [...collection]
+    .map(c => ({ ...c, totalVal: (parseFloat(c.price) || 0) * (c.qty || 1) }))
+    .sort((a, b) => b.totalVal - a.totalVal)
+    .slice(0, 20)
+
+  function handlePrint() {
+    window.print()
+  }
+
+  return (
+    <>
+      {/* Backdrop — hidden when printing */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 500, backdropFilter: 'blur(4px)' }}
+        className="no-print"
+      />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(680px, 96vw)', maxHeight: '90vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: '18px', zIndex: 501, padding: '24px',
+        boxShadow: '0 24px 60px rgba(0,0,0,.7)',
+      }}>
+        {/* Toolbar — hidden when printing */}
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: '1rem' }}>🖨️ Insurance / Print Report</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>Shows top 20 cards by value + totals. Use your browser's Print to save as PDF.</div>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={handlePrint}>🖨️ Print / Save PDF</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1.1rem', padding: '4px 8px' }}>✕</button>
+        </div>
+
+        {/* ── Report content (also what prints) ── */}
+        <div id="insurance-report">
+          {/* Header */}
+          <div style={{ borderBottom: '2px solid var(--accent-gold)', paddingBottom: '14px', marginBottom: '16px' }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-gold)' }}>Vaulted Singles — Collection Insurance Report</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Generated on {today}</div>
+          </div>
+
+          {/* Summary stats */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            {[
+              ['Total Cards',   totalCards.toLocaleString()],
+              ['Unique Cards',  collection.length.toLocaleString()],
+              ['Mid Value',     `$${totalValue.toFixed(2)}`],
+              ['Low Est.',      `$${(totalValue * 0.80).toFixed(2)}`],
+              ['High Est.',     `$${(totalValue * 1.25).toFixed(2)}`],
+            ].map(([label, val]) => (
+              <div key={label} style={{
+                flex: '1 1 100px', background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)', borderRadius: '10px',
+                padding: '10px 14px',
+              }}>
+                <div style={{ fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>{label}</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: label === 'Mid Value' ? 'var(--accent-gold)' : 'var(--text-primary)', marginTop: '2px' }}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Top cards table */}
+          <div style={{ fontSize: '.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            Top {topCards.length} Cards by Value
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['#', 'Card', 'Set', 'Condition', 'Qty', 'Unit Price', 'Total'].map(h => (
+                  <th key={h} style={{ textAlign: h === '#' || h === 'Qty' ? 'center' : 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 700, fontSize: '.68rem' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {topCards.map((card, i) => (
+                <tr key={card.id || i} style={{ borderBottom: '1px solid var(--border-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--bg-secondary)' }}>
+                  <td style={{ textAlign: 'center', padding: '7px 8px', color: 'var(--text-muted)', fontSize: '.7rem' }}>{i + 1}</td>
+                  <td style={{ padding: '7px 8px', fontWeight: 600 }}>
+                    {card.name}
+                    {card.isFoil && <span style={{ marginLeft: '5px', fontSize: '.6rem', color: '#7dd3fc' }}>✨ Foil</span>}
+                  </td>
+                  <td style={{ padding: '7px 8px', color: 'var(--text-muted)', fontSize: '.72rem' }}>{card.setName || '—'}</td>
+                  <td style={{ padding: '7px 8px', color: 'var(--text-muted)', fontSize: '.72rem' }}>{card.condition || 'NM'}</td>
+                  <td style={{ textAlign: 'center', padding: '7px 8px' }}>{card.qty || 1}</td>
+                  <td style={{ padding: '7px 8px', color: 'var(--accent-gold)' }}>
+                    {card.price ? `$${parseFloat(card.price).toFixed(2)}` : '—'}
+                  </td>
+                  <td style={{ padding: '7px 8px', fontWeight: 700, color: 'var(--accent-gold)' }}>
+                    {card.totalVal > 0 ? `$${card.totalVal.toFixed(2)}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid var(--accent-gold)' }}>
+                <td colSpan={5} style={{ padding: '8px', fontWeight: 800 }}>Total (top {topCards.length})</td>
+                <td />
+                <td style={{ padding: '8px', fontWeight: 800, color: 'var(--accent-gold)', fontSize: '.95rem' }}>
+                  ${topCards.reduce((s, c) => s + c.totalVal, 0).toFixed(2)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div style={{ marginTop: '16px', fontSize: '.68rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+            Prices are market mid estimates from Scryfall / TCGPlayer at time of export. This report is for informational purposes only and does not constitute a professional appraisal. Consult a certified appraiser for insurance purposes.
+          </div>
+        </div>
+      </div>
+
+      {/* Print-only styles */}
+      <style>{`
+        @media print {
+          body > * { visibility: hidden !important; }
+          #insurance-report, #insurance-report * { visibility: visible !important; }
+          #insurance-report { position: fixed; top: 0; left: 0; width: 100%; padding: 20px; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+    </>
   )
 }
 

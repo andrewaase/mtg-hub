@@ -543,6 +543,30 @@ function SearchView({ onBack, onCardSelect }) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
+// ── Recently viewed helpers ────────────────────────────────────────────────────
+const RV_KEY   = 'vs-recently-viewed'
+const RV_MAX   = 8
+
+function loadRecentlyViewed() {
+  try { return JSON.parse(localStorage.getItem(RV_KEY) || '[]') } catch { return [] }
+}
+
+function saveRecentlyViewed(card) {
+  try {
+    const existing = loadRecentlyViewed().filter(c => c.id !== card.id)
+    const entry = {
+      id:    card.id,
+      name:  card.name,
+      img:   card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || null,
+      price: card.prices?.usd || null,
+      set:   card.set_name || null,
+    }
+    const updated = [entry, ...existing].slice(0, RV_MAX)
+    localStorage.setItem(RV_KEY, JSON.stringify(updated))
+    return updated
+  } catch { return [] }
+}
+
 export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch }) {
   const [view, setView]           = useState('home') // 'home' | 'search' | 'set' | 'card'
   const [sets, setSets]           = useState([])
@@ -553,6 +577,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
   const [cardDetail, setCardDetail] = useState(null)
   const [printings, setPrintings]  = useState([])
   const [printLoad, setPrintLoad]  = useState(false)
+  const [recentCards, setRecentCards] = useState(loadRecentlyViewed)
   const prevView = useRef('home')
 
   // Incoming card from Dashboard (random card or format staple tap)
@@ -619,6 +644,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
     setCardDetail(card)
     prevView.current = view
     setView('card')
+    setRecentCards(saveRecentlyViewed(card))
     getAllPrintings(card.name)
       .then(p => { setPrintings(p); setPrintLoad(false) })
       .catch(() => setPrintLoad(false))
@@ -708,8 +734,45 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
         <span style={{ color: '#444', fontSize: '1.1rem', lineHeight: 1 }}>›</span>
       </div>
 
+      {/* Recently Viewed */}
+      {recentCards.length > 0 && (
+        <div style={{ marginTop: '24px', paddingBottom: '4px' }}>
+          <div style={{ padding: '0 16px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: MUTED }}>
+              Recently Viewed
+            </div>
+            <button
+              onClick={() => { localStorage.removeItem(RV_KEY); setRecentCards([]) }}
+              style={{ background: 'none', border: 'none', color: '#333', fontSize: '.65rem', cursor: 'pointer', padding: '2px 4px' }}
+            >
+              Clear
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', paddingLeft: '16px', paddingRight: '16px', overflowX: 'auto', paddingBottom: '12px' }}>
+            {recentCards.map(rc => (
+              <div
+                key={rc.id}
+                onClick={() => openCardDetail(rc.name)}
+                style={{ flexShrink: 0, width: '80px', cursor: 'pointer' }}
+              >
+                {rc.img
+                  ? <img src={rc.img} alt={rc.name} style={{ width: '80px', borderRadius: '6px', display: 'block', border: '1px solid #1a1a1a', transition: 'transform .12s' }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    />
+                  : <div style={{ width: '80px', height: '112px', background: '#111', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>🃏</div>
+                }
+                <div style={{ marginTop: '4px', fontSize: '.6rem', color: '#888', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {rc.price ? `$${parseFloat(rc.price).toFixed(2)}` : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sets list */}
-      <div style={{ marginTop: '24px' }}>
+      <div style={{ marginTop: recentCards.length > 0 ? '8px' : '24px' }}>
 
         {/* Set search */}
         <div style={{ padding: '0 16px 12px' }}>

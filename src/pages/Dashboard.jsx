@@ -340,7 +340,7 @@ function TournamentWidget({ collection, setPage }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function Dashboard({ matches, collection, openLogMatch, setPage, onStartTutorial }) {
+export default function Dashboard({ matches, collection, wishlist, openLogMatch, setPage, onStartTutorial }) {
   const winRate = calculateWinRate(matches)
   const streak  = calculateStreak(matches)
 
@@ -419,6 +419,39 @@ export default function Dashboard({ matches, collection, openLogMatch, setPage, 
           </button>
         </div>
       )}
+
+      {/* ── Wishlist alert badge ── */}
+      {(() => {
+        const wl = wishlist || []
+        const hits = wl.filter(i => i.targetPrice != null && i.currentPrice != null && i.currentPrice <= i.targetPrice)
+        if (hits.length === 0) return null
+        return (
+          <div
+            onClick={() => setPage?.('wishlist')}
+            style={{
+              margin: '12px 16px 0', cursor: 'pointer',
+              background: 'linear-gradient(135deg, rgba(62,207,178,.12), rgba(62,207,178,.06))',
+              border: '1px solid rgba(62,207,178,.35)',
+              borderRadius: '12px', padding: '11px 14px',
+              display: 'flex', alignItems: 'center', gap: '10px',
+              transition: 'border-color .15s, background .15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(62,207,178,.6)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(62,207,178,.35)'}
+          >
+            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>🎯</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--accent-teal)' }}>
+                {hits.length} wishlist card{hits.length > 1 ? 's' : ''} at or below target price!
+              </div>
+              <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {hits.map(h => h.name).join(', ')}
+              </div>
+            </div>
+            <span style={{ fontSize: '.75rem', color: 'var(--accent-teal)', flexShrink: 0 }}>View →</span>
+          </div>
+        )
+      })()}
 
       {/* ── Portfolio Value (compact horizontal layout) ── */}
       <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px 0', overflow: 'hidden' }}>
