@@ -168,6 +168,10 @@ exports.handler = async (event) => {
     const items = JSON.parse(meta.items || '[]')
     if (!items.length) throw new Error('No items in metadata')
 
+    // Validate all item IDs are UUIDs before any are used in PostgREST URLs
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!items.every(i => i.id && UUID_RE.test(i.id))) throw new Error('Invalid item ID in metadata')
+
     // ── 0. Idempotency check — skip if this payment was already processed ────
     const dupRes  = await fetch(
       `${SUPABASE_URL}/rest/v1/orders?stripe_payment_intent=eq.${pi.id}&select=id&limit=1`,

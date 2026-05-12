@@ -29,6 +29,12 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields (items, shipping.name, shipping.email, shipping.line1)' }) }
   }
 
+  // Validate all item IDs are UUIDs before interpolating into PostgREST URLs
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!items.every(i => i.id && UUID_RE.test(i.id))) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid item ID format' }) }
+  }
+
   const adminHeaders = {
     apikey:        SERVICE_KEY,
     Authorization: `Bearer ${SERVICE_KEY}`,
@@ -68,7 +74,7 @@ exports.handler = async (event) => {
     let subtotal = 0
     for (const item of items) {
       const listing = listings.find(l => l.id === item.id)
-      if (!listing)              return { statusCode: 400, body: JSON.stringify({ error: `Item not found: ${item.id}` }) }
+      if (!listing)              return { statusCode: 400, body: JSON.stringify({ error: 'One or more cart items could not be found' }) }
       if (!listing.active)       return { statusCode: 400, body: JSON.stringify({ error: `${listing.name} is no longer available` }) }
       if (listing.qty_available < (item.qty || 1)) {
         return { statusCode: 400, body: JSON.stringify({ error: `Not enough stock for ${listing.name}` }) }
