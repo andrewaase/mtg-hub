@@ -75,6 +75,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [authPrompt, setAuthPrompt] = useState(null)
   // Deck modal nav-block: prevents accidental navigation while deck editor is open
   const deckModalOpenRef = useRef(false)
   const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
@@ -243,7 +244,14 @@ export default function App() {
     user, isAdmin, matches, setMatches, collection, setCollection, showToast, setPage,
     openLogMatch: () => setShowLogMatch(true),
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
-    openCamera: () => setShowCamera(true),
+    openCamera: () => {
+      if (!user) {
+        setAuthPrompt({ icon: '📷', title: 'Scan cards with your camera', body: 'Create a free account to scan cards and add them to your collection instantly.' })
+        setShowAuth(true)
+        return
+      }
+      setShowCamera(true)
+    },
     openDecklist: (deck) => setDecklistDeck(deck),
     setDeckModalOpen,
     openCardSearch,
@@ -276,9 +284,9 @@ export default function App() {
           )}
         </div>
       </div>
-      <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={() => setShowCamera(true)} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
+      <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
-      {showAuth    && <AuthModal onClose={() => setShowAuth(false)} showToast={showToast} user={user} />}
+      {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
       {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}

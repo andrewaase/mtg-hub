@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
-export default function AuthModal({ onClose, showToast, user }) {
-  const [tab, setTab] = useState('signin')
+export default function AuthModal({ onClose, showToast, user, prompt, defaultTab }) {
+  const [tab, setTab] = useState(defaultTab || 'signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -98,6 +98,18 @@ export default function AuthModal({ onClose, showToast, user }) {
   return (
     <div className="auth-modal open">
       <div className="modal-box" style={{ maxWidth: '380px' }}>
+        {prompt && (
+          <div style={{
+            background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)',
+            borderRadius: '10px', padding: '14px 16px', marginBottom: '20px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{prompt.icon}</div>
+            <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--accent-gold)', marginBottom: '4px' }}>{prompt.title}</div>
+            <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{prompt.body}</div>
+          </div>
+        )}
+
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.2rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>
             VAULTED SINGLES
