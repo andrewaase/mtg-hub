@@ -129,60 +129,15 @@ function parseRssXml(xmlText, source) {
 }
 
 export async function fetchNews(source) {
-  let feedUrl = ''
-
-  if (source === 'community') {
-    // Wizards removed their RSS feed in their 2024 site redesign.
-    // r/magicTCG covers official announcements, spoilers, and tournament results.
-    feedUrl = 'https://www.reddit.com/r/magicTCG/.rss'
-  } else if (source === 'mtggoldfish') {
-    feedUrl = 'https://www.mtggoldfish.com/feed'
-  } else if (source === 'edhrec') {
-    feedUrl = 'https://edhrec.com/articles/feed'
-  }
-
-  if (!feedUrl) return []
-
-  // 1. Try rss2json (returns JSON items directly) — correct API URL
+  // Fetch via our own Netlify function — avoids CORS and unreliable third-party proxies
   try {
-    const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`
-    const res = await fetchWithTimeout(rss2jsonUrl, 6000)
+    const res = await fetchWithTimeout(
+      `/.netlify/functions/news-feed?source=${encodeURIComponent(source)}`,
+      10000
+    )
     if (res.ok) {
       const data = await res.json()
-      if (data.status === 'ok' && data.items && data.items.length > 0) {
-        return data.items.slice(0, 10).map(item => ({
-          title: item.title || 'Untitled',
-          link: item.link || item.url || '',
-          source,
-          pubDate: item.pubDate || item.published || new Date().toISOString(),
-          image: item.thumbnail || item.enclosure?.link || null,
-          description: item.description || item.content || ''
-        }))
-      }
-    }
-  } catch { /* fall through */ }
-
-  // 2. Try allorigins (returns raw XML in `contents` field) — parse with DOMParser
-  try {
-    const alloriginsUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`
-    const res = await fetchWithTimeout(alloriginsUrl, 6000)
-    if (res.ok) {
-      const data = await res.json()
-      if (data.contents) {
-        const parsed = parseRssXml(data.contents, source)
-        if (parsed && parsed.length > 0) return parsed
-      }
-    }
-  } catch { /* fall through */ }
-
-  // 3. Try corsproxy (returns raw XML) — parse with DOMParser
-  try {
-    const corsproxyUrl = `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`
-    const res = await fetchWithTimeout(corsproxyUrl, 6000)
-    if (res.ok) {
-      const text = await res.text()
-      const parsed = parseRssXml(text, source)
-      if (parsed && parsed.length > 0) return parsed
+      if (data.items?.length > 0) return data.items
     }
   } catch { /* fall through */ }
 
