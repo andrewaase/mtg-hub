@@ -1,6 +1,12 @@
 // netlify/functions/scan-card.js
 // Accepts a base64 JPEG of a MTG card and returns name + set code + collector number via Claude Vision.
 
+// ~5 MB of base64 ≈ ~3.75 MB actual image — well above any real card scan
+const MAX_BASE64_CHARS = 5 * 1024 * 1024
+
+// Valid base64 prefixes for JPEG, PNG, and WebP magic bytes
+const VALID_IMAGE_PREFIXES = ['/9j/', 'iVBOR', 'UklGR']
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
@@ -23,6 +29,16 @@ exports.handler = async (event) => {
 
   if (!image) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing image field' }) }
+  }
+
+  // Reject oversized payloads before hitting the Anthropic API
+  if (image.length > MAX_BASE64_CHARS) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Image exceeds maximum allowed size' }) }
+  }
+
+  // Reject anything that doesn't look like a real image (JPEG, PNG, or WebP)
+  if (!VALID_IMAGE_PREFIXES.some(prefix => image.startsWith(prefix))) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid image format' }) }
   }
 
   try {
