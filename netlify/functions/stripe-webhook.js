@@ -3,22 +3,40 @@
 // On payment_intent.succeeded: creates the order in Supabase, decrements inventory,
 // and sends an itemized HTML confirmation email via Resend.
 
+// ── HTML escaping ────────────────────────────────────────────────────────────
+// Escapes user-supplied strings before interpolating into HTML email templates.
+function escHtml(str) {
+  if (str == null) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Only allow https:// image URLs in email — prevents javascript: and data: URIs
+function safeImgSrc(url) {
+  if (typeof url === 'string' && url.startsWith('https://')) return escHtml(url)
+  return ''
+}
+
 // ── HTML confirmation email ──────────────────────────────────────────────────
 async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCost, total, address }, resendKey) {
   const itemRows = items.map(item => `
     <tr>
       <td style="padding:10px 8px;border-bottom:1px solid #1e293b;vertical-align:middle;width:46px;">
-        ${item.img_url
-          ? `<img src="${item.img_url}" width="36" style="border-radius:4px;display:block;" alt="">`
+        ${safeImgSrc(item.img_url)
+          ? `<img src="${safeImgSrc(item.img_url)}" width="36" style="border-radius:4px;display:block;" alt="">`
           : `<div style="width:36px;height:50px;background:#1e293b;border-radius:4px;"></div>`
         }
       </td>
       <td style="padding:10px 8px;border-bottom:1px solid #1e293b;vertical-align:middle;">
-        <div style="font-weight:600;font-size:14px;color:#f1f5f9;">${item.name}</div>
-        <div style="font-size:12px;color:#64748b;margin-top:2px;">${[item.set_name, item.is_foil ? '✦ Foil' : ''].filter(Boolean).join(' · ')}</div>
+        <div style="font-weight:600;font-size:14px;color:#f1f5f9;">${escHtml(item.name)}</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;">${[escHtml(item.set_name), item.is_foil ? '✦ Foil' : ''].filter(Boolean).join(' · ')}</div>
       </td>
-      <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:center;color:#94a3b8;font-size:13px;">${item.condition || 'NM'}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:center;font-size:13px;color:#e2e8f0;">${item.qty}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:center;color:#94a3b8;font-size:13px;">${escHtml(item.condition || 'NM')}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:center;font-size:13px;color:#e2e8f0;">${escHtml(item.qty)}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:right;font-weight:700;font-size:14px;color:#c9a84c;">$${(item.price * item.qty).toFixed(2)}</td>
     </tr>`).join('')
 
@@ -41,7 +59,7 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
   <!-- Greeting -->
   <tr>
     <td style="padding:28px 36px 4px;">
-      <p style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0 0 10px;">Thanks, ${firstName}! Your order is confirmed 🎉</p>
+      <p style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0 0 10px;">Thanks, ${escHtml(firstName)}! Your order is confirmed 🎉</p>
       <p style="color:#94a3b8;font-size:14px;line-height:1.7;margin:0;">Your payment was successful. We'll get your cards packed up and send a shipping notification within 1–2 business days.</p>
     </td>
   </tr>
@@ -82,7 +100,7 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
         <tr>
           <td style="padding:14px 16px;">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px;">📦 Shipping To</div>
-            <div style="color:#e2e8f0;font-size:14px;line-height:1.7;">${name}<br>${address.line1}<br>${address.city}, ${address.state} ${address.zip}</div>
+            <div style="color:#e2e8f0;font-size:14px;line-height:1.7;">${escHtml(name)}<br>${escHtml(address.line1)}<br>${escHtml(address.city)}, ${escHtml(address.state)} ${escHtml(address.zip)}</div>
           </td>
         </tr>
       </table>
