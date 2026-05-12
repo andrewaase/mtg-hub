@@ -3,13 +3,22 @@ const { corsHeaders } = require('./_cors')
 // Syncs store listing prices with current Scryfall market data.
 //
 // Triggered two ways:
-//   1. Daily by Netlify scheduler (no auth needed — internal call)
+//   1. Daily by Netlify scheduler — Netlify invokes the function directly,
+//      so event.httpMethod is undefined. No auth needed for that path.
 //   2. Manually via HTTP POST from the admin panel (requires admin JWT)
-//
-// Uses Scryfall's POST /cards/collection endpoint to batch-fetch up to 75
-// cards per request, then patches changed prices in Supabase.
 
 exports.handler = async (event) => {
+  // CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(event) }
+  }
+
+  // Block all plain HTTP requests that are not admin POSTs.
+  // Scheduler invocations have no httpMethod, so they pass through unaffected.
+  if (event.httpMethod && event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
+  }
+
   const ADMIN_EMAIL  = process.env.ADMIN_EMAIL
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
