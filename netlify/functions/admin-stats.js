@@ -118,7 +118,6 @@ exports.handler = async (event) => {
     const ms30d   = 30 * 24 * 60 * 60 * 1000
 
     // Build enriched user list
-    const now = Date.now()
     const users = rawUsers.map(u => {
       const profile = profileByUser[u.id] || {}
       let tier = profile.membership_tier || 'free'
