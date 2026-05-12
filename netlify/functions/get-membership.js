@@ -29,16 +29,30 @@ exports.handler = async (event) => {
   }
 
   // Verify token and get user
-  let userId
+  let userId, userEmail
   try {
     const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
     })
     if (!verifyRes.ok) throw new Error('invalid token')
     const userData = await verifyRes.json()
-    userId = userData.id
+    userId    = userData.id
+    userEmail = userData.email
   } catch {
     return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
+  }
+
+  // Admin always gets Pro — no need to check DB
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+  if (ADMIN_EMAIL && userEmail === ADMIN_EMAIL) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
+      body: JSON.stringify({
+        tier: 'pro', isPro: true, membershipEnd: null, freeMonthsRemaining: 0,
+        scansToday: 0, scanLimit: null, deckLimit: null, scansLeft: null, canScan: true,
+      }),
+    }
   }
 
   const adminHeaders = {

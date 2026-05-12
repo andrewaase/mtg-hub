@@ -60,19 +60,22 @@ exports.handler = async (event) => {
   }
 
   try {
-    const [usersRes, collectionRes, matchesRes] = await Promise.all([
+    const [usersRes, collectionRes, matchesRes, profilesRes] = await Promise.all([
       // All auth users (up to 1000)
       fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: adminHeaders }),
       // All collection rows — just user_id + qty
       fetch(`${SUPABASE_URL}/rest/v1/collection?select=user_id,qty`, { headers: adminHeaders }),
       // All match rows — user_id + result + date
       fetch(`${SUPABASE_URL}/rest/v1/matches?select=user_id,result,created_at`, { headers: adminHeaders }),
+      // All profiles — membership info
+      fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,membership_tier,membership_end`, { headers: adminHeaders }),
     ])
 
-    const [usersJson, collectionRaw, matchRaw] = await Promise.all([
+    const [usersJson, collectionRaw, matchRaw, profilesRaw] = await Promise.all([
       usersRes.json(),
       collectionRes.json(),
       matchesRes.json(),
+      profilesRes.json(),
     ])
 
     // Guard: Supabase returns an error object (truthy non-array) when a query fails.
@@ -86,7 +89,12 @@ exports.handler = async (event) => {
 
     const collectionRows = Array.isArray(collectionRaw) ? collectionRaw : []
     const matchRows      = Array.isArray(matchRaw)      ? matchRaw      : []
+    const profileRows    = Array.isArray(profilesRaw)   ? profilesRaw   : []
     const rawUsers       = usersJson.users || []
+
+    // Index profiles by user id
+    const profileByUser = {}
+    for (const p of profileRows) profileByUser[p.id] = p
 
     // ── 3. Aggregate ─────────────────────────────────────────────────────────
 
@@ -110,16 +118,29 @@ exports.handler = async (event) => {
     const ms30d   = 30 * 24 * 60 * 60 * 1000
 
     // Build enriched user list
-    const users = rawUsers.map(u => ({
-      id:              u.id,
-      email:           u.email,
-      createdAt:       u.created_at,
-      lastSignIn:      u.last_sign_in_at,
-      uniqueCards:     collectionByUser[u.id] || 0,
-      totalCards:      cardQtyByUser[u.id]    || 0,
-      matchCount:      matchesByUser[u.id]    || 0,
-      is_admin:        u.email === ADMIN_EMAIL,
-    })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    const now = Date.now()
+    const users = rawUsers.map(u => {
+      const profile = profileByUser[u.id] || {}
+      let tier = profile.membership_tier || 'free'
+      // Treat expired pro as free
+      if (tier === 'pro' && profile.membership_end && new Date(profile.membership_end) < new Date()) {
+        tier = 'free'
+      }
+      // Admin always gets pro
+      if (u.email === ADMIN_EMAIL) tier = 'pro'
+      return {
+        id:              u.id,
+        email:           u.email,
+        createdAt:       u.created_at,
+        lastSignIn:      u.last_sign_in_at,
+        uniqueCards:     collectionByUser[u.id] || 0,
+        totalCards:      cardQtyByUser[u.id]    || 0,
+        matchCount:      matchesByUser[u.id]    || 0,
+        is_admin:        u.email === ADMIN_EMAIL,
+        tier,
+        membershipEnd:   profile.membership_end || null,
+      }
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
     // Signup counts over last 30 days (day buckets)
     const signupsByDay = {}
@@ -137,6 +158,9 @@ exports.handler = async (event) => {
     const newLast30d = rawUsers.filter(u => now - new Date(u.created_at) < ms30d).length
     const usersWithCollection = Object.keys(collectionByUser).length
 
+    const proUsers  = users.filter(u => u.tier === 'pro').length
+    const freeUsers = users.filter(u => u.tier === 'free').length
+
     const totals = {
       users:             rawUsers.length,
       newLast7d,
@@ -145,6 +169,8 @@ exports.handler = async (event) => {
       totalUniqueCards:  collectionRows.length,
       totalCards:        collectionRows.reduce((s, r) => s + (r.qty || 1), 0),
       totalMatches:      matchRows.length,
+      proUsers,
+      freeUsers,
     }
 
     return {

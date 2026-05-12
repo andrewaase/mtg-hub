@@ -90,12 +90,44 @@ function SignupChart({ signupsByDay }) {
   )
 }
 
+// ── Set membership (admin action) ──────────────────────────────────────────
+
+async function setUserMembership(userId, tier, months, token) {
+  const res = await fetch('/.netlify/functions/set-membership', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify({ userId, tier, months }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+// ── Tier badge ─────────────────────────────────────────────────────────────
+
+function TierBadge({ tier }) {
+  const isPro = tier === 'pro'
+  return (
+    <span style={{
+      fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+      background: isPro ? 'rgba(201,168,76,.2)' : 'rgba(148,163,184,.1)',
+      color:      isPro ? '#f59e0b'             : '#64748b',
+      border:     `1px solid ${isPro ? 'rgba(201,168,76,.35)' : 'rgba(148,163,184,.2)'}`,
+    }}>
+      {isPro ? '⚡ PRO' : 'FREE'}
+    </span>
+  )
+}
+
 // ── User table ─────────────────────────────────────────────────────────────
 
-function UserTable({ users }) {
+function UserTable({ users, onTierChange }) {
   const [search,  setSearch]  = useState('')
   const [sortKey, setSortKey] = useState('createdAt')
   const [sortDir, setSortDir] = useState('desc')
+  const [changing, setChanging] = useState(null) // userId currently being updated
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -165,10 +197,10 @@ function UserTable({ users }) {
           <thead>
             <tr>
               <SortHeader label="Email"        k="email"       />
+              <SortHeader label="Tier"         k="tier"        />
               <SortHeader label="Joined"       k="createdAt"   />
               <SortHeader label="Last Seen"    k="lastSignIn"  />
               <SortHeader label="Cards"        k="totalCards"  />
-              <SortHeader label="Unique Cards" k="uniqueCards" />
               <SortHeader label="Matches"      k="matchCount"  />
             </tr>
           </thead>
@@ -200,6 +232,36 @@ function UserTable({ users }) {
                     )}
                   </div>
                 </td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                  {u.is_admin ? (
+                    <TierBadge tier="pro" />
+                  ) : (
+                    <select
+                      value={u.tier || 'free'}
+                      disabled={changing === u.id}
+                      onChange={async e => {
+                        const newTier = e.target.value
+                        setChanging(u.id)
+                        try {
+                          await onTierChange(u.id, newTier)
+                        } finally {
+                          setChanging(null)
+                        }
+                      }}
+                      style={{
+                        background: u.tier === 'pro' ? 'rgba(201,168,76,.15)' : 'rgba(255,255,255,.06)',
+                        border: `1px solid ${u.tier === 'pro' ? 'rgba(201,168,76,.35)' : 'rgba(255,255,255,.1)'}`,
+                        color: u.tier === 'pro' ? '#f59e0b' : '#94a3b8',
+                        borderRadius: 6, padding: '3px 6px', fontSize: '0.72rem',
+                        fontWeight: 700, cursor: 'pointer', outline: 'none',
+                        opacity: changing === u.id ? 0.5 : 1,
+                      }}
+                    >
+                      <option value="free">FREE</option>
+                      <option value="pro">⚡ PRO</option>
+                    </select>
+                  )}
+                </td>
                 <td style={{ padding: '10px 12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{fmtDate(u.createdAt)}</td>
                 <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                   <span style={{ color: u.lastSignIn && (Date.now() - new Date(u.lastSignIn)) < 7 * 86400000 ? '#4ade80' : '#64748b' }}>
@@ -212,9 +274,6 @@ function UserTable({ users }) {
                     : <span style={{ color: '#334155' }}>—</span>
                   }
                 </td>
-                <td style={{ padding: '10px 12px', textAlign: 'center', color: '#64748b' }}>
-                  {u.uniqueCards || '—'}
-                </td>
                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                   {u.matchCount > 0
                     ? <span style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>{u.matchCount}</span>
@@ -225,7 +284,7 @@ function UserTable({ users }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: '#334155' }}>
+                <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#334155' }}>
                   No users match that search.
                 </td>
               </tr>
@@ -1622,14 +1681,25 @@ export default function AdminPanel({ user, isAdmin }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12, marginBottom: 20 }}>
               <StatCard icon="👤" label="Total Users"        value={totals.users}                                  color="#6366f1" />
               <StatCard icon="🆕" label="New This Week"      value={totals.newLast7d}                              color="#22c55e" sub={`${totals.newLast30d} this month`} />
+              <StatCard icon="⚡" label="Pro Members"        value={totals.proUsers ?? '—'}                        color="#f59e0b" sub={totals.users ? `${Math.round((totals.proUsers / totals.users) * 100)}% of users` : ''} />
+              <StatCard icon="🆓" label="Free Accounts"      value={totals.freeUsers ?? '—'}                       color="#64748b" />
               <StatCard icon="📦" label="Active Collections" value={totals.usersWithCollection}                   color="#3b82f6" sub={`${engagementRate}% of users`} />
-              <StatCard icon="🃏" label="Cards Tracked"      value={totals.totalCards?.toLocaleString()}          color="#f59e0b" sub={`${totals.totalUniqueCards} unique`} />
+              <StatCard icon="🃏" label="Cards Tracked"      value={totals.totalCards?.toLocaleString()}          color="#a78bfa" sub={`${totals.totalUniqueCards} unique`} />
               <StatCard icon="⚔️" label="Matches Logged"     value={totals.totalMatches?.toLocaleString()}        color="#ec4899" />
               <StatCard icon="📊" label="Engagement Rate"    value={`${engagementRate}%`}                         color="#14b8a6" sub="users with ≥1 card" />
             </div>
           )}
           {signupsByDay && <SignupChart signupsByDay={signupsByDay} />}
-          {users && <UserTable users={users} />}
+          {users && (
+            <UserTable
+              users={users}
+              onTierChange={async (userId, tier) => {
+                const { data: { session } } = await supabase.auth.getSession()
+                await setUserMembership(userId, tier, tier === 'pro' ? 1 : 0, session.access_token)
+                await fetchStats()
+              }}
+            />
+          )}
         </>
       )}
 
