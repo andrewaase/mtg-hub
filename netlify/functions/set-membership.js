@@ -64,13 +64,18 @@ exports.handler = async (event) => {
     membershipEnd = new Date(Date.now() + monthsToAdd * 30 * 24 * 60 * 60 * 1000).toISOString()
   }
 
-  // Upsert profile — handles users who haven't logged in yet (no profile row)
+  // Upsert — creates the profile row if it doesn't exist yet (older accounts
+  // may not have one if the handle_new_user trigger hadn't fired).
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${targetUserId}`,
+    `${SUPABASE_URL}/rest/v1/profiles`,
     {
-      method:  'PATCH',
-      headers: adminHeaders,
-      body:    JSON.stringify({
+      method:  'POST',
+      headers: {
+        ...adminHeaders,
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id:              targetUserId,
         membership_tier: tier,
         membership_end:  membershipEnd,
       }),
@@ -79,7 +84,7 @@ exports.handler = async (event) => {
 
   if (!res.ok) {
     const err = await res.text()
-    console.error('[set-membership] patch failed:', err)
+    console.error('[set-membership] upsert failed:', err)
     return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'Failed to update membership' }) }
   }
 
