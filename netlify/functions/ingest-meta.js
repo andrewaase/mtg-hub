@@ -24,7 +24,16 @@ function getWeekStart(offsetWeeks = 0) {
   return d.toISOString().slice(0, 10)
 }
 
+// Max rows accepted per POST to prevent payload-flooding
+const MAX_CARD_ROWS      = 500
+const MAX_ARCHETYPE_ROWS = 100
+
 exports.handler = async (event) => {
+  // CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(event) }
+  }
+
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
 
@@ -37,7 +46,7 @@ exports.handler = async (event) => {
     ...corsHeaders(event),
   }
 
-  // ── GET: return latest stored week ──────────────────────────────────────
+  // ── GET: return latest stored week (public, no auth required) ────────────
   if (event.httpMethod !== 'POST') {
     try {
       const res  = await fetch(
@@ -57,6 +66,25 @@ exports.handler = async (event) => {
     }
   }
 
+  // ── POST: require a logged-in user to write snapshot data ───────────────
+  // Any authenticated Supabase user can submit — prevents anonymous poisoning
+  // while keeping the feature working for all logged-in users.
+  const authHeader = (event.headers || {})['authorization'] || ''
+  const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
+
+  if (!userJwt) {
+    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Authentication required' }) }
+  }
+
+  try {
+    const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
+    })
+    if (!verifyRes.ok) throw new Error('invalid token')
+  } catch {
+    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid or expired token' }) }
+  }
+
   // ── POST: save snapshots sent from browser ───────────────────────────────
   let body
   try { body = JSON.parse(event.body || '{}') } catch {
@@ -66,6 +94,11 @@ exports.handler = async (event) => {
   const { cardSnapshots = [], archetypeSnapshots = [] } = body
   if (cardSnapshots.length === 0 && archetypeSnapshots.length === 0) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'No snapshot data provided' }) }
+  }
+
+  // Cap payload size to prevent flooding
+  if (cardSnapshots.length > MAX_CARD_ROWS || archetypeSnapshots.length > MAX_ARCHETYPE_ROWS) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Payload exceeds maximum row limit' }) }
   }
 
   const results = { cardRows: 0, archetypeRows: 0, errors: [] }

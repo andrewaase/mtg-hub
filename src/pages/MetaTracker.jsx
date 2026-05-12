@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -447,7 +448,7 @@ function getWeekStart(offsetWeeks = 0) {
   return d.toISOString().slice(0, 10)
 }
 
-async function runClientIngest(offsetWeeks = 0) {
+async function runClientIngest(offsetWeeks = 0, accessToken = null) {
   const week = getWeekStart(offsetWeeks)
   const cardSnapshots      = []
   const archetypeSnapshots = []
@@ -468,9 +469,10 @@ async function runClientIngest(offsetWeeks = 0) {
 
   if (cardSnapshots.length === 0 && archetypeSnapshots.length === 0) return { ok: false, reason: 'no data fetched' }
 
+  const authHeaders = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}
   const res = await fetch('/.netlify/functions/ingest-meta', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     body:    JSON.stringify({ cardSnapshots, archetypeSnapshots }),
   })
   return res.json()
@@ -497,7 +499,8 @@ function SpikePredictor() {
         const needsIngest = !latestWeek || latestWeek < currentWeek
         if (needsIngest) {
           setIngestStatus('ingesting')
-          await runClientIngest()
+          const { data: { session } } = await supabase.auth.getSession()
+          await runClientIngest(0, session?.access_token ?? null)
           setIngestStatus('done')
         }
       } catch {
@@ -527,7 +530,8 @@ function SpikePredictor() {
   const handleSeedPrevWeek = useCallback(async () => {
     setSeedingPrev(true)
     try {
-      await runClientIngest(1)
+      const { data: { session } } = await supabase.auth.getSession()
+      await runClientIngest(1, session?.access_token ?? null)
       await fetchSpikes(spikeFormat)
     } catch { /* non-fatal */ }
     setSeedingPrev(false)
