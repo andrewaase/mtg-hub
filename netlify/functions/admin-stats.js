@@ -10,6 +10,9 @@ const { corsHeaders } = require('./_cors')
 //   4. Otherwise → 403
 
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(event) }
+  }
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }

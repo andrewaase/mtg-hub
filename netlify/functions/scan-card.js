@@ -1,5 +1,6 @@
 // netlify/functions/scan-card.js
 // Accepts a base64 JPEG of a MTG card and returns name + set code + collector number via Claude Vision.
+const { corsHeaders } = require('./_cors')
 
 // ~5 MB of base64 ≈ ~3.75 MB actual image — well above any real card scan
 const MAX_BASE64_CHARS = 5 * 1024 * 1024
@@ -8,6 +9,9 @@ const MAX_BASE64_CHARS = 5 * 1024 * 1024
 const VALID_IMAGE_PREFIXES = ['/9j/', 'iVBOR', 'UklGR']
 
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(event) }
+  }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
@@ -96,7 +100,7 @@ If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"colle
     function makeResult(parsed) {
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
         body: JSON.stringify({
           name:            (parsed.name            || 'unknown').trim(),
           setCode:         parsed.setCode          || null,
@@ -121,11 +125,11 @@ If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"colle
     // 3 — last resort: the raw text is probably just the card name
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
       body: JSON.stringify({ name: stripped || 'unknown', setCode: null, collectorNumber: null }),
     }
   } catch (err) {
     console.error('[scan-card] fetch error:', err)
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal error' }) }
+    return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'Internal error' }) }
   }
 }

@@ -1,10 +1,14 @@
 // netlify/functions/create-payment-intent.js
 // Creates a Stripe PaymentIntent after validating cart prices server-side.
 // Never trusts client-supplied prices.
+const { corsHeaders } = require('./_cors')
 
 const DEFAULT_SHIPPING = 4.99
 
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(event) }
+  }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
@@ -120,7 +124,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
       body: JSON.stringify({
         clientSecret: paymentIntent.client_secret,
         total,
@@ -130,6 +134,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.error('[create-payment-intent]', err)
-    return { statusCode: 500, body: JSON.stringify({ error: 'Payment processing failed' }) }
+    return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'Payment processing failed' }) }
   }
 }

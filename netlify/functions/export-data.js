@@ -5,6 +5,9 @@ const { corsHeaders } = require('./_cors')
 // collection, matches, and exported_at.
 
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(event) }
+  }
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
