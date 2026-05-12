@@ -23,6 +23,13 @@ const STEPS = [
     icon:  '📦',
     title: 'Build Your Collection',
     body:  'Add cards manually or scan them with your camera. Your collection value is tracked daily so you can watch it grow over time.',
+    cta:   'Next: Sell Tab',
+  },
+  {
+    page:  'collection',
+    icon:  '💰',
+    title: 'Know What to Sell',
+    body:  "Tap the Sell tab inside your collection. Each card shows live buylist prices from top vendors so you know exactly what it's worth to sell today. Cards flagged with a signal have strong sell indicators — high buylist-to-market ratios, price spikes, or low reprint risk.",
     cta:   'Next: My Decks',
   },
   {
@@ -30,6 +37,13 @@ const STEPS = [
     icon:  '📚',
     title: 'Build & Track Decks',
     body:  'Import a decklist from Arena, MTGO, or Moxfield — or build one from scratch. Vaulted Singles automatically values your deck and highlights cards you already own.',
+    cta:   'Next: Hand Simulator',
+  },
+  {
+    page:  'decks',
+    icon:  '🃏',
+    title: 'Hand Simulator & Solitaire',
+    body:  "Open any deck and hit Simulate Hand to draw a 7-card opening hand. Mulligan as many times as you want to test consistency. Use Deck Solitaire to play through your early turns and see how your deck goldfishes before taking it to a real match.",
     cta:   'Next: Wishlist',
   },
   {
