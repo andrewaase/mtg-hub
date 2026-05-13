@@ -71,7 +71,9 @@ export async function searchScryfall(query) {
 
 export async function getCardDetails(cardName) {
   try {
-    const res = await fetchWithTimeout(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`)
+    // Use fuzzy matching so deck-imported names with minor formatting differences
+    // (split-card spacing, Unicode characters, etc.) still resolve correctly
+    const res = await fetchWithTimeout(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`)
     if (!res.ok) return null
     return await res.json()
   } catch {
