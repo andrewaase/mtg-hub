@@ -95,8 +95,6 @@ export default function App() {
   const [cardSearch, setCardSearch] = useState('')
   // Store pre-search: set by clicking "Buy from Vaulted Singles" in Card Lookup
   const [storeSearch, setStoreSearch] = useState('')
-  // Lazy-mount: track which pages have ever been visited so their state survives tab switches
-  const [mountedPages, setMountedPages] = useState(() => new Set([getInitialPage()]))
 
   const setPage = useCallback((newPage) => {
     // Silently block navigation while the deck import/edit modal is open
@@ -186,16 +184,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  // Add each page to mountedPages the first time it's visited — this keeps
-  // components alive (display:none) so state survives tab switches
-  useEffect(() => {
-    setMountedPages(prev => {
-      if (prev.has(page)) return prev
-      const next = new Set(prev)
-      next.add(page)
-      return next
-    })
-  }, [page])
 
 
 
@@ -369,23 +357,24 @@ export default function App() {
             page === 'decks'      ? <DecksSkeleton />      :
             null
           ) : (
-            /* Lazy-mount: once a page is visited it stays rendered (display:none when inactive)
-               so scroll position, search state, and open cards are preserved across tab switches. */
+            /* All pages stay mounted once loading is done; inactive ones are hidden with
+               display:none so every page's scroll position, search state, and open cards
+               are preserved across tab switches — no state reset on navigation. */
             <>
-              {mountedPages.has('dashboard')  && <div style={{ display: page === 'dashboard'  ? undefined : 'none' }}><Dashboard {...pageProps} /></div>}
-              {mountedPages.has('log')        && <div style={{ display: page === 'log'        ? undefined : 'none' }}><MatchLog {...pageProps} /></div>}
-              {mountedPages.has('stats')      && <div style={{ display: page === 'stats'      ? undefined : 'none' }}><Stats {...pageProps} /></div>}
-              {mountedPages.has('news')       && <div style={{ display: page === 'news'       ? undefined : 'none' }}><News {...pageProps} /></div>}
-              {mountedPages.has('cards')      && <div style={{ display: page === 'cards'      ? undefined : 'none' }}><CardLookup {...pageProps} initialSearch={cardSearch} onSearchUsed={() => setCardSearch('')} /></div>}
-              {mountedPages.has('collection') && <div style={{ display: page === 'collection' ? undefined : 'none' }}><Collection {...pageProps} /></div>}
-              {mountedPages.has('releases')   && <div style={{ display: page === 'releases'   ? undefined : 'none' }}><SetReleases /></div>}
-              {mountedPages.has('friends')    && <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} /></div>}
-              {mountedPages.has('decks')      && <div style={{ display: page === 'decks'      ? undefined : 'none' }}><Decks {...pageProps} /></div>}
-              {mountedPages.has('wishlist')   && <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>}
-              {mountedPages.has('store')      && <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} /></div>}
-              {mountedPages.has('membership') && <div style={{ display: page === 'membership' ? undefined : 'none' }}><Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} /></div>}
-              {mountedPages.has('about')      && <div style={{ display: page === 'about'      ? undefined : 'none' }}><About /></div>}
-              {mountedPages.has('admin')      && <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>}
+              <div style={{ display: page === 'dashboard'  ? undefined : 'none' }}><Dashboard {...pageProps} /></div>
+              <div style={{ display: page === 'log'        ? undefined : 'none' }}><MatchLog {...pageProps} /></div>
+              <div style={{ display: page === 'stats'      ? undefined : 'none' }}><Stats {...pageProps} /></div>
+              <div style={{ display: page === 'news'       ? undefined : 'none' }}><News {...pageProps} /></div>
+              <div style={{ display: page === 'cards'      ? undefined : 'none' }}><CardLookup {...pageProps} initialSearch={cardSearch} onSearchUsed={() => setCardSearch('')} /></div>
+              <div style={{ display: page === 'collection' ? undefined : 'none' }}><Collection {...pageProps} /></div>
+              <div style={{ display: page === 'releases'   ? undefined : 'none' }}><SetReleases /></div>
+              <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} /></div>
+              <div style={{ display: page === 'decks'      ? undefined : 'none' }}><Decks {...pageProps} /></div>
+              <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>
+              <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} /></div>
+              <div style={{ display: page === 'membership' ? undefined : 'none' }}><Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} /></div>
+              <div style={{ display: page === 'about'      ? undefined : 'none' }}><About /></div>
+              <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>
             </>
           )}
         </div>
