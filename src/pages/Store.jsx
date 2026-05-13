@@ -693,8 +693,8 @@ function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout }) {
       <div
         onClick={onClose}
         style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
-          zIndex: 200, backdropFilter: 'blur(2px)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)',
+          zIndex: 200,
         }}
       />
       {/* Drawer */}
