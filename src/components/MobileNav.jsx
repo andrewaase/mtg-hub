@@ -20,8 +20,8 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
         <div
           onClick={() => setShowSheet(false)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
-            zIndex: 199, backdropFilter: 'blur(3px)',
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)',
+            zIndex: 199,
           }}
         />
       )}

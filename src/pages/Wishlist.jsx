@@ -440,7 +440,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
     {/* ── Card preview modal ── */}
     {showPreview && (
       <>
-        <div onClick={() => setShowPreview(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, backdropFilter: 'blur(6px)' }} />
+        <div onClick={() => setShowPreview(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400 }} />
         <div style={{
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           zIndex: 401, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,

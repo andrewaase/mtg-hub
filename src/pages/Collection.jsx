@@ -260,7 +260,7 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
   return (
     <>
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, backdropFilter: 'blur(4px)' }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500 }} />
 
       {/* Modal */}
       <div style={{
@@ -503,7 +503,7 @@ function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400 }} />
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 'min(560px,96vw)', maxHeight: '92vh', overflowY: 'auto',
@@ -1514,7 +1514,7 @@ function InsuranceModal({ collection, onClose }) {
       {/* Backdrop — hidden when printing */}
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 500, backdropFilter: 'blur(4px)' }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 500 }}
         className="no-print"
       />
       <div style={{

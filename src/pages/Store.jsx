@@ -244,7 +244,7 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400 }} />
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 'min(560px, 96vw)', maxHeight: '92vh', overflowY: 'auto',
@@ -631,7 +631,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
   }
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400, backdropFilter: 'blur(4px)' }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400 }} />
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 'min(520px,96vw)', maxHeight: '90vh', overflowY: 'auto',
@@ -898,7 +898,7 @@ function CheckoutModal({ cart, onClose, onSuccess }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 300, backdropFilter: 'blur(3px)' }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 300 }} />
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 'min(480px, 96vw)', maxHeight: '90vh', overflowY: 'auto',
@@ -1038,7 +1038,7 @@ function WaitlistModal({ listing, user, onClose }) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 410, backdropFilter: 'blur(4px)' }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 410 }} />
       <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px,92vw)', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 411, padding: '24px 22px 28px', boxShadow: '0 24px 60px rgba(0,0,0,.65)' }}>
         <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: '#fff', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         {done ? (
@@ -1617,7 +1617,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background: 'rgba(15,12,5,.92)', backdropFilter: 'blur(16px)',
+            background: 'rgba(15,12,5,.92)',
             border: '1px solid rgba(201,168,76,.45)',
             borderRadius: 16, padding: '12px 16px',
             boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(201,168,76,.15)',
