@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { searchScryfall, getCardDetails } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
@@ -18,11 +18,18 @@ export default function Wishlist({ user, showToast, openStoreSearch }) {
   const [showDrop,   setShowDrop]   = useState(false)
   const [cardData,   setCardData]   = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  // Prevent Supabase token-refresh events (new user reference, same identity)
+  // from flipping loading=true and unmounting WishlistItems (which resets showPreview)
+  const initialLoadDoneRef = useRef(false)
 
   // Load from Supabase (or localStorage for guests)
   useEffect(() => {
-    setLoading(true)
-    getWishlist(user?.id).then(data => { setItems(data); setLoading(false) })
+    if (!initialLoadDoneRef.current) setLoading(true)
+    getWishlist(user?.id).then(data => {
+      setItems(data)
+      setLoading(false)
+      initialLoadDoneRef.current = true
+    })
   }, [user])
 
   // Autocomplete
