@@ -683,9 +683,9 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
 }
 
 // ── Cart drawer ───────────────────────────────────────────────────────────────
-function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout }) {
+function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout, shippingCost }) {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
-  const total    = subtotal + SHIPPING_COST
+  const total    = subtotal + shippingCost
 
   return (
     <>
@@ -767,7 +767,7 @@ function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout }) {
               <span>Subtotal</span><span>{fmt(subtotal)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: 10 }}>
-              <span>Shipping</span><span>{fmt(SHIPPING_COST)}</span>
+              <span>Shipping</span><span>{fmt(shippingCost)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', marginBottom: 14 }}>
               <span>Total</span><span style={{ color: 'var(--accent-gold)' }}>{fmt(total)}</span>
@@ -842,7 +842,7 @@ function PaymentForm({ onSuccess, onBack, total }) {
 }
 
 // ── Checkout modal ─────────────────────────────────────────────────────────────
-function CheckoutModal({ cart, onClose, onSuccess }) {
+function CheckoutModal({ cart, onClose, onSuccess, shippingCost }) {
   const [step,         setStep]         = useState('shipping') // shipping | payment | success
   const [clientSecret, setClientSecret] = useState(null)
   const [orderTotal,   setOrderTotal]   = useState(0)
@@ -943,11 +943,11 @@ function CheckoutModal({ cart, onClose, onSuccess }) {
                 </div>
               ))}
               <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', color: 'var(--text-muted)' }}>
-                <span>Shipping</span><span>{fmt(SHIPPING_COST)}</span>
+                <span>Shipping</span><span>{fmt(shippingCost)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '.9rem', marginTop: 4 }}>
                 <span>Total</span>
-                <span style={{ color: 'var(--accent-gold)' }}>{fmt(subtotal + SHIPPING_COST)}</span>
+                <span style={{ color: 'var(--accent-gold)' }}>{fmt(subtotal + shippingCost)}</span>
               </div>
             </div>
 
@@ -1575,6 +1575,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
       {cartOpen && (
         <CartDrawer
           cart={cart}
+          shippingCost={SHIPPING_COST}
           onClose={() => setCartOpen(false)}
           onRemove={removeFromCart}
           onQtyChange={changeQty}
@@ -1586,6 +1587,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
       {checkoutOpen && (
         <CheckoutModal
           cart={cart}
+          shippingCost={SHIPPING_COST}
           onClose={() => setCheckoutOpen(false)}
           onSuccess={() => setCart([])}
         />
