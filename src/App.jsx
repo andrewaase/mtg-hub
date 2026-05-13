@@ -91,6 +91,9 @@ export default function App() {
   // Deck modal nav-block: prevents accidental navigation while deck editor is open
   const deckModalOpenRef = useRef(false)
   const setDeckModalOpen = useCallback((v) => { deckModalOpenRef.current = v }, [])
+  // Track whether initial data load has completed so token-refresh re-runs of load()
+  // don't flip loading back to true and unmount every page (resetting their state)
+  const initialLoadDoneRef = useRef(false)
   // Card lookup pre-search: set by clicking a card name in the deck builder
   const [cardSearch, setCardSearch] = useState('')
   // Store pre-search: set by clicking "Buy from Vaulted Singles" in Card Lookup
@@ -246,7 +249,10 @@ export default function App() {
     }
 
     async function load() {
-      setLoading(true)
+      // Only show the loading skeleton on the very first data load.
+      // Subsequent calls (Supabase TOKEN_REFRESHED, sign-in/out) silently
+      // refresh data in the background without unmounting pages.
+      if (!initialLoadDoneRef.current) setLoading(true)
       const [m, c, w] = await Promise.all([getMatches(user?.id), getCollection(user?.id), getWishlist(user?.id)])
 
       // Auto-migrate localStorage data → Supabase on first sign-in
@@ -267,6 +273,7 @@ export default function App() {
               )
               localStorage.setItem(migrationKey, '1')
               setLoading(false)
+              initialLoadDoneRef.current = true
               showToast(`✅ Synced ${lsCards.length} cards to your account`)
               return
             } else {
@@ -280,6 +287,7 @@ export default function App() {
       setCollection(withBinders(c))
       setWishlist(w || [])
       setLoading(false)
+      initialLoadDoneRef.current = true
 
       // Daily portfolio snapshot (no-op if already taken today)
       if (c.length > 0) takeSnapshot(c)

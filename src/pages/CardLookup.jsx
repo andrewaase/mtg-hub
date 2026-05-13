@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { searchScryfall, getCardDetails, getAllPrintings } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
@@ -567,18 +567,30 @@ function saveRecentlyViewed(card) {
   } catch { return [] }
 }
 
+// ── sessionStorage helpers for persisting open-card state across remounts ─────
+const SS_VIEW   = 'vs-cl-view'
+const SS_CARD   = 'vs-cl-card'
+function ssGetView()   { try { return sessionStorage.getItem(SS_VIEW) || 'home' } catch { return 'home' } }
+function ssGetCard()   { try { const s = sessionStorage.getItem(SS_CARD); return s ? JSON.parse(s) : null } catch { return null } }
+function ssSaveView(v) { try { sessionStorage.setItem(SS_VIEW, v) } catch {} }
+function ssSaveCard(c) { try { if (c) sessionStorage.setItem(SS_CARD, JSON.stringify(c)); else sessionStorage.removeItem(SS_CARD) } catch {} }
+
 export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch }) {
-  const [view, setView]           = useState('home') // 'home' | 'search' | 'set' | 'card'
+  const [view, setViewRaw]        = useState(ssGetView)  // restore from sessionStorage on mount
   const [sets, setSets]           = useState([])
   const [secretLairs, setSecretLairs] = useState([])
   const [setsLoading, setSetsLoad] = useState(true)
   const [setSearch, setSetSearch] = useState('')
   const [selectedSet, setSelSet]  = useState(null)
-  const [cardDetail, setCardDetail] = useState(null)
+  const [cardDetail, setCardDetailRaw] = useState(ssGetCard)  // restore from sessionStorage on mount
   const [printings, setPrintings]  = useState([])
   const [printLoad, setPrintLoad]  = useState(false)
   const [recentCards, setRecentCards] = useState(loadRecentlyViewed)
-  const prevView = useRef('home')
+  const prevView = useRef(ssGetView() === 'card' ? 'home' : ssGetView())
+
+  // Wrappers that persist to sessionStorage so open-card state survives any remount
+  const setView = useCallback((v) => { setViewRaw(v); ssSaveView(v) }, [])
+  const setCardDetail = useCallback((c) => { setCardDetailRaw(c); ssSaveCard(c) }, [])
 
   // Incoming card from Dashboard (random card or format staple tap)
   useEffect(() => {
