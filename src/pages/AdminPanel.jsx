@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { upsertStoreListing } from '../lib/db'
 
@@ -1569,6 +1569,54 @@ function MetaTab() {
   const [moversRunning, setMoversRunning] = useState(false)
   const [moversResult,  setMoversResult]  = useState(null)
 
+  // ── Art card picker state ───────────────────────────────────────────────────
+  const [artPickerOpen, setArtPickerOpen]   = useState(false)
+  const [artQuery,      setArtQuery]        = useState('')
+  const [artResults,    setArtResults]      = useState([])
+  const [artSearching,  setArtSearching]    = useState(false)
+  const [artPreviewUrl, setArtPreviewUrl]   = useState(null)
+  const artDebounce = useRef(null)
+
+  // Fetch preview when art_card name changes
+  useEffect(() => {
+    if (!form.art_card?.trim()) { setArtPreviewUrl(null); return }
+    fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(form.art_card)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(c => {
+        const url = c?.image_uris?.art_crop || c?.card_faces?.[0]?.image_uris?.art_crop || null
+        setArtPreviewUrl(url)
+      })
+      .catch(() => setArtPreviewUrl(null))
+  }, [form.art_card])
+
+  const searchArtCards = (q) => {
+    setArtQuery(q)
+    clearTimeout(artDebounce.current)
+    if (!q.trim()) { setArtResults([]); return }
+    artDebounce.current = setTimeout(async () => {
+      setArtSearching(true)
+      try {
+        const res = await fetch(
+          `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}+game%3Apaper&unique=cards&order=name`
+        )
+        if (!res.ok) throw new Error()
+        const data = await res.json()
+        setArtResults((data.data || []).slice(0, 9).map(c => ({
+          name: c.name,
+          img:  c.image_uris?.art_crop || c.card_faces?.[0]?.image_uris?.art_crop || null,
+        })))
+      } catch { setArtResults([]) }
+      finally  { setArtSearching(false) }
+    }, 350)
+  }
+
+  const selectArtCard = (name) => {
+    setForm(p => ({ ...p, art_card: name }))
+    setArtPickerOpen(false)
+    setArtQuery('')
+    setArtResults([])
+  }
+
   const runMarketMovers = async () => {
     setMoversRunning(true)
     setMoversResult(null)
@@ -1835,8 +1883,88 @@ function MetaTab() {
           {F('Notes (optional)',
             <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Short note…" style={inputStyle} />
           )}
-          {F('Art Card (for tile background)',
-            <input value={form.art_card} onChange={e => setForm(p => ({ ...p, art_card: e.target.value }))} placeholder="e.g. Lightning Bolt" style={inputStyle} />
+          {F('Art Card (tile background)',
+            <div>
+              {/* Text input + Pick button row */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  value={form.art_card}
+                  onChange={e => setForm(p => ({ ...p, art_card: e.target.value }))}
+                  placeholder="e.g. Lightning Bolt"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setArtPickerOpen(o => !o); setArtQuery(''); setArtResults([]) }}
+                  style={{
+                    padding: '8px 12px', borderRadius: 8, flexShrink: 0,
+                    border: `1px solid ${artPickerOpen ? '#f59e0b' : 'rgba(255,255,255,.15)'}`,
+                    background: artPickerOpen ? 'rgba(245,158,11,.12)' : 'rgba(255,255,255,.05)',
+                    color: artPickerOpen ? '#f59e0b' : '#e2e8f0',
+                    cursor: 'pointer', fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap',
+                    transition: 'all .15s',
+                  }}
+                >
+                  🖼 Pick
+                </button>
+              </div>
+
+              {/* Current art preview (shown when picker is closed) */}
+              {artPreviewUrl && !artPickerOpen && (
+                <div style={{ marginTop: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)' }}>
+                  <img
+                    src={artPreviewUrl}
+                    alt={form.art_card}
+                    style={{ width: '100%', maxHeight: 110, objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              )}
+
+              {/* Picker panel */}
+              {artPickerOpen && (
+                <div style={{ marginTop: 8, background: '#08080e', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, padding: '12px' }}>
+                  <input
+                    autoFocus
+                    value={artQuery}
+                    onChange={e => searchArtCards(e.target.value)}
+                    placeholder="Search card name…"
+                    style={{ ...inputStyle, marginBottom: 10 }}
+                  />
+                  {artSearching && (
+                    <div style={{ textAlign: 'center', color: '#64748b', fontSize: '.72rem', padding: '10px 0' }}>Searching…</div>
+                  )}
+                  {!artSearching && artQuery && artResults.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#64748b', fontSize: '.72rem', padding: '10px 0' }}>No cards found</div>
+                  )}
+                  {!artQuery && (
+                    <div style={{ textAlign: 'center', color: '#475569', fontSize: '.7rem', padding: '6px 0' }}>Type a card name to search</div>
+                  )}
+                  {artResults.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      {artResults.map(card => (
+                        <div
+                          key={card.name}
+                          onClick={() => selectArtCard(card.name)}
+                          title={card.name}
+                          style={{
+                            cursor: 'pointer', borderRadius: 6, overflow: 'hidden',
+                            border: '2px solid transparent', transition: 'border-color .12s',
+                            aspectRatio: '4/3', background: '#111',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = '#f59e0b'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+                        >
+                          {card.img
+                            ? <img src={card.img} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.6rem', color: '#64748b', padding: '4px', textAlign: 'center' }}>{card.name}</div>
+                          }
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {F('Colors (e.g. UR, WUB, G)',
             <input value={form.colors} onChange={e => setForm(p => ({ ...p, colors: e.target.value }))} placeholder="e.g. UR" style={inputStyle} />
