@@ -533,35 +533,53 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         </div>
       )}
 
-      {/* ── 7-Day Movers ── */}
-      {(vGainers.length > 0 || vLosers.length > 0) ? (
-        <div style={{ margin: '12px 16px 0' }}>
-          <div className="section-title" style={{ padding: '0 0 8px' }}>7-Day Movers</div>
-          <div className="grid-2">
-            <div className="card" style={{ padding: '12px 14px' }}>
-              <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-green)', marginBottom: '10px' }}>▲ Gainers</div>
-              {vGainers.length === 0
-                ? <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>None tracked yet</div>
-                : vGainers.map(g => <VelocityRow key={g.name} item={g} type="gain" />)
-              }
+      {/* ── Price Movers ── */}
+      {collection.length > 0 && (() => {
+        // Prefer 7-day velocity data; fall back to all-time gainers/losers when velocity is thin
+        const showGainers = vGainers.length > 0 ? vGainers : gainers
+        const showLosers  = vLosers.length  > 0 ? vLosers  : losers
+        const hasAnyData  = showGainers.length > 0 || showLosers.length > 0
+        const isVelocity  = vGainers.length > 0 || vLosers.length > 0
+
+        return (
+          <div style={{ margin: '12px 16px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div className="section-title" style={{ padding: 0 }}>
+                {isVelocity ? '7-Day Movers' : 'Price Movers'}
+              </div>
+              {!hasAnyData && (
+                <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>Building history…</div>
+              )}
             </div>
-            <div className="card" style={{ padding: '12px 14px' }}>
-              <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)', marginBottom: '10px' }}>▼ Losers</div>
-              {vLosers.length === 0
-                ? <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>None tracked yet</div>
-                : vLosers.map(l => <VelocityRow key={l.name} item={l} type="loss" />)
-              }
+            <div className="grid-2">
+              {/* Gainers */}
+              <div className="card" style={{ padding: '12px 14px' }}>
+                <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-green)', marginBottom: '10px' }}>▲ Gainers</div>
+                {showGainers.length === 0 ? (
+                  <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    {hasAnyData ? 'None this period' : 'Tracking begins after day 2'}
+                  </div>
+                ) : isVelocity
+                  ? showGainers.map(g => <VelocityRow key={g.name} item={g} type="gain" />)
+                  : showGainers.map(g => <MoverRow   key={g.name} item={g} type="gain" />)
+                }
+              </div>
+              {/* Losers */}
+              <div className="card" style={{ padding: '12px 14px' }}>
+                <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)', marginBottom: '10px' }}>▼ Losers</div>
+                {showLosers.length === 0 ? (
+                  <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    {hasAnyData ? 'None this period' : 'Tracking begins after day 2'}
+                  </div>
+                ) : isVelocity
+                  ? showLosers.map(l => <VelocityRow key={l.name} item={l} type="loss" />)
+                  : showLosers.map(l => <MoverRow   key={l.name} item={l} type="loss" />)
+                }
+              </div>
             </div>
           </div>
-        </div>
-      ) : collection.length > 0 && (
-        <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px' }}>
-          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>📈</span>
-            <span>Price tracking starts after your first daily snapshot.</span>
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Tournament Demand ── */}
       <TournamentWidget collection={collection} setPage={setPage} />
