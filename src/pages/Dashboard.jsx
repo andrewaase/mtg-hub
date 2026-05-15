@@ -4,7 +4,7 @@ import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
 import { getSnapshots } from '../lib/priceHistory'
-import { updateMarketPrices, getMarketMovers } from '../lib/marketPrices'
+import { fetchMarketMovers } from '../lib/marketPrices'
 import SparklineChart from '../components/SparklineChart'
 
 function fmt(n) {
@@ -375,12 +375,15 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   const hasTrend   = snapshots.length >= 2
 
   // ── Market movers state ──────────────────────────────────────────────────
-  const [marketMovers, setMarketMovers] = useState(() => getMarketMovers())
+  const [marketMovers, setMarketMovers] = useState({ gainers: [], losers: [], daysApart: 0, ready: false })
+  const [moversLoading, setMoversLoading] = useState(true)
   const [moverSort,    setMoverSort]    = useState('dollar')   // 'dollar' | 'pct'
 
-  // Fetch today's watchlist prices once on mount (no-op if already fetched today)
+  // Read pre-computed movers from Supabase on mount
   useEffect(() => {
-    updateMarketPrices().then(() => setMarketMovers(getMarketMovers()))
+    fetchMarketMovers()
+      .then(data => setMarketMovers(data))
+      .finally(() => setMoversLoading(false))
   }, [])
 
   const matchupSummary = {}
@@ -540,8 +543,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
       {/* ── Market Movers ── */}
       {(() => {
-        const { gainers: allGainers, losers: allLosers, daysTracked } = marketMovers
-        const hasData = allGainers.length > 0 || allLosers.length > 0
+        const { gainers: allGainers, losers: allLosers, ready, daysApart, computedDate } = marketMovers
 
         // Sort gainers: highest first ($ or %)
         const sortedGainers = [...allGainers]
@@ -571,24 +573,38 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
           <div style={{ margin: '12px 16px 0' }}>
             {/* Section header + sort toggle */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div className="section-title" style={{ padding: 0 }}>Market Movers</div>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <SortBtn id="dollar" label="$ Amount" />
-                <SortBtn id="pct"    label="% Change" />
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <div className="section-title" style={{ padding: 0 }}>Market Movers</div>
+                {ready && daysApart > 0 && (
+                  <span style={{ fontSize: '.6rem', color: 'var(--text-muted)' }}>{daysApart}d change</span>
+                )}
               </div>
+              {ready && (
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <SortBtn id="dollar" label="$ Amount" />
+                  <SortBtn id="pct"    label="% Change" />
+                </div>
+              )}
             </div>
 
-            {/* No history yet — single placeholder */}
-            {daysTracked < 2 ? (
+            {/* Loading */}
+            {moversLoading ? (
+              <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>Loading market data…</div>
+              </div>
+
+            /* No data yet (scheduler hasn't run) */
+            ) : !ready ? (
               <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>📊</div>
                 <div style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
                   Building market history
                 </div>
                 <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
-                  Prices are being tracked daily — movers will appear after day 2.
+                  The market tracker runs daily — movers appear after 8 days of snapshots.
                 </div>
               </div>
+
             ) : (
               <div className="grid-2">
                 {/* Gainers */}

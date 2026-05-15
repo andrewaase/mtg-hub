@@ -14,6 +14,10 @@
 [functions."ingest-meta"]
   schedule = "0 6 * * 0"
 
+# Fetch all paper card prices, snapshot daily, compute 7-day market movers at 9am UTC
+[functions."compute-market-movers"]
+  schedule = "0 9 * * *"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
