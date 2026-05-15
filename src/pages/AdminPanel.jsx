@@ -1541,13 +1541,36 @@ const BLANK_DECK = {
 }
 
 function MetaTab() {
-  const [decks,    setDecks]    = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [form,     setForm]     = useState(BLANK_DECK)
-  const [editId,   setEditId]   = useState(null)
-  const [saving,   setSaving]   = useState(false)
-  const [err,      setErr]      = useState(null)
-  const [csvText,  setCsvText]  = useState('')
+  const [decks,         setDecks]         = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [form,          setForm]          = useState(BLANK_DECK)
+  const [editId,        setEditId]        = useState(null)
+  const [saving,        setSaving]        = useState(false)
+  const [err,           setErr]           = useState(null)
+  const [csvText,       setCsvText]       = useState('')
+  const [moversRunning, setMoversRunning] = useState(false)
+  const [moversResult,  setMoversResult]  = useState(null)
+
+  const runMarketMovers = async () => {
+    setMoversRunning(true)
+    setMoversResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) throw new Error('Not signed in')
+      const res  = await fetch('/.netlify/functions/compute-market-movers', {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${jwt}` },
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      setMoversResult({ ok: true, ...json })
+    } catch (e) {
+      setMoversResult({ ok: false, message: e.message })
+    } finally {
+      setMoversRunning(false)
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -1646,6 +1669,47 @@ function MetaTab() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
+
+      {/* Run Market Movers button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: moversResult ? 10 : 20, flexWrap: 'wrap' }}>
+        <button
+          onClick={runMarketMovers}
+          disabled={moversRunning}
+          style={{
+            padding: '9px 18px', borderRadius: 8,
+            border: '1px solid rgba(251,191,36,.3)',
+            background: 'rgba(251,191,36,.1)', color: '#fbbf24',
+            fontWeight: 700, fontSize: '.82rem',
+            cursor: moversRunning ? 'not-allowed' : 'pointer',
+            opacity: moversRunning ? 0.7 : 1,
+          }}
+        >
+          {moversRunning ? '⏳ Fetching all card prices… (takes a few minutes)' : '📈 Run Market Movers Now'}
+        </button>
+        <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>
+          Fetches all ~5,000+ paper cards from Scryfall, snapshots prices, computes 7-day movers.
+        </span>
+      </div>
+
+      {/* Movers result banner */}
+      {moversResult && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+          background: moversResult.ok ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+          border: `1px solid ${moversResult.ok ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)'}`,
+          color: moversResult.ok ? '#6ee7b7' : '#fca5a5',
+          fontSize: '.8rem', gap: 10,
+        }}>
+          <span>
+            {moversResult.ok
+              ? `✓ Done — ${moversResult.total_cards?.toLocaleString()} cards tracked · ${moversResult.gainers} gainers · ${moversResult.losers} losers · vs ${moversResult.ref_date || '—'} (${moversResult.days_apart}d)`
+              : `⚠️ Failed: ${moversResult.message}`
+            }
+          </span>
+          <button onClick={() => setMoversResult(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '.9rem', opacity: 0.6, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
 
       {/* Template download hint */}
       <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: '.78rem', color: '#a5b4fc', lineHeight: 1.6 }}>
