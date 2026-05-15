@@ -1,0 +1,12 @@
+format,deck_name,archetype,win_rate,meta_share,avg_price,source,updated_at,notes
+Standard,Mono-Red Aggro,Aggro,58.2,14.5,180,MTGGoldfish,2025-05-10,Fast burn deck with Emberholt
+Standard,Azorius Soldiers,Aggro,55.1,11.3,320,MTGGoldfish,2025-05-10,
+Standard,Esper Midrange,Midrange,54.8,10.7,420,MTGTop8,2025-05-10,
+Standard,Domain Ramp,Ramp,52.3,9.4,380,MTGGoldfish,2025-05-10,
+Standard,Dimir Control,Control,51.7,8.6,350,MTGTop8,2025-05-10,
+Modern,Golgari Yawgmoth,Combo,57.9,12.8,1200,MTGGoldfish,2025-05-10,
+Modern,Mardu Energy,Midrange,55.6,11.2,900,MTGGoldfish,2025-05-10,
+Modern,Living End,Combo,54.1,9.7,600,MTGTop8,2025-05-10,
+Pioneer,Izzet Phoenix,Tempo,56.3,15.2,600,MTGGoldfish,2025-05-10,
+Pioneer,Amalia Combo,Combo,55.8,13.4,400,MTGGoldfish,2025-05-10,
+Commander,Atraxa Praetors Voice,Midrange,,18.5,,EDHREC,2025-05-10,Most popular commander on EDHREC

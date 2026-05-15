@@ -3,8 +3,20 @@ import { createPortal } from 'react-dom'
 import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
 import { getDeckValueSync, fetchUnknownDeckPrices } from '../lib/pricing'
+import { supabase } from '../lib/supabase'
 import ImportDeckModal from '../modals/ImportDeckModal'
 import UpgradeModal from '../components/UpgradeModal'
+
+// ── Meta Explore constants ────────────────────────────────────────────────────
+const META_FORMATS = ['All', 'Standard', 'Pioneer', 'Modern', 'Legacy', 'Pauper', 'Commander', 'Brawl']
+const ARCHETYPE_COLOR = {
+  Aggro:     { bg: 'rgba(248,113,113,.12)', border: '#f87171', text: '#f87171' },
+  Control:   { bg: 'rgba(99,163,255,.12)',  border: '#63a3ff', text: '#63a3ff' },
+  Midrange:  { bg: 'rgba(74,222,128,.12)',  border: '#4ade80', text: '#4ade80' },
+  Combo:     { bg: 'rgba(167,139,250,.12)', border: '#a78bfa', text: '#a78bfa' },
+  Tempo:     { bg: 'rgba(251,191,36,.12)',  border: '#fbbf24', text: '#fbbf24' },
+  Ramp:      { bg: 'rgba(74,222,128,.12)',  border: '#4ade80', text: '#4ade80' },
+}
 
 const FORMAT_ALL = 'All'
 
@@ -43,9 +55,31 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   const [copied, setCopied]         = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
 
+  // ── Meta Explore state ──
+  const [metaDecks,   setMetaDecks]   = useState([])
+  const [metaLoading, setMetaLoading] = useState(false)
+  const [metaFormat,  setMetaFormat]  = useState('All')
+  const [metaLoaded,  setMetaLoaded]  = useState(false)
+
   useEffect(() => {
     getDecks(user?.id).then(d => { setDecks(d); setLoading(false) })
   }, [user])
+
+  // Load meta decks when Explore tab opens (once)
+  useEffect(() => {
+    if (activeTab !== 'explore' || metaLoaded) return
+    setMetaLoading(true)
+    supabase
+      .from('meta_decks')
+      .select('*')
+      .order('meta_share', { ascending: false })
+      .then(({ data }) => {
+        setMetaDecks(data || [])
+        setMetaLoaded(true)
+        setMetaLoading(false)
+      })
+      .catch(() => setMetaLoading(false))
+  }, [activeTab, metaLoaded])
 
   // Block sidebar navigation while deck modal is open
   useEffect(() => {
@@ -133,14 +167,15 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   return (
     <div>
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-        {[['my', '🃏 Decks'], ['explore', '🔍 Explore']].map(([key, label]) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+        {[['my', '🃏 My Decks'], ['explore', '📊 Explore Meta']].map(([key, label]) => (
           <button key={key} onClick={() => setActiveTab(key)} style={{
-            padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: '.88rem', fontWeight: 600,
-            color: activeTab === key ? 'var(--accent-teal)' : 'var(--text-muted)',
-            borderBottom: activeTab === key ? '2px solid var(--accent-teal)' : '2px solid transparent',
-            marginBottom: '-1px', transition: 'color .15s',
+            padding: '6px 14px', background: activeTab === key ? 'var(--accent-gold-glow)' : 'transparent',
+            border: `1px solid ${activeTab === key ? 'var(--accent-gold)' : 'var(--border)'}`,
+            borderRadius: '99px', cursor: 'pointer',
+            fontSize: '.78rem', fontWeight: 600,
+            color: activeTab === key ? 'var(--accent-gold)' : 'var(--text-muted)',
+            transition: 'all .15s',
           }}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
@@ -160,9 +195,143 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
       </div>
 
       {activeTab === 'explore' ? (
-        <div className="empty-state" style={{ padding: '60px 20px' }}>
-          <div className="empty-icon">🔍</div>
-          <p>Browse popular decks from the community.<br />Coming soon. Check Meta Tracker for now.</p>
+        <div style={{ paddingBottom: 32 }}>
+          {/* Format filter pills */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+            {META_FORMATS.map(f => (
+              <button key={f} onClick={() => setMetaFormat(f)} style={{
+                padding: '5px 13px', borderRadius: 99, fontSize: '.74rem', fontWeight: 600,
+                background: metaFormat === f ? 'var(--accent-gold-glow)' : 'transparent',
+                border: `1px solid ${metaFormat === f ? 'var(--accent-gold)' : 'var(--border)'}`,
+                color: metaFormat === f ? 'var(--accent-gold)' : 'var(--text-muted)',
+                cursor: 'pointer', transition: 'all .15s',
+              }}>{f}</button>
+            ))}
+            <button
+              onClick={() => { setMetaLoaded(false) }}
+              style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 99, fontSize: '.7rem', fontWeight: 600, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer' }}
+              title="Refresh meta data"
+            >⟳</button>
+          </div>
+
+          {metaLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[...Array(5)].map((_, i) => (
+                <div key={i} style={{ height: 88, borderRadius: 12, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              ))}
+            </div>
+          ) : (() => {
+            const filtered = metaDecks.filter(d => metaFormat === 'All' || d.format === metaFormat)
+            const maxShare = Math.max(1, ...filtered.map(d => parseFloat(d.meta_share) || 0))
+            const lastUpdated = filtered.length > 0
+              ? filtered.reduce((latest, d) => (!latest || d.updated_at > latest ? d.updated_at : latest), null)
+              : null
+
+            if (filtered.length === 0) {
+              return (
+                <div className="empty-state" style={{ padding: '60px 20px' }}>
+                  <div className="empty-icon">📊</div>
+                  <p>No meta data for {metaFormat} yet.<br />
+                    <span style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>
+                      Add decks via the Admin Panel → Meta tab.
+                    </span>
+                  </p>
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {/* Header row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
+                    {filtered.length} decks · {metaFormat}
+                  </div>
+                  {lastUpdated && (
+                    <div style={{ fontSize: '.64rem', color: 'var(--text-muted)' }}>
+                      Updated {new Date(lastUpdated + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Deck cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {filtered.map((deck, i) => {
+                    const share = parseFloat(deck.meta_share) || 0
+                    const wr    = parseFloat(deck.win_rate)   || null
+                    const price = parseFloat(deck.avg_price)  || null
+                    const arch  = deck.archetype || ''
+                    const ac    = ARCHETYPE_COLOR[arch] || { bg: 'rgba(255,255,255,.06)', border: '#333', text: '#888' }
+                    const barW  = Math.round((share / maxShare) * 100)
+                    const wrColor = wr == null ? 'var(--text-muted)' : wr >= 55 ? '#4ade80' : wr >= 50 ? '#fbbf24' : '#f87171'
+
+                    return (
+                      <div key={deck.id} style={{
+                        background: 'var(--bg-card)', border: '1px solid var(--border)',
+                        borderRadius: 12, padding: '14px 16px',
+                      }}>
+                        {/* Top row: rank + name + archetype */}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                          <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--text-muted)', minWidth: 20, paddingTop: 2 }}>
+                            #{i + 1}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {deck.deck_name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                              {arch && (
+                                <span style={{ fontSize: '.6rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: ac.bg, border: `1px solid ${ac.border}`, color: ac.text }}>
+                                  {arch}
+                                </span>
+                              )}
+                              {deck.format && metaFormat === 'All' && (
+                                <span style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>{deck.format}</span>
+                              )}
+                            </div>
+                          </div>
+                          {/* Win rate badge */}
+                          {wr != null && (
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>Win %</div>
+                              <div style={{ fontSize: '.95rem', fontWeight: 800, color: wrColor }}>{wr.toFixed(1)}%</div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Meta share bar */}
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', fontWeight: 600 }}>META SHARE</div>
+                            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)' }}>{share.toFixed(1)}%</div>
+                          </div>
+                          <div style={{ height: 5, borderRadius: 99, background: 'var(--border)' }}>
+                            <div style={{ height: '100%', borderRadius: 99, width: `${barW}%`, background: 'linear-gradient(90deg, var(--accent-gold), var(--accent-gold-light))' }} />
+                          </div>
+                        </div>
+
+                        {/* Bottom row: price + source */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: '.72rem', color: price ? 'var(--text-secondary)' : 'var(--text-muted)', fontWeight: 600 }}>
+                            {price ? `~$${price.toFixed(0)} avg` : ''}
+                          </div>
+                          {deck.source && (
+                            <div style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>via {deck.source}</div>
+                          )}
+                        </div>
+
+                        {deck.notes && (
+                          <div style={{ marginTop: 8, fontSize: '.72rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                            {deck.notes}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )
+          })()}
         </div>
       ) : (
         <>

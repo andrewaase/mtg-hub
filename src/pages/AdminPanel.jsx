@@ -1524,8 +1524,238 @@ const TABS = [
   { id: 'overview',  label: '📊 Overview'  },
   { id: 'listings',  label: '🏪 Listings'  },
   { id: 'orders',    label: '📦 Orders'    },
+  { id: 'meta',      label: '📈 Meta'      },
   { id: 'settings',  label: '⚙️ Settings'  },
 ]
+
+// ── Meta Tracker admin tab ──────────────────────────────────────────────────
+
+const META_FORMATS_ADMIN  = ['Standard','Pioneer','Modern','Legacy','Pauper','Commander','Brawl','Vintage','Explorer']
+const META_ARCHETYPES     = ['Aggro','Control','Midrange','Combo','Tempo','Ramp','Prison','Reanimator','Other']
+const META_SOURCES        = ['MTGGoldfish','MTGTop8','MTGArena','Untapped.gg','Other']
+
+const BLANK_DECK = {
+  format: 'Standard', deck_name: '', archetype: 'Midrange',
+  win_rate: '', meta_share: '', avg_price: '', source: 'MTGGoldfish',
+  notes: '', updated_at: new Date().toISOString().slice(0, 10),
+}
+
+function MetaTab() {
+  const [decks,    setDecks]    = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [form,     setForm]     = useState(BLANK_DECK)
+  const [editId,   setEditId]   = useState(null)
+  const [saving,   setSaving]   = useState(false)
+  const [err,      setErr]      = useState(null)
+  const [csvText,  setCsvText]  = useState('')
+
+  const load = useCallback(() => {
+    setLoading(true)
+    supabase.from('meta_decks').select('*').order('meta_share', { ascending: false })
+      .then(({ data }) => { setDecks(data || []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleSave = async () => {
+    setErr(null)
+    if (!form.deck_name.trim()) { setErr('Deck name is required'); return }
+    setSaving(true)
+    const payload = {
+      format:     form.format,
+      deck_name:  form.deck_name.trim(),
+      archetype:  form.archetype || null,
+      win_rate:   form.win_rate  !== '' ? parseFloat(form.win_rate)  : null,
+      meta_share: form.meta_share !== '' ? parseFloat(form.meta_share) : null,
+      avg_price:  form.avg_price !== '' ? parseFloat(form.avg_price) : null,
+      source:     form.source    || null,
+      notes:      form.notes     || null,
+      updated_at: form.updated_at || new Date().toISOString().slice(0, 10),
+    }
+    const { error: e } = editId
+      ? await supabase.from('meta_decks').update(payload).eq('id', editId)
+      : await supabase.from('meta_decks').insert(payload)
+    setSaving(false)
+    if (e) { setErr(e.message); return }
+    setForm(BLANK_DECK)
+    setEditId(null)
+    load()
+  }
+
+  const handleEdit = (deck) => {
+    setEditId(deck.id)
+    setForm({
+      format:     deck.format     || 'Standard',
+      deck_name:  deck.deck_name  || '',
+      archetype:  deck.archetype  || '',
+      win_rate:   deck.win_rate   ?? '',
+      meta_share: deck.meta_share ?? '',
+      avg_price:  deck.avg_price  ?? '',
+      source:     deck.source     || 'MTGGoldfish',
+      notes:      deck.notes      || '',
+      updated_at: deck.updated_at || new Date().toISOString().slice(0, 10),
+    })
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this meta entry?')) return
+    await supabase.from('meta_decks').delete().eq('id', id)
+    load()
+  }
+
+  // CSV import: parse pasted CSV from template
+  const importCsv = async () => {
+    if (!csvText.trim()) return
+    const lines = csvText.trim().split('\n').filter(l => l.trim())
+    if (lines.length < 2) { setErr('CSV must have a header row and at least one data row'); return }
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
+    const rows = lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+      const obj = {}
+      headers.forEach((h, i) => { obj[h] = vals[i] || '' })
+      return {
+        format:     obj.format     || 'Standard',
+        deck_name:  obj.deck_name  || obj.name || '',
+        archetype:  obj.archetype  || null,
+        win_rate:   obj.win_rate   ? parseFloat(obj.win_rate)   : null,
+        meta_share: obj.meta_share ? parseFloat(obj.meta_share) : null,
+        avg_price:  obj.avg_price  || obj.price ? parseFloat(obj.avg_price || obj.price) : null,
+        source:     obj.source     || 'MTGGoldfish',
+        notes:      obj.notes      || null,
+        updated_at: obj.updated_at || obj.date || new Date().toISOString().slice(0, 10),
+      }
+    }).filter(r => r.deck_name)
+    if (rows.length === 0) { setErr('No valid rows found in CSV'); return }
+    setSaving(true)
+    const { error: e } = await supabase.from('meta_decks').insert(rows)
+    setSaving(false)
+    if (e) { setErr(e.message); return }
+    setCsvText('')
+    load()
+  }
+
+  const F = (label, children) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: '#64748b' }}>{label}</label>
+      {children}
+    </div>
+  )
+  const inputStyle = { background: '#0d0d12', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: '.85rem', outline: 'none', width: '100%' }
+  const selectStyle = { ...inputStyle }
+
+  return (
+    <div style={{ paddingBottom: 40 }}>
+
+      {/* Template download hint */}
+      <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: '.78rem', color: '#a5b4fc', lineHeight: 1.6 }}>
+        <strong>📋 Workflow:</strong> Fill in your Google Sheet using columns:
+        <code style={{ display: 'block', marginTop: 6, background: 'rgba(0,0,0,.3)', padding: '6px 10px', borderRadius: 6, fontSize: '.72rem', color: '#94a3b8', letterSpacing: '.3px' }}>
+          format, deck_name, archetype, win_rate, meta_share, avg_price, source, updated_at, notes
+        </code>
+        Then paste the CSV below to bulk import, or add decks one by one using the form.
+      </div>
+
+      {/* CSV Import */}
+      <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', marginBottom: 10 }}>📥 Bulk Import from CSV</div>
+        <textarea
+          value={csvText}
+          onChange={e => setCsvText(e.target.value)}
+          placeholder={'format,deck_name,archetype,win_rate,meta_share,avg_price,source,updated_at,notes\nStandard,Mono-Red Aggro,Aggro,58.2,14.5,180,MTGGoldfish,2025-05-10,Fast aggro deck'}
+          rows={5}
+          style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '.72rem', lineHeight: 1.5 }}
+        />
+        <button
+          onClick={importCsv}
+          disabled={saving || !csvText.trim()}
+          style={{ marginTop: 8, padding: '8px 18px', borderRadius: 8, background: 'rgba(99,102,241,.2)', border: '1px solid rgba(99,102,241,.35)', color: '#a5b4fc', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+        >
+          {saving ? 'Importing…' : '⬆ Import Rows'}
+        </button>
+      </div>
+
+      {/* Add / Edit form */}
+      <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', marginBottom: 14 }}>
+          {editId ? '✏️ Edit Entry' : '➕ Add Entry'}
+        </div>
+        {err && <div style={{ marginBottom: 12, fontSize: '.78rem', color: '#f87171', background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)', borderRadius: 8, padding: '8px 12px' }}>{err}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
+          {F('Format',
+            <select value={form.format} onChange={e => setForm(p => ({ ...p, format: e.target.value }))} style={selectStyle}>
+              {META_FORMATS_ADMIN.map(f => <option key={f}>{f}</option>)}
+            </select>
+          )}
+          {F('Deck Name',
+            <input value={form.deck_name} onChange={e => setForm(p => ({ ...p, deck_name: e.target.value }))} placeholder="e.g. Mono-Red Aggro" style={inputStyle} />
+          )}
+          {F('Archetype',
+            <select value={form.archetype} onChange={e => setForm(p => ({ ...p, archetype: e.target.value }))} style={selectStyle}>
+              <option value="">—</option>
+              {META_ARCHETYPES.map(a => <option key={a}>{a}</option>)}
+            </select>
+          )}
+          {F('Win Rate %',
+            <input type="number" step="0.1" min="0" max="100" value={form.win_rate} onChange={e => setForm(p => ({ ...p, win_rate: e.target.value }))} placeholder="e.g. 58.3" style={inputStyle} />
+          )}
+          {F('Meta Share %',
+            <input type="number" step="0.1" min="0" max="100" value={form.meta_share} onChange={e => setForm(p => ({ ...p, meta_share: e.target.value }))} placeholder="e.g. 12.5" style={inputStyle} />
+          )}
+          {F('Avg Price $',
+            <input type="number" step="1" min="0" value={form.avg_price} onChange={e => setForm(p => ({ ...p, avg_price: e.target.value }))} placeholder="e.g. 350" style={inputStyle} />
+          )}
+          {F('Source',
+            <select value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} style={selectStyle}>
+              {META_SOURCES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          )}
+          {F('Updated At',
+            <input type="date" value={form.updated_at} onChange={e => setForm(p => ({ ...p, updated_at: e.target.value }))} style={inputStyle} />
+          )}
+          {F('Notes (optional)',
+            <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Short note…" style={inputStyle} />
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', borderRadius: 8, background: '#f59e0b', border: 'none', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+            {saving ? 'Saving…' : editId ? 'Update' : 'Add Deck'}
+          </button>
+          {editId && (
+            <button onClick={() => { setEditId(null); setForm(BLANK_DECK); setErr(null) }} style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,.15)', color: '#94a3b8', fontWeight: 600, fontSize: '.82rem', cursor: 'pointer' }}>
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Existing entries table */}
+      <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#94a3b8', marginBottom: 10 }}>
+        {decks.length} entries
+      </div>
+      {loading ? (
+        <div style={{ color: '#475569', fontSize: '.85rem', padding: '20px 0' }}>Loading…</div>
+      ) : decks.length === 0 ? (
+        <div style={{ color: '#334155', fontSize: '.82rem', padding: '20px 0', textAlign: 'center' }}>No meta decks added yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {decks.map(d => (
+            <div key={d.id} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.deck_name}</div>
+                <div style={{ fontSize: '.7rem', color: '#475569', marginTop: 2 }}>
+                  {d.format}{d.archetype ? ` · ${d.archetype}` : ''}{d.meta_share != null ? ` · ${d.meta_share}% meta` : ''}{d.win_rate != null ? ` · ${d.win_rate}% wr` : ''}{d.source ? ` · ${d.source}` : ''}
+                </div>
+              </div>
+              <button onClick={() => handleEdit(d)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.25)', color: '#f59e0b', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+              <button onClick={() => handleDelete(d.id)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#f87171', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function AdminPanel({ user, isAdmin }) {
   const [tab,           setTab]           = useState('overview')
@@ -1708,6 +1938,9 @@ export default function AdminPanel({ user, isAdmin }) {
 
       {/* ── Orders tab ── */}
       {tab === 'orders' && <OrdersTab />}
+
+      {/* ── Meta tab ── */}
+      {tab === 'meta' && <MetaTab />}
 
       {/* ── Settings tab ── */}
       {tab === 'settings' && <SettingsTab />}
