@@ -242,9 +242,9 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
           </div>
 
           {metaLoading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            <div className="deck-art-grid">
               {[...Array(6)].map((_, i) => (
-                <div key={i} style={{ aspectRatio: '3/4', maxHeight: 220, borderRadius: 10, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div key={i} className="deck-art-tile" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (() => {
@@ -280,8 +280,8 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                   )}
                 </div>
 
-                {/* Tile grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                {/* Tile grid — uses same CSS as My Decks for consistent sizing */}
+                <div className="deck-art-grid">
                   {filteredMeta.map(deck => (
                     <MetaTile key={deck.id} deck={deck} onClick={() => setSelectedMetaDeck(deck)} />
                   ))}
@@ -438,7 +438,7 @@ const MONO_COLOR_TEXT = {
   G: '#86efac',   // mint
 }
 
-// ── Meta tile (MTGGoldfish-style art tile) ────────────────────────────────────
+// ── Meta tile — matches DeckArtTile exactly, adds META% in the subtitle ──────
 function MetaTile({ deck, onClick }) {
   const [artUrl, setArtUrl] = useState(null)
   const fetchedRef = useRef(false)
@@ -457,92 +457,35 @@ function MetaTile({ deck, onClick }) {
       .catch(() => {})
   }, [deck.art_card, deck.deck_name])
 
-  const colors = deck.colors ? deck.colors.split('') : []
-  const isMulti = colors.length > 1
-  const nameColor = isMulti
-    ? 'var(--accent-gold)'
-    : colors.length === 1
-      ? (MONO_COLOR_TEXT[colors[0]] || 'var(--text-primary)')
-      : 'var(--text-primary)'
-
-  const keyCards = (() => {
-    if (!deck.key_cards) return []
-    if (Array.isArray(deck.key_cards)) return deck.key_cards.slice(0, 3)
-    try { return JSON.parse(deck.key_cards).slice(0, 3) } catch { return [] }
-  })()
-
   const share = parseFloat(deck.meta_share) || 0
   const price = parseFloat(deck.avg_price) || null
+  const priceLabel = price
+    ? price >= 1000 ? `$${(price / 1000).toFixed(1)}k` : `$${price.toFixed(0)}`
+    : null
+
+  // Subtitle: "Standard · 11.5% META" (or just "11.5% META" if no format)
+  const subtitle = [
+    deck.format,
+    share > 0 ? `${share.toFixed(1)}% META` : null,
+  ].filter(Boolean).join(' · ')
 
   return (
-    <div
-      onClick={onClick}
-      style={{
-        position: 'relative', cursor: 'pointer', borderRadius: 10,
-        overflow: 'hidden', aspectRatio: '3/4',
-        background: 'var(--bg-card)', border: '1px solid var(--border)',
-        transition: 'transform .15s, box-shadow .15s',
-        maxHeight: 220,
-      }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.7)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }}
-    >
-      {/* Art background */}
+    <div className="deck-art-tile" onClick={onClick}>
       {artUrl
-        ? <img src={artUrl} alt={deck.deck_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', objectPosition: 'center 20%' }} />
-        : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a2e, #0d0d1a)' }} />
+        ? <img src={artUrl} alt={deck.deck_name} className="deck-art-tile-img" />
+        : <div className="deck-art-tile-placeholder" style={{ background: 'linear-gradient(135deg, #1a1a2e, #0d0d0f)' }}>📊</div>
       }
-
-      {/* Gradient overlay */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.95) 100%)',
-      }} />
-
-      {/* Content anchored to bottom */}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '8px 8px 6px' }}>
-
-        {/* Color pips */}
-        {colors.length > 0 && (
-          <div style={{ display: 'flex', gap: 2, marginBottom: 3 }}>
-            {colors.map((c, i) => <ManaSymbol key={i} c={c} size={13} />)}
-          </div>
-        )}
-
-        {/* Deck name */}
-        <div style={{
-          fontWeight: 800, fontSize: '.75rem', lineHeight: 1.2, marginBottom: 3,
-          color: nameColor, textShadow: '0 1px 5px rgba(0,0,0,.95)',
-          overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-        }}>
-          {deck.deck_name}
-        </div>
-
-        {/* Key cards — only show if they fit (limit to 2 on small tiles) */}
-        {keyCards.length > 0 && (
-          <div style={{ marginBottom: 4 }}>
-            {keyCards.slice(0, 2).map((name, i) => (
-              <div key={i} style={{ fontSize: '.55rem', color: 'rgba(255,255,255,.7)', lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {name}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Bottom bar: META% left, price right */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: 4, marginTop: 1,
-        }}>
-          <div style={{ fontSize: '.58rem', fontWeight: 700, color: 'var(--accent-gold)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
-            {share > 0 ? `${share.toFixed(1)}% META` : deck.format || ''}
-          </div>
-          {price && (
-            <div style={{ fontSize: '.58rem', fontWeight: 700, color: 'rgba(255,255,255,.75)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
-              ~${price.toFixed(0)}
+      <div className="deck-art-tile-overlay" />
+      <div className="deck-art-tile-body">
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'space-between' }}>
+          <div className="deck-art-tile-name" style={{ flex: 1, minWidth: 0 }}>{deck.deck_name}</div>
+          {priceLabel && (
+            <div style={{ fontSize: '.75rem', fontWeight: 800, color: 'var(--accent-gold)', flexShrink: 0, textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
+              {priceLabel}
             </div>
           )}
         </div>
+        <div className="deck-art-tile-format">{subtitle}</div>
       </div>
     </div>
   )
