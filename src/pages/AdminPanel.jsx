@@ -1558,13 +1558,16 @@ function MetaTab() {
       const { data: { session } } = await supabase.auth.getSession()
       const jwt = session?.access_token
       if (!jwt) throw new Error('Not signed in')
-      const res  = await fetch('/.netlify/functions/compute-market-movers', {
+      // Background function — returns 202 immediately; work runs for up to 15 min
+      const res = await fetch('/.netlify/functions/compute-market-movers-background', {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${jwt}` },
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
-      setMoversResult({ ok: true, ...json })
+      if (res.status !== 202 && !res.ok) {
+        const txt = await res.text()
+        throw new Error(`HTTP ${res.status}: ${txt.slice(0, 120)}`)
+      }
+      setMoversResult({ ok: true, background: true })
     } catch (e) {
       setMoversResult({ ok: false, message: e.message })
     } finally {
@@ -1627,14 +1630,16 @@ function MetaTab() {
     load()
   }
 
-  // CSV import: parse pasted CSV from template
+  // CSV/TSV import: handles both Google Sheets paste (tab-separated) and .csv (comma-separated)
   const importCsv = async () => {
     if (!csvText.trim()) return
     const lines = csvText.trim().split('\n').filter(l => l.trim())
-    if (lines.length < 2) { setErr('CSV must have a header row and at least one data row'); return }
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
+    if (lines.length < 2) { setErr('Must have a header row and at least one data row'); return }
+    // Auto-detect delimiter: Google Sheets pastes tabs, .csv files use commas
+    const delim = lines[0].includes('\t') ? '\t' : ','
+    const headers = lines[0].split(delim).map(h => h.trim().toLowerCase().replace(/\s+/g, '_'))
     const rows = lines.slice(1).map(line => {
-      const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+      const vals = line.split(delim).map(v => v.trim().replace(/^"|"$/g, ''))
       const obj = {}
       headers.forEach((h, i) => { obj[h] = vals[i] || '' })
       return {
@@ -1684,7 +1689,7 @@ function MetaTab() {
             opacity: moversRunning ? 0.7 : 1,
           }}
         >
-          {moversRunning ? '⏳ Fetching all card prices… (takes a few minutes)' : '📈 Run Market Movers Now'}
+          {moversRunning ? '⏳ Starting…' : '📈 Run Market Movers Now'}
         </button>
         <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>
           Fetches all ~5,000+ paper cards from Scryfall, snapshots prices, computes 7-day movers.
@@ -1703,7 +1708,7 @@ function MetaTab() {
         }}>
           <span>
             {moversResult.ok
-              ? `✓ Done — ${moversResult.total_cards?.toLocaleString()} cards tracked · ${moversResult.gainers} gainers · ${moversResult.losers} losers · vs ${moversResult.ref_date || '—'} (${moversResult.days_apart}d)`
+              ? `✓ Job started — fetching all card prices in the background. Check the Dashboard in ~5 minutes to see the updated Market Movers.`
               : `⚠️ Failed: ${moversResult.message}`
             }
           </span>
