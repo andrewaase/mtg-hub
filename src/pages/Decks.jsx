@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
-import { getDeckValueSync, fetchUnknownDeckPrices } from '../lib/pricing'
+import { getDeckValueSync, fetchUnknownDeckPrices, prefetchDeckPrices } from '../lib/pricing'
 import { supabase } from '../lib/supabase'
 import ImportDeckModal from '../modals/ImportDeckModal'
 import UpgradeModal from '../components/UpgradeModal'
@@ -54,6 +54,9 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   const [activeTab, setActiveTab]   = useState('my')
   const [copied, setCopied]         = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  // priceVersion increments after background prefetch so DeckArtTile re-reads the cache
+  const [priceVersion, setPriceVersion] = useState(0)
+  const prefetchedRef  = useRef(false)
 
   // ── Meta Explore state ──
   const [metaDecks,   setMetaDecks]   = useState([])
@@ -62,8 +65,19 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   const [metaLoaded,  setMetaLoaded]  = useState(false)
 
   useEffect(() => {
-    getDecks(user?.id).then(d => { setDecks(d); setLoading(false) })
-  }, [user])
+    getDecks(user?.id).then(d => {
+      setDecks(d)
+      setLoading(false)
+      // Kick off background price prefetch for all decks as soon as they load.
+      // Guards with a ref so it only runs once per session even if user changes.
+      if (d.length > 0 && !prefetchedRef.current) {
+        prefetchedRef.current = true
+        prefetchDeckPrices(d, collection)
+          .then(count => { if (count > 0) setPriceVersion(v => v + 1) })
+          .catch(() => {})
+      }
+    })
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load meta decks when Explore tab opens (once)
   useEffect(() => {
@@ -370,6 +384,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                     key={deck.id}
                     deck={deck}
                     collection={collection}
+                    priceVersion={priceVersion}
                     onClick={() => setSelected(deck)}
                     onEdit={() => { setEditDeck(deck); setShowImport(true) }}
                     onDelete={() => handleDelete(deck)}
@@ -400,7 +415,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
 }
 
 // ── Deck art tile ─────────────────────────────────────────────────────────────
-function DeckArtTile({ deck, collection, onClick, onEdit, onDelete }) {
+function DeckArtTile({ deck, collection, onClick, onEdit, onDelete, priceVersion = 0 }) {
   const [artUrl, setArtUrl] = useState(null)
   const fetchedRef = useRef(false)
 
@@ -420,7 +435,7 @@ function DeckArtTile({ deck, collection, onClick, onEdit, onDelete }) {
 
   const { main } = countCards(deck)
   const isCmdr  = isCommanderFormat(deck.format)
-  const deckVal = useMemo(() => getDeckValueSync(deck, collection || []), [deck, collection])
+  const deckVal = useMemo(() => getDeckValueSync(deck, collection || []), [deck, collection, priceVersion])
   const price   = deckVal.cachedValue > 0
     ? deckVal.cachedValue >= 1000
       ? `$${(deckVal.cachedValue / 1000).toFixed(1)}k`

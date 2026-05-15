@@ -3,7 +3,8 @@ import logoPng from '../assets/vaulted_singles_logo.png'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
-import { getSnapshots, getGainersLosers, getVelocity } from '../lib/priceHistory'
+import { getSnapshots } from '../lib/priceHistory'
+import { updateMarketPrices, getMarketMovers } from '../lib/marketPrices'
 import SparklineChart from '../components/SparklineChart'
 
 function fmt(n) {
@@ -373,10 +374,14 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   const chartColor = delta30d == null || delta30d.chg >= 0 ? '#f59e0b' : '#f87171'
   const hasTrend   = snapshots.length >= 2
 
-  const { gainers, losers } = getGainersLosers(collection)
-  const hasMovers = gainers.length > 0 || losers.length > 0
+  // ── Market movers state ──────────────────────────────────────────────────
+  const [marketMovers, setMarketMovers] = useState(() => getMarketMovers())
+  const [moverSort,    setMoverSort]    = useState('dollar')   // 'dollar' | 'pct'
 
-  const { gainers: vGainers, losers: vLosers } = getVelocity(collection)
+  // Fetch today's watchlist prices once on mount (no-op if already fetched today)
+  useEffect(() => {
+    updateMarketPrices().then(() => setMarketMovers(getMarketMovers()))
+  }, [])
 
   const matchupSummary = {}
   matches.forEach(m => {
@@ -533,50 +538,77 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         </div>
       )}
 
-      {/* ── Price Movers ── */}
-      {collection.length > 0 && (() => {
-        // Prefer 7-day velocity data; fall back to all-time gainers/losers when velocity is thin
-        const showGainers = vGainers.length > 0 ? vGainers : gainers
-        const showLosers  = vLosers.length  > 0 ? vLosers  : losers
-        const hasAnyData  = showGainers.length > 0 || showLosers.length > 0
-        const isVelocity  = vGainers.length > 0 || vLosers.length > 0
+      {/* ── Market Movers ── */}
+      {(() => {
+        const { gainers: allGainers, losers: allLosers, daysTracked } = marketMovers
+        const hasData = allGainers.length > 0 || allLosers.length > 0
+
+        // Sort gainers: highest first ($ or %)
+        const sortedGainers = [...allGainers]
+          .sort(moverSort === 'pct'
+            ? (a, b) => b.pctChange    - a.pctChange
+            : (a, b) => b.dollarChange - a.dollarChange)
+          .slice(0, 5)
+
+        // Sort losers: most negative first ($ or %)
+        const sortedLosers = [...allLosers]
+          .sort(moverSort === 'pct'
+            ? (a, b) => a.pctChange    - b.pctChange
+            : (a, b) => a.dollarChange - b.dollarChange)
+          .slice(0, 5)
+
+        const SortBtn = ({ id, label }) => (
+          <button onClick={() => setMoverSort(id)} style={{
+            padding: '3px 10px', borderRadius: 99, fontSize: '.64rem', fontWeight: 700,
+            background:  moverSort === id ? 'var(--accent-gold-glow)' : 'transparent',
+            border:      `1px solid ${moverSort === id ? 'var(--accent-gold)' : 'var(--border)'}`,
+            color:       moverSort === id ? 'var(--accent-gold)' : 'var(--text-muted)',
+            cursor: 'pointer', transition: 'all .15s',
+          }}>{label}</button>
+        )
 
         return (
           <div style={{ margin: '12px 16px 0' }}>
+            {/* Section header + sort toggle */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div className="section-title" style={{ padding: 0 }}>
-                {isVelocity ? '7-Day Movers' : 'Price Movers'}
-              </div>
-              {!hasAnyData && (
-                <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>Building history…</div>
-              )}
-            </div>
-            <div className="grid-2">
-              {/* Gainers */}
-              <div className="card" style={{ padding: '12px 14px' }}>
-                <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-green)', marginBottom: '10px' }}>▲ Gainers</div>
-                {showGainers.length === 0 ? (
-                  <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    {hasAnyData ? 'None this period' : 'Tracking begins after day 2'}
-                  </div>
-                ) : isVelocity
-                  ? showGainers.map(g => <VelocityRow key={g.name} item={g} type="gain" />)
-                  : showGainers.map(g => <MoverRow   key={g.name} item={g} type="gain" />)
-                }
-              </div>
-              {/* Losers */}
-              <div className="card" style={{ padding: '12px 14px' }}>
-                <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)', marginBottom: '10px' }}>▼ Losers</div>
-                {showLosers.length === 0 ? (
-                  <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    {hasAnyData ? 'None this period' : 'Tracking begins after day 2'}
-                  </div>
-                ) : isVelocity
-                  ? showLosers.map(l => <VelocityRow key={l.name} item={l} type="loss" />)
-                  : showLosers.map(l => <MoverRow   key={l.name} item={l} type="loss" />)
-                }
+              <div className="section-title" style={{ padding: 0 }}>Market Movers</div>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <SortBtn id="dollar" label="$ Amount" />
+                <SortBtn id="pct"    label="% Change" />
               </div>
             </div>
+
+            {/* No history yet — single placeholder */}
+            {daysTracked < 2 ? (
+              <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>📊</div>
+                <div style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  Building market history
+                </div>
+                <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
+                  Prices are being tracked daily — movers will appear after day 2.
+                </div>
+              </div>
+            ) : (
+              <div className="grid-2">
+                {/* Gainers */}
+                <div className="card" style={{ padding: '12px 14px' }}>
+                  <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-green)', marginBottom: '10px' }}>▲ Gainers</div>
+                  {sortedGainers.length === 0
+                    ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable gainers today</div>
+                    : sortedGainers.map(g => <MoverRow key={g.name} item={g} type="gain" sort={moverSort} />)
+                  }
+                </div>
+                {/* Losers */}
+                <div className="card" style={{ padding: '12px 14px' }}>
+                  <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)', marginBottom: '10px' }}>▼ Losers</div>
+                  {sortedLosers.length === 0
+                    ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable losers today</div>
+                    : sortedLosers.map(l => <MoverRow key={l.name} item={l} type="loss" sort={moverSort} />)
+                  }
+                </div>
+              </div>
+            )}
           </div>
         )
       })()}
@@ -647,9 +679,15 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   )
 }
 
-function MoverRow({ item, type }) {
-  const isGain = type === 'gain'
-  const color  = isGain ? 'var(--accent-green)' : 'var(--accent-red)'
+function MoverRow({ item, type, sort = 'dollar' }) {
+  const isGain   = type === 'gain'
+  const color    = isGain ? 'var(--accent-green)' : 'var(--accent-red)'
+  const primary  = sort === 'pct'
+    ? `${isGain ? '+' : ''}${item.pctChange}%`
+    : `${item.dollarChange > 0 ? '+' : '-'}$${Math.abs(item.dollarChange).toFixed(2)}`
+  const secondary = sort === 'pct'
+    ? `${item.dollarChange > 0 ? '+' : '-'}$${Math.abs(item.dollarChange).toFixed(2)}`
+    : `${isGain ? '+' : ''}${item.pctChange}%`
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }} className="mover-row-last-no-border">
       {item.img
@@ -658,44 +696,13 @@ function MoverRow({ item, type }) {
       }
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-        <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>${item.oldPrice} → ${item.newPrice}</div>
+        <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>${item.oldPrice.toFixed(2)} → ${item.newPrice.toFixed(2)}</div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: '.82rem', fontWeight: 800, color }}>{isGain ? '+' : ''}{item.pctChange}%</div>
-        <div style={{ fontSize: '.62rem', color, opacity: .8 }}>{item.dollarChange > 0 ? '+' : ''}${Math.abs(item.dollarChange).toFixed(2)}</div>
+        <div style={{ fontSize: '.82rem', fontWeight: 800, color }}>{primary}</div>
+        <div style={{ fontSize: '.62rem', color, opacity: .7, marginTop: '1px' }}>{secondary}</div>
       </div>
     </div>
   )
 }
 
-function VelocityRow({ item, type }) {
-  const isGain = type === 'gain'
-  const color  = isGain ? 'var(--accent-green)' : 'var(--accent-red)'
-  const oldPrice = Math.round((item.currentPrice - item.dollar7d / item.qty) * 100) / 100
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }} className="mover-row-last-no-border">
-      {item.img
-        ? <img src={item.img} alt={item.name} style={{ width: '28px', borderRadius: '3px', flexShrink: 0 }} />
-        : <div style={{ width: '28px', height: '40px', background: 'var(--bg-hover)', borderRadius: '3px', flexShrink: 0 }} />
-      }
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-        <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-          ${oldPrice.toFixed(2)} → ${item.currentPrice.toFixed(2)}
-        </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{
-          fontSize: '.82rem', fontWeight: 800, color,
-          background: isGain ? 'rgba(74,222,128,.1)' : 'rgba(248,113,113,.1)',
-          borderRadius: '5px', padding: '1px 6px',
-        }}>
-          {isGain ? '+' : ''}{item.pct7d}%
-        </div>
-        <div style={{ fontSize: '.62rem', color, opacity: .8, marginTop: '2px' }}>
-          {item.dollar7d > 0 ? '+' : ''}${Math.abs(item.dollar7d).toFixed(2)}
-        </div>
-      </div>
-    </div>
-  )
-}

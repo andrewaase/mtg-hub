@@ -121,6 +121,25 @@ export function getDeckValueSync(deck, collection) {
   return { ownedValue, cachedValue, cardValues, unknownCards }
 }
 
+// Prefetch prices for all decks when the My Decks page loads.
+// Collects every unique unknown-price card across all decks and fetches them in one
+// sequential batch so the deck list shows prices immediately without needing a click.
+// Limited to `limit` unique cards to avoid long waits on large collections.
+export async function prefetchDeckPrices(decks, collection, limit = 80) {
+  const unknownSet = new Set()
+  for (const deck of decks) {
+    const { unknownCards } = getDeckValueSync(deck, collection || [])
+    for (const name of unknownCards) {
+      unknownSet.add(name)
+      if (unknownSet.size >= limit) break
+    }
+    if (unknownSet.size >= limit) break
+  }
+  if (unknownSet.size === 0) return 0
+  await fetchUnknownDeckPrices([...unknownSet])
+  return unknownSet.size
+}
+
 // Fetches market prices for cards not in collection or cache.
 // onProgress(done, total) for UI feedback.
 export async function fetchUnknownDeckPrices(unknownCards, { onProgress } = {}) {
