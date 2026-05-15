@@ -1538,6 +1538,24 @@ const BLANK_DECK = {
   format: 'Standard', deck_name: '', archetype: 'Midrange',
   win_rate: '', meta_share: '', avg_price: '', source: 'MTGGoldfish',
   notes: '', updated_at: new Date().toISOString().slice(0, 10),
+  art_card: '', colors: '', key_cards_raw: '', decklist_raw: '',
+}
+
+function parseArenaDecklist(text) {
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean)
+  const mainboard = [], sideboard = []
+  let inSide = false
+  for (const line of lines) {
+    if (['Deck', 'Commander', 'Companion'].includes(line)) continue
+    if (line === 'Sideboard') { inSide = true; continue }
+    if (line.startsWith('//')) continue
+    const m = line.match(/^(\d+)\s+(.+?)(?:\s+\([A-Z0-9]+\)\s+\d+)?$/)
+    if (m) {
+      const entry = { qty: parseInt(m[1]), name: m[2].trim() }
+      ;(inSide ? sideboard : mainboard).push(entry)
+    }
+  }
+  return { mainboard, sideboard }
 }
 
 function MetaTab() {
@@ -1588,6 +1606,12 @@ function MetaTab() {
     setErr(null)
     if (!form.deck_name.trim()) { setErr('Deck name is required'); return }
     setSaving(true)
+    const keyCardsArr = form.key_cards_raw
+      ? form.key_cards_raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 3)
+      : []
+    const decklistParsed = form.decklist_raw
+      ? parseArenaDecklist(form.decklist_raw)
+      : { mainboard: [], sideboard: [] }
     const payload = {
       format:     form.format,
       deck_name:  form.deck_name.trim(),
@@ -1598,6 +1622,10 @@ function MetaTab() {
       source:     form.source    || null,
       notes:      form.notes     || null,
       updated_at: form.updated_at || new Date().toISOString().slice(0, 10),
+      art_card:   form.art_card.trim() || null,
+      colors:     form.colors.trim() || null,
+      key_cards:  keyCardsArr,
+      decklist:   decklistParsed,
     }
     const { error: e } = editId
       ? await supabase.from('meta_decks').update(payload).eq('id', editId)
@@ -1611,16 +1639,38 @@ function MetaTab() {
 
   const handleEdit = (deck) => {
     setEditId(deck.id)
+    // Rebuild decklist_raw from stored JSON so admin can edit and re-save
+    const decklistObj = (() => {
+      if (!deck.decklist) return { mainboard: [], sideboard: [] }
+      if (typeof deck.decklist === 'object') return deck.decklist
+      try { return JSON.parse(deck.decklist) } catch { return { mainboard: [], sideboard: [] } }
+    })()
+    const decklistRaw = [
+      'Deck',
+      ...(decklistObj.mainboard || []).map(c => `${c.qty} ${c.name}`),
+      ...(decklistObj.sideboard && decklistObj.sideboard.length > 0
+        ? ['', 'Sideboard', ...decklistObj.sideboard.map(c => `${c.qty} ${c.name}`)]
+        : []),
+    ].join('\n')
+    const keyCardsArr = (() => {
+      if (!deck.key_cards) return []
+      if (Array.isArray(deck.key_cards)) return deck.key_cards
+      try { return JSON.parse(deck.key_cards) } catch { return [] }
+    })()
     setForm({
-      format:     deck.format     || 'Standard',
-      deck_name:  deck.deck_name  || '',
-      archetype:  deck.archetype  || '',
-      win_rate:   deck.win_rate   ?? '',
-      meta_share: deck.meta_share ?? '',
-      avg_price:  deck.avg_price  ?? '',
-      source:     deck.source     || 'MTGGoldfish',
-      notes:      deck.notes      || '',
-      updated_at: deck.updated_at || new Date().toISOString().slice(0, 10),
+      format:        deck.format     || 'Standard',
+      deck_name:     deck.deck_name  || '',
+      archetype:     deck.archetype  || '',
+      win_rate:      deck.win_rate   ?? '',
+      meta_share:    deck.meta_share ?? '',
+      avg_price:     deck.avg_price  ?? '',
+      source:        deck.source     || 'MTGGoldfish',
+      notes:         deck.notes      || '',
+      updated_at:    deck.updated_at || new Date().toISOString().slice(0, 10),
+      art_card:      deck.art_card   || '',
+      colors:        deck.colors     || '',
+      key_cards_raw: keyCardsArr.join(', '),
+      decklist_raw:  decklistRaw !== 'Deck' ? decklistRaw : '',
     })
   }
 
@@ -1785,7 +1835,25 @@ function MetaTab() {
           {F('Notes (optional)',
             <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Short note…" style={inputStyle} />
           )}
+          {F('Art Card (for tile background)',
+            <input value={form.art_card} onChange={e => setForm(p => ({ ...p, art_card: e.target.value }))} placeholder="e.g. Lightning Bolt" style={inputStyle} />
+          )}
+          {F('Colors (e.g. UR, WUB, G)',
+            <input value={form.colors} onChange={e => setForm(p => ({ ...p, colors: e.target.value }))} placeholder="e.g. UR" style={inputStyle} />
+          )}
+          {F('Key Cards (comma-separated, max 3)',
+            <input value={form.key_cards_raw} onChange={e => setForm(p => ({ ...p, key_cards_raw: e.target.value }))} placeholder="e.g. Ragavan, Dragon's Rage Channeler, Murktide Regent" style={inputStyle} />
+          )}
         </div>
+        {F('Decklist (Arena format — paste from MTGGoldfish / Moxfield)',
+          <textarea
+            value={form.decklist_raw}
+            onChange={e => setForm(p => ({ ...p, decklist_raw: e.target.value }))}
+            placeholder={'Deck\n4 Lightning Bolt\n4 Monastery Swiftspear\n...\n\nSideboard\n2 Smash to Smithereens'}
+            rows={10}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '.72rem', lineHeight: 1.5, marginTop: 4 }}
+          />
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', borderRadius: 8, background: '#f59e0b', border: 'none', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
             {saving ? 'Saving…' : editId ? 'Update' : 'Add Deck'}

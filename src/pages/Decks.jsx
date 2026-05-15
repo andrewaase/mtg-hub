@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
-import { getDeckValueSync, fetchUnknownDeckPrices, prefetchDeckPrices } from '../lib/pricing'
+import { getDeckValueSync, fetchUnknownDeckPrices, prefetchDeckPrices, getCachedPrice } from '../lib/pricing'
+import { getTCGPlayerLink } from '../lib/tcgplayer'
+import { getManaPoolLink } from '../lib/manapool'
 import { supabase } from '../lib/supabase'
 import ImportDeckModal from '../modals/ImportDeckModal'
 import UpgradeModal from '../components/UpgradeModal'
@@ -59,10 +61,11 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   const prefetchedRef  = useRef(false)
 
   // ── Meta Explore state ──
-  const [metaDecks,   setMetaDecks]   = useState([])
-  const [metaLoading, setMetaLoading] = useState(false)
-  const [metaFormat,  setMetaFormat]  = useState('All')
-  const [metaLoaded,  setMetaLoaded]  = useState(false)
+  const [metaDecks,        setMetaDecks]        = useState([])
+  const [metaLoading,      setMetaLoading]      = useState(false)
+  const [metaFormat,       setMetaFormat]       = useState('All')
+  const [metaLoaded,       setMetaLoaded]       = useState(false)
+  const [selectedMetaDeck, setSelectedMetaDeck] = useState(null)
 
   useEffect(() => {
     getDecks(user?.id).then(d => {
@@ -209,6 +212,16 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
       </div>
 
       {activeTab === 'explore' ? (
+        selectedMetaDeck ? (
+          <MetaDeckDetail
+            deck={selectedMetaDeck}
+            onBack={() => setSelectedMetaDeck(null)}
+            onSave={handleSave}
+            showToast={showToast}
+            openCardSearch={openCardSearch}
+            user={user}
+          />
+        ) : (
         <div style={{ paddingBottom: 32 }}>
           {/* Format filter pills */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -229,19 +242,18 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
           </div>
 
           {metaLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[...Array(5)].map((_, i) => (
-                <div key={i} style={{ height: 88, borderRadius: 12, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              {[...Array(6)].map((_, i) => (
+                <div key={i} style={{ aspectRatio: '3/4', borderRadius: 12, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (() => {
-            const filtered = metaDecks.filter(d => metaFormat === 'All' || d.format === metaFormat)
-            const maxShare = Math.max(1, ...filtered.map(d => parseFloat(d.meta_share) || 0))
-            const lastUpdated = filtered.length > 0
-              ? filtered.reduce((latest, d) => (!latest || d.updated_at > latest ? d.updated_at : latest), null)
+            const filteredMeta = metaDecks.filter(d => metaFormat === 'All' || d.format === metaFormat)
+            const lastUpdated = filteredMeta.length > 0
+              ? filteredMeta.reduce((latest, d) => (!latest || d.updated_at > latest ? d.updated_at : latest), null)
               : null
 
-            if (filtered.length === 0) {
+            if (filteredMeta.length === 0) {
               return (
                 <div className="empty-state" style={{ padding: '60px 20px' }}>
                   <div className="empty-icon">📊</div>
@@ -259,7 +271,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                 {/* Header row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
-                    {filtered.length} decks · {metaFormat}
+                    {filteredMeta.length} decks · {metaFormat}
                   </div>
                   {lastUpdated && (
                     <div style={{ fontSize: '.64rem', color: 'var(--text-muted)' }}>
@@ -268,85 +280,17 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                   )}
                 </div>
 
-                {/* Deck cards */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {filtered.map((deck, i) => {
-                    const share = parseFloat(deck.meta_share) || 0
-                    const wr    = parseFloat(deck.win_rate)   || null
-                    const price = parseFloat(deck.avg_price)  || null
-                    const arch  = deck.archetype || ''
-                    const ac    = ARCHETYPE_COLOR[arch] || { bg: 'rgba(255,255,255,.06)', border: '#333', text: '#888' }
-                    const barW  = Math.round((share / maxShare) * 100)
-                    const wrColor = wr == null ? 'var(--text-muted)' : wr >= 55 ? '#4ade80' : wr >= 50 ? '#fbbf24' : '#f87171'
-
-                    return (
-                      <div key={deck.id} style={{
-                        background: 'var(--bg-card)', border: '1px solid var(--border)',
-                        borderRadius: 12, padding: '14px 16px',
-                      }}>
-                        {/* Top row: rank + name + archetype */}
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-                          <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--text-muted)', minWidth: 20, paddingTop: 2 }}>
-                            #{i + 1}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {deck.deck_name}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                              {arch && (
-                                <span style={{ fontSize: '.6rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: ac.bg, border: `1px solid ${ac.border}`, color: ac.text }}>
-                                  {arch}
-                                </span>
-                              )}
-                              {deck.format && metaFormat === 'All' && (
-                                <span style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>{deck.format}</span>
-                              )}
-                            </div>
-                          </div>
-                          {/* Win rate badge */}
-                          {wr != null && (
-                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                              <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>Win %</div>
-                              <div style={{ fontSize: '.95rem', fontWeight: 800, color: wrColor }}>{wr.toFixed(1)}%</div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Meta share bar */}
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <div style={{ fontSize: '.62rem', color: 'var(--text-muted)', fontWeight: 600 }}>META SHARE</div>
-                            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)' }}>{share.toFixed(1)}%</div>
-                          </div>
-                          <div style={{ height: 5, borderRadius: 99, background: 'var(--border)' }}>
-                            <div style={{ height: '100%', borderRadius: 99, width: `${barW}%`, background: 'linear-gradient(90deg, var(--accent-gold), var(--accent-gold-light))' }} />
-                          </div>
-                        </div>
-
-                        {/* Bottom row: price + source */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: '.72rem', color: price ? 'var(--text-secondary)' : 'var(--text-muted)', fontWeight: 600 }}>
-                            {price ? `~$${price.toFixed(0)} avg` : ''}
-                          </div>
-                          {deck.source && (
-                            <div style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>via {deck.source}</div>
-                          )}
-                        </div>
-
-                        {deck.notes && (
-                          <div style={{ marginTop: 8, fontSize: '.72rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                            {deck.notes}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                {/* Tile grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {filteredMeta.map(deck => (
+                    <MetaTile key={deck.id} deck={deck} onClick={() => setSelectedMetaDeck(deck)} />
+                  ))}
                 </div>
               </>
             )
           })()}
         </div>
+        )
       ) : (
         <>
           {decks.length > 0 && (
@@ -470,6 +414,458 @@ function DeckArtTile({ deck, collection, onClick, onEdit, onDelete, priceVersion
         <button onClick={onEdit}   style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#fff', cursor: 'pointer' }}>✏️</button>
         <button onClick={onDelete} style={{ background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '.68rem', color: '#f87171', cursor: 'pointer' }}>🗑</button>
       </div>
+    </div>
+  )
+}
+
+// ── Mana symbol pip ──────────────────────────────────────────────────────────
+function ManaSymbol({ c }) {
+  return (
+    <img
+      src={`https://svgs.scryfall.io/card-symbols/${c.toUpperCase()}.svg`}
+      alt={c}
+      style={{ width: 16, height: 16, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.8))' }}
+    />
+  )
+}
+
+// Color name mapping for mono-color deck tile text
+const MONO_COLOR_TEXT = {
+  W: '#f5f0dc',   // cream
+  U: '#7ec8f0',   // sky blue
+  B: '#a78bfa',   // violet
+  R: '#f9a07a',   // salmon
+  G: '#86efac',   // mint
+}
+
+// ── Meta tile (MTGGoldfish-style art tile) ────────────────────────────────────
+function MetaTile({ deck, onClick }) {
+  const [artUrl, setArtUrl] = useState(null)
+  const fetchedRef = useRef(false)
+
+  useEffect(() => {
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    const cardName = deck.art_card || deck.deck_name
+    if (!cardName) return
+    fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(card => {
+        const url = card?.image_uris?.art_crop || card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.art_crop
+        if (url) setArtUrl(url)
+      })
+      .catch(() => {})
+  }, [deck.art_card, deck.deck_name])
+
+  const colors = deck.colors ? deck.colors.split('') : []
+  const isMulti = colors.length > 1
+  const nameColor = isMulti
+    ? 'var(--accent-gold)'
+    : colors.length === 1
+      ? (MONO_COLOR_TEXT[colors[0]] || 'var(--text-primary)')
+      : 'var(--text-primary)'
+
+  const keyCards = (() => {
+    if (!deck.key_cards) return []
+    if (Array.isArray(deck.key_cards)) return deck.key_cards.slice(0, 3)
+    try { return JSON.parse(deck.key_cards).slice(0, 3) } catch { return [] }
+  })()
+
+  const share = parseFloat(deck.meta_share) || 0
+  const price = parseFloat(deck.avg_price) || null
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        position: 'relative', cursor: 'pointer', borderRadius: 12,
+        overflow: 'hidden', aspectRatio: '3/4',
+        background: 'var(--bg-card)', border: '1px solid var(--border)',
+        transition: 'transform .15s, box-shadow .15s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.025)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,0,0,.7)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }}
+    >
+      {/* Art background */}
+      {artUrl
+        ? <img src={artUrl} alt={deck.deck_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a2e, #0d0d1a)' }} />
+      }
+
+      {/* Gradient overlay: transparent top → black bottom */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.92) 100%)',
+      }} />
+
+      {/* Content */}
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 10px 10px' }}>
+
+        {/* Color pips */}
+        {colors.length > 0 && (
+          <div style={{ display: 'flex', gap: 3, marginBottom: 5 }}>
+            {colors.map((c, i) => <ManaSymbol key={i} c={c} />)}
+          </div>
+        )}
+
+        {/* Deck name */}
+        <div style={{
+          fontWeight: 800, fontSize: '.88rem', lineHeight: 1.2, marginBottom: 4,
+          color: nameColor, textShadow: '0 1px 6px rgba(0,0,0,.9)',
+          overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        }}>
+          {deck.deck_name}
+        </div>
+
+        {/* Key cards */}
+        {keyCards.length > 0 && (
+          <div style={{ marginBottom: 6 }}>
+            {keyCards.map((name, i) => (
+              <div key={i} style={{ fontSize: '.62rem', color: 'rgba(255,255,255,.75)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {name}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Bottom bar: META% left, price right */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          borderTop: '1px solid rgba(255,255,255,.15)', paddingTop: 6, marginTop: 2,
+        }}>
+          <div style={{ fontSize: '.65rem', fontWeight: 700, color: 'var(--accent-gold)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
+            {share > 0 ? `${share.toFixed(1)}% META` : deck.format || ''}
+          </div>
+          {price && (
+            <div style={{ fontSize: '.65rem', fontWeight: 700, color: 'rgba(255,255,255,.8)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
+              ~${price.toFixed(0)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Meta deck detail (full-page view) ────────────────────────────────────────
+function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user }) {
+  const [artUrl,        setArtUrl]        = useState(null)
+  const [cardTypes,     setCardTypes]     = useState({})
+  const [cardPrices,    setCardPrices]    = useState({})
+  const [typesLoading,  setTypesLoading]  = useState(false)
+  const [saving,        setSaving]        = useState(false)
+  const artFetchedRef = useRef(false)
+
+  // Parse decklist from stored JSON
+  const decklist = (() => {
+    if (!deck.decklist) return { mainboard: [], sideboard: [] }
+    if (typeof deck.decklist === 'object') return deck.decklist
+    try { return JSON.parse(deck.decklist) } catch { return { mainboard: [], sideboard: [] } }
+  })()
+  const mainboard = decklist.mainboard || []
+  const sideboard = decklist.sideboard || []
+
+  const colors = deck.colors ? deck.colors.split('') : []
+
+  // Fetch art crop for hero image
+  useEffect(() => {
+    if (artFetchedRef.current) return
+    artFetchedRef.current = true
+    const cardName = deck.art_card || deck.deck_name
+    if (!cardName) return
+    fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(card => {
+        const url = card?.image_uris?.art_crop || card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.art_crop
+        if (url) setArtUrl(url)
+      })
+      .catch(() => {})
+  }, [deck.art_card, deck.deck_name])
+
+  // Fetch card types + prices from Scryfall for mainboard
+  useEffect(() => {
+    if (mainboard.length === 0) return
+    setTypesLoading(true)
+    const uniqueNames = [...new Set(mainboard.map(c => c.name))]
+    const BATCH = 75
+    const promises = []
+    for (let i = 0; i < uniqueNames.length; i += BATCH) {
+      const batch = uniqueNames.slice(i, i + BATCH)
+      promises.push(
+        fetch('https://api.scryfall.com/cards/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifiers: batch.map(n => ({ name: n })) }),
+        })
+        .then(r => r.ok ? r.json() : { data: [] })
+        .then(({ data = [] }) => {
+          const types = {}, prices = {}
+          for (const card of data) {
+            const typeLine = (card.type_line || '').split(' // ')[0]
+            types[card.name] = typeLine
+            const frontName = card.name.split(' // ')[0]
+            if (frontName !== card.name) types[frontName] = typeLine
+            const price = parseFloat(card.prices?.usd) || null
+            if (price != null) {
+              prices[card.name] = price
+              if (frontName !== card.name) prices[frontName] = price
+            }
+          }
+          return { types, prices }
+        })
+        .catch(() => ({ types: {}, prices: {} }))
+      )
+    }
+    Promise.all(promises).then(results => {
+      setCardTypes(Object.assign({}, ...results.map(r => r.types)))
+      setCardPrices(Object.assign({}, ...results.map(r => r.prices)))
+      setTypesLoading(false)
+    })
+  }, [deck.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Build type groups for mainboard
+  const typeGroups = useMemo(() => {
+    if (typesLoading || mainboard.length === 0) return null
+    const buckets = {}
+    for (const card of mainboard) {
+      const bucket = getTypeBucket(cardTypes[card.name] || '')
+      if (!buckets[bucket]) buckets[bucket] = []
+      buckets[bucket].push(card)
+    }
+    return TYPE_ORDER
+      .map(t => ({ ...t, cards: buckets[t.key] || [], count: (buckets[t.key] || []).reduce((s, c) => s + c.qty, 0) }))
+      .filter(t => t.cards.length > 0)
+  }, [mainboard, cardTypes, typesLoading])
+
+  // Total deck price from fetched card prices
+  const totalPrice = useMemo(() => {
+    let sum = 0
+    for (const card of mainboard) {
+      const p = cardPrices[card.name]
+      if (p != null) sum += p * card.qty
+    }
+    return sum
+  }, [mainboard, cardPrices])
+
+  // Copy Arena format to clipboard
+  const handleCopyArena = async () => {
+    const lines = [
+      'Deck',
+      ...mainboard.map(c => `${c.qty} ${c.name}`),
+      ...(sideboard.length > 0 ? ['', 'Sideboard', ...sideboard.map(c => `${c.qty} ${c.name}`)] : []),
+    ].join('\n')
+    try {
+      await navigator.clipboard.writeText(lines)
+      showToast('Copied to clipboard. Paste into MTG Arena ✓')
+    } catch {
+      showToast('Copy failed. Try selecting the text manually')
+    }
+  }
+
+  // Save to My Decks
+  const handleSaveToMyDecks = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await onSave({ name: deck.deck_name, format: deck.format, mainboard, sideboard })
+      showToast('Saved to My Decks ✓')
+    } catch (err) {
+      showToast(`Save failed: ${err.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // TCGPlayer: copy list and open mass entry
+  const TCG_MASSENTRY = 'https://partner.tcgplayer.com/c/7200332/1780961/21018'
+    + '?u=' + encodeURIComponent('https://www.tcgplayer.com/massentry')
+  const handleTCGPlayer = async () => {
+    const text = mainboard.map(c => `${c.qty} ${c.name}`).join('\n')
+    try { await navigator.clipboard.writeText(text) } catch { /* ok */ }
+    window.open(TCG_MASSENTRY, '_blank', 'noopener')
+    showToast('Decklist copied — paste it into TCGPlayer Mass Entry!')
+  }
+
+  // ManaPool affiliate
+  const handleManaPool = async () => {
+    const text = mainboard.map(c => `${c.qty} ${c.name}`).join('\n')
+    try { await navigator.clipboard.writeText(text) } catch { /* ok */ }
+    window.open('https://manapool.com/add-deck?ref=vaultedsingles', '_blank', 'noopener')
+    showToast('Decklist copied — paste it into ManaPool!')
+  }
+
+  const share = parseFloat(deck.meta_share) || 0
+  const wr    = parseFloat(deck.win_rate) || null
+  const price = parseFloat(deck.avg_price) || null
+  const wrColor = wr == null ? 'var(--text-muted)' : wr >= 55 ? '#4ade80' : wr >= 50 ? '#fbbf24' : '#f87171'
+
+  return (
+    <div style={{ paddingBottom: 40 }}>
+      {/* Back button */}
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={onBack}
+        style={{ marginBottom: 16 }}
+      >
+        ← Back to Meta
+      </button>
+
+      {/* Hero section */}
+      <div style={{
+        position: 'relative', borderRadius: 14, overflow: 'hidden',
+        height: 180, marginBottom: 16, background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+      }}>
+        {artUrl && (
+          <img
+            src={artUrl}
+            alt={deck.deck_name}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }}
+          />
+        )}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to bottom, rgba(0,0,0,.2) 0%, rgba(0,0,0,.7) 60%, rgba(0,0,0,.92) 100%)',
+        }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px' }}>
+          {colors.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+              {colors.map((c, i) => <ManaSymbol key={i} c={c} />)}
+            </div>
+          )}
+          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,.9)', lineHeight: 1.2 }}>
+            {deck.deck_name}
+          </h2>
+          <div style={{ fontSize: '.75rem', color: 'rgba(255,255,255,.65)', marginTop: 4 }}>
+            {[deck.format, deck.archetype].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{
+        display: 'flex', gap: 0, background: 'var(--bg-card)', border: '1px solid var(--border)',
+        borderRadius: 12, overflow: 'hidden', marginBottom: 14,
+      }}>
+        {[
+          { label: 'META', value: share > 0 ? `${share.toFixed(1)}%` : '—', color: 'var(--accent-gold)' },
+          { label: 'WIN RATE', value: wr != null ? `${wr.toFixed(1)}%` : '—', color: wrColor },
+          { label: 'AVG PRICE', value: price ? `~$${price.toFixed(0)}` : '—', color: 'var(--text-primary)' },
+        ].map((stat, i) => (
+          <div key={stat.label} style={{
+            flex: 1, padding: '12px 8px', textAlign: 'center',
+            borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
+          }}>
+            <div style={{ fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 4 }}>
+              {stat.label}
+            </div>
+            <div style={{ fontSize: '1rem', fontWeight: 800, color: stat.color }}>
+              {stat.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Action row */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={handleSaveToMyDecks}
+          disabled={saving || mainboard.length === 0}
+          style={{ fontSize: '.78rem' }}
+        >
+          {saving ? 'Saving…' : '📥 Save to My Decks'}
+        </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={handleCopyArena}
+          style={{ fontSize: '.78rem' }}
+        >
+          📋 Copy to Arena
+        </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={handleTCGPlayer}
+          style={{ fontSize: '.78rem', color: '#4ade80' }}
+        >
+          🛒 Buy on TCGPlayer
+        </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={handleManaPool}
+          style={{ fontSize: '.78rem', color: '#38bdf8' }}
+        >
+          🌊 Buy on ManaPool
+        </button>
+      </div>
+
+      {/* Decklist */}
+      {mainboard.length === 0 ? (
+        <div style={{
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '40px 20px', textAlign: 'center',
+          color: 'var(--text-muted)', fontSize: '.85rem',
+        }}>
+          No decklist available for this deck yet.
+        </div>
+      ) : (
+        <>
+          {/* Total computed price */}
+          {totalPrice > 0 && (
+            <div style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '10px 14px', marginBottom: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div style={{ fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
+                Deck Value (Scryfall prices)
+              </div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
+                ${totalPrice.toFixed(2)}
+              </div>
+            </div>
+          )}
+
+          {/* Mainboard type groups */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 14 }}>
+            {typesLoading || !typeGroups
+              ? (
+                <DeckSection
+                  title={`Main Deck (${mainboard.reduce((s, c) => s + c.qty, 0)})`}
+                  cards={mainboard}
+                  cardValues={cardPrices}
+                  openCardSearch={openCardSearch}
+                />
+              )
+              : typeGroups.map(group => (
+                <DeckSection
+                  key={group.key}
+                  title={`${group.label} (${group.count})`}
+                  cards={group.cards}
+                  cardValues={cardPrices}
+                  openCardSearch={openCardSearch}
+                />
+              ))
+            }
+          </div>
+
+          {/* Sideboard */}
+          {sideboard.length > 0 && (
+            <DeckSection
+              title={`🔄 Sideboard (${sideboard.reduce((s, c) => s + c.qty, 0)})`}
+              cards={sideboard}
+              cardValues={cardPrices}
+              openCardSearch={openCardSearch}
+            />
+          )}
+        </>
+      )}
+
+      {deck.notes && (
+        <div style={{ marginTop: 14, fontSize: '.78rem', color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
+          {deck.notes}
+        </div>
+      )}
     </div>
   )
 }
