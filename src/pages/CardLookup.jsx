@@ -575,183 +575,6 @@ function ssGetCard()   { try { const s = sessionStorage.getItem(SS_CARD); return
 function ssSaveView(v) { try { sessionStorage.setItem(SS_VIEW, v) } catch {} }
 function ssSaveCard(c) { try { if (c) sessionStorage.setItem(SS_CARD, JSON.stringify(c)); else sessionStorage.removeItem(SS_CARD) } catch {} }
 
-// ── Sealed product definitions ─────────────────────────────────────────────────
-const SEALED_PRODUCTS = [
-  {
-    id: 'play',
-    name: 'Play Booster',
-    sub: 'The standard booster since 2024',
-    emoji: '🎴',
-    bg: 'linear-gradient(145deg, #10103a 0%, #1e1470 55%, #0c1e3a 100%)',
-    accent: '#818cf8',
-    count: '14 cards',
-    bullets: [
-      '6–7 Commons',
-      '3 Uncommons',
-      '1 guaranteed Rare or Mythic Rare',
-      '1 Land (may be full-art or non-basic)',
-      '1 Wildcard slot — foil, showcase, or bonus rare',
-    ],
-    bestFor: 'Drafting & Collecting',
-  },
-  {
-    id: 'collector',
-    name: 'Collector Booster',
-    sub: 'Premium foils & exclusive treatments',
-    emoji: '✨',
-    bg: 'linear-gradient(145deg, #1c1200 0%, #3a2600 55%, #1a1600 100%)',
-    accent: '#f0c060',
-    count: '15 cards',
-    bullets: [
-      '3–5 Rares & Mythic Rares',
-      'Extended art & borderless versions',
-      'Showcase alternate-frame treatments',
-      'Serialized 1/500 cards in select sets',
-      'Every card is premium foil',
-    ],
-    bestFor: 'Collectors & Investors',
-  },
-  {
-    id: 'commander',
-    name: 'Commander Deck',
-    sub: 'Ready to play straight out of the box',
-    emoji: '⚔️',
-    bg: 'linear-gradient(145deg, #081808 0%, #0e320e 55%, #081a18 100%)',
-    accent: '#4ade80',
-    count: '100 cards',
-    bullets: [
-      '100 curated cards for Commander format',
-      '2–15 brand-new cards exclusive to the deck',
-      'Foil-etched legendary commander',
-      'Double-sided tokens',
-      'Strategy insert included',
-    ],
-    bestFor: 'Commander Format',
-  },
-  {
-    id: 'bundle',
-    name: 'Bundle',
-    sub: 'Best value way into a new set',
-    emoji: '📦',
-    bg: 'linear-gradient(145deg, #081420 0%, #0d2040 55%, #081a10 100%)',
-    accent: '#38bdf8',
-    count: '8 Boosters + extras',
-    bullets: [
-      '8 Play Boosters (112+ cards total)',
-      '40 full-art basic lands',
-      '1 exclusive foil promo rare',
-      'Spindown life counter die',
-      'Sturdy storage box',
-    ],
-    bestFor: 'New Players & Value',
-  },
-  {
-    id: 'secret-lair',
-    name: 'Secret Lair',
-    sub: 'Limited drops, stunning alternate art',
-    emoji: '🌟',
-    bg: 'linear-gradient(145deg, #1a0012 0%, #3a0025 55%, #100030 100%)',
-    accent: '#e879f9',
-    count: '5–15 cards',
-    bullets: [
-      'Reprints of iconic cards with new art only',
-      'Top-tier artist & crossover collaborations',
-      'Foil & non-foil editions available',
-      'Limited-window availability',
-      'No pack randomness — you see what you get',
-    ],
-    bestFor: 'Art Lovers & Collectors',
-  },
-  {
-    id: 'prerelease',
-    name: 'Prerelease Pack',
-    sub: 'Play the new set a week early',
-    emoji: '🎉',
-    bg: 'linear-gradient(145deg, #1a0e00 0%, #3a2000 55%, #1a1800 100%)',
-    accent: '#fbbf24',
-    count: '6 Boosters + promo',
-    bullets: [
-      '6 Play Boosters for the new set',
-      '1 date-stamped foil promo rare',
-      'Exclusive prerelease stamp on promo',
-      'Only available at local game stores',
-      'Sealed deck / draft event ready',
-    ],
-    bestFor: 'LGS Events',
-  },
-]
-
-// ── Product card tile (sealed products section) ────────────────────────────────
-function ProductCard({ product }) {
-  return (
-    <div style={{
-      flexShrink: 0,
-      width: 220,
-      borderRadius: 16,
-      background: product.bg,
-      border: '1px solid rgba(255,255,255,.05)',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
-      {/* Hero */}
-      <div style={{ padding: '20px 18px 16px', position: 'relative' }}>
-        {/* Soft glow behind emoji */}
-        <div style={{
-          position: 'absolute', top: 8, left: 12,
-          width: 64, height: 64,
-          background: `radial-gradient(circle, ${product.accent}50 0%, transparent 70%)`,
-          filter: 'blur(14px)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{ fontSize: '2.4rem', marginBottom: 10, position: 'relative' }}>{product.emoji}</div>
-        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f0f0f0', position: 'relative' }}>{product.name}</div>
-        <div style={{ fontSize: '.68rem', color: product.accent, marginTop: 2, position: 'relative', lineHeight: 1.3 }}>{product.sub}</div>
-        <div style={{
-          marginTop: 10, display: 'inline-flex', alignItems: 'center',
-          background: `${product.accent}20`, border: `1px solid ${product.accent}40`,
-          borderRadius: 99, padding: '3px 10px',
-          fontSize: '.65rem', fontWeight: 700, color: product.accent, position: 'relative',
-        }}>
-          {product.count}
-        </div>
-      </div>
-
-      {/* Thin accent divider */}
-      <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${product.accent}35, transparent)` }} />
-
-      {/* What's inside */}
-      <div style={{ padding: '14px 18px 10px', flex: 1 }}>
-        <div style={{ fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.9px', color: '#444', marginBottom: 9 }}>
-          What's Inside
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {product.bullets.map((b, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-              <div style={{
-                width: 5, height: 5, borderRadius: '50%',
-                background: product.accent, flexShrink: 0, marginTop: 5,
-              }} />
-              <span style={{ fontSize: '.73rem', color: '#bbb', lineHeight: 1.4 }}>{b}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        padding: '10px 18px 14px',
-        borderTop: `1px solid ${product.accent}20`,
-        background: `${product.accent}08`,
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-        <span style={{ fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#555' }}>Best for</span>
-        <span style={{ fontSize: '.72rem', fontWeight: 700, color: product.accent }}>{product.bestFor}</span>
-      </div>
-    </div>
-  )
-}
-
 export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch }) {
   const [view, setViewRaw]        = useState(ssGetView)  // restore from sessionStorage on mount
   const [sets, setSets]           = useState([])
@@ -803,7 +626,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
           'expansion', 'core', 'masters', 'draft_innovation',
           'commander', 'duel_deck', 'funny', 'starter', 'box',
           'from_the_vault', 'spellbook', 'planechase', 'archenemy',
-          'memorabilia',
+          'memorabilia', 'masterpiece',
         ])
         const mainSets = all.filter(s =>
           MAIN_TYPES.has(s.set_type) && !s.digital && s.card_count >= 1
@@ -961,27 +784,8 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
         </div>
       )}
 
-      {/* ── Sealed Products ────────────────────────────────────────────────────── */}
-      <div style={{ marginTop: recentCards.length > 0 ? 16 : 28 }}>
-        <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <div style={{ fontSize: '.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: MUTED }}>
-            Sealed Products
-          </div>
-          <span style={{ fontSize: '.6rem', color: '#2a2a2a' }}>scroll ›</span>
-        </div>
-        <div style={{
-          display: 'flex', gap: 12,
-          paddingLeft: 16, paddingBottom: 20,
-          overflowX: 'auto', scrollbarWidth: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}>
-          {SEALED_PRODUCTS.map(p => <ProductCard key={p.id} product={p} />)}
-          <div style={{ flexShrink: 0, width: 16 }} />
-        </div>
-      </div>
-
       {/* ── Sets Browser ───────────────────────────────────────────────────────── */}
-      <div style={{ borderTop: `1px solid ${DIVID}` }}>
+      <div style={{ marginTop: recentCards.length > 0 ? 8 : 24, borderTop: `1px solid ${DIVID}` }}>
         <div style={{ padding: '16px 16px 10px' }}>
           <div style={{ fontSize: '.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: MUTED, marginBottom: 10 }}>
             Browse Sets

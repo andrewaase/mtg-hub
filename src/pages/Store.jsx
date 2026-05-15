@@ -619,6 +619,230 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
   )
 }
 
+// ── Resealed hybrid page ──────────────────────────────────────────────────────
+// Static per-product copy keyed by lowercase name match
+function getResealedMeta(name) {
+  const n = name.toLowerCase()
+  if (n.includes('vaulted rarities')) return {
+    accent: '#c9a84c',
+    tagline: 'A mystery pack assembled by hand from our personal vault',
+    highlights: [
+      '1 hand-selected MTG single — foil rares, commander staples & premium treatments',
+      '1 sealed booster pack from a curated set',
+      'Red insert inside the pack signals a rare hit pull',
+    ],
+    tiers: [
+      { label: 'Every Pack',   desc: 'Curated single + sealed booster', color: '#94a3b8' },
+      { label: 'Super Hit',    desc: 'CEDH staple, Reserved List, or $30+ card', color: '#c9a84c', note: '~1 in 36' },
+      { label: 'Mega Hit',     desc: '$100+ card or Revised-era rare', color: '#f97316', note: '~1 in 72' },
+      { label: 'Jackpot',      desc: 'Revised Dual Land or Power-equivalent', color: '#e879f9', note: '~1 in 144' },
+    ],
+  }
+  if (n.includes('relics awakened')) return {
+    accent: '#b46e1e',
+    tagline: "Vintage & classic MTG singles pulled from Magic's early history",
+    highlights: [
+      'Cards sourced from vintage and classic MTG sets (pre-2010)',
+      'Old-border and pre-modern frame treatments',
+      'At least one sought-after reprint guaranteed per pack',
+    ],
+    tiers: [
+      { label: 'Every Pack',  desc: 'Old-border or classic-frame MTG card', color: '#94a3b8' },
+      { label: 'Hit',         desc: 'Dual land variant or Reserved List card', color: '#c9a84c', note: '~1 in 20' },
+      { label: 'Big Hit',     desc: '$50+ vintage single', color: '#f97316', note: '~1 in 50' },
+    ],
+  }
+  return {
+    accent: '#a78bfa',
+    tagline: 'Hand-curated MTG mystery pack from our inventory',
+    highlights: [
+      'Personally selected MTG singles from our collection',
+      'Premium foils and special treatments possible',
+      'Guaranteed value — every pack is worth more than its price',
+    ],
+    tiers: [
+      { label: 'Every Pack', desc: 'Curated single card', color: '#94a3b8' },
+      { label: 'Hit',        desc: 'Rare foil or format staple', color: '#a78bfa' },
+    ],
+  }
+}
+
+function ResealedHeroArt({ name }) {
+  const n = name.toLowerCase()
+  if (n.includes('vaulted rarities')) return (
+    <div style={{
+      width: '100%', height: 320,
+      background: 'linear-gradient(160deg,#0d0618 0%,#1a0f35 45%,#0f1a2e 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 55%, rgba(201,168,76,.22) 0%, transparent 65%)' }} />
+      {/* Corner ornaments */}
+      {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h]) => (
+        <div key={v+h} style={{ position: 'absolute', [v]: 20, [h]: 24, fontSize: '.85rem', color: 'rgba(201,168,76,.45)' }}>✦</div>
+      ))}
+      {/* Horizontal rule */}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'linear-gradient(to right,transparent,rgba(201,168,76,.2) 30%,rgba(201,168,76,.4) 50%,rgba(201,168,76,.2) 70%,transparent)' }} />
+      <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ fontSize: '5.5rem', filter: 'drop-shadow(0 0 32px rgba(201,168,76,.65))' }}>🏛️</div>
+        <div style={{ fontSize: '1.8rem', fontWeight: 900, letterSpacing: '.2em', color: '#c9a84c', textTransform: 'uppercase', marginTop: 12, textShadow: '0 0 28px rgba(201,168,76,.55)' }}>
+          Vaulted Rarities
+        </div>
+        <div style={{ width: 64, height: 1, background: 'linear-gradient(90deg,transparent,#c9a84c,transparent)', margin: '14px auto' }} />
+        <div style={{ fontSize: '.75rem', color: 'rgba(201,168,76,.55)', letterSpacing: '.2em', textTransform: 'uppercase' }}>
+          Premium Mystery Pack
+        </div>
+      </div>
+    </div>
+  )
+  if (n.includes('relics awakened')) return (
+    <div style={{
+      width: '100%', height: 320,
+      background: 'linear-gradient(160deg,#1a0600 0%,#2d1200 45%,#1a1a00 75%,#001a0d 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 55%, rgba(180,110,30,.22) 0%, transparent 65%)' }} />
+      {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v,h]) => (
+        <div key={v+h} style={{ position: 'absolute', [v]: 20, [h]: 24, fontSize: '.9rem', color: 'rgba(180,110,30,.65)' }}>◈</div>
+      ))}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'linear-gradient(to right,transparent,rgba(180,110,30,.4) 50%,transparent)' }} />
+      <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ fontSize: '5.5rem', filter: 'drop-shadow(0 0 32px rgba(180,110,30,.65))' }}>⚗️</div>
+        <div style={{ fontSize: '1.8rem', fontWeight: 900, letterSpacing: '.18em', color: '#b46e1e', textTransform: 'uppercase', marginTop: 12, textShadow: '0 0 28px rgba(180,110,30,.55)' }}>
+          Relics Awakened
+        </div>
+        <div style={{ width: 64, height: 1, background: 'linear-gradient(90deg,transparent,#b46e1e,transparent)', margin: '14px auto' }} />
+        <div style={{ fontSize: '.75rem', color: 'rgba(180,110,30,.55)', letterSpacing: '.18em', textTransform: 'uppercase' }}>
+          Magic's History Unearthed
+        </div>
+      </div>
+    </div>
+  )
+  return (
+    <div style={{
+      width: '100%', height: 320,
+      background: 'linear-gradient(160deg,#0f0f1a 0%,#1a1435 55%,#0f1a14 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 55%, rgba(139,92,246,.18) 0%, transparent 65%)' }} />
+      <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ fontSize: '5.5rem' }}>🎴</div>
+        <div style={{ fontSize: '1.7rem', fontWeight: 900, letterSpacing: '.15em', color: '#a78bfa', textTransform: 'uppercase', marginTop: 12 }}>{name}</div>
+        <div style={{ width: 64, height: 1, background: 'linear-gradient(90deg,transparent,#a78bfa,transparent)', margin: '14px auto' }} />
+        <div style={{ fontSize: '.75rem', color: 'rgba(139,92,246,.55)', letterSpacing: '.18em', textTransform: 'uppercase' }}>Curated Mystery Pack</div>
+      </div>
+    </div>
+  )
+}
+
+function ResealedSection({ listing, onAdd, inCart }) {
+  const meta = getResealedMeta(listing.name)
+  const qty  = listing.qty_available || 0
+  const outOfStock   = qty <= 0
+  const almostGone   = qty > 0 && qty <= 5
+  const stockColor   = qty <= 2 ? '#f87171' : qty <= 5 ? '#fb923c' : '#4ade80'
+  const btnBg        = outOfStock ? 'rgba(255,255,255,.06)'
+    : inCart ? `${meta.accent}28` : meta.accent
+  const btnColor     = outOfStock ? '#555' : inCart ? meta.accent : meta.accent === '#c9a84c' ? '#000' : '#fff'
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {/* Hero image / generated art */}
+      <div style={{ borderRadius: 18, overflow: 'hidden', boxShadow: '0 16px 48px rgba(0,0,0,.6)', marginBottom: 22 }}>
+        {listing.img_url
+          ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', maxHeight: 380, objectFit: 'cover' }} />
+          : <ResealedHeroArt name={listing.name} />}
+        {almostGone && (
+          <div style={{ textAlign: 'center', padding: '7px 0', background: 'rgba(249,115,22,.9)', color: '#fff', fontSize: '.72rem', fontWeight: 800, letterSpacing: '.06em' }}>
+            🔥 ALMOST GONE — {qty} LEFT
+          </div>
+        )}
+      </div>
+
+      {/* Header: badge + name + price */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: `${meta.accent}18`, border: `1px solid ${meta.accent}38`, borderRadius: 99, padding: '3px 10px', marginBottom: 8 }}>
+            <span style={{ fontSize: '.58rem' }}>🎴</span>
+            <span style={{ fontSize: '.6rem', fontWeight: 700, color: meta.accent, letterSpacing: '.06em', textTransform: 'uppercase' }}>Resealed Pack</span>
+          </div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.15 }}>{listing.name}</div>
+          <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.5 }}>{meta.tagline}</div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0, paddingTop: 4 }}>
+          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: meta.accent, lineHeight: 1 }}>{fmt(listing.price)}</div>
+          <div style={{ fontSize: '.65rem', color: stockColor, fontWeight: 700, marginTop: 4 }}>
+            {outOfStock ? 'Out of stock' : almostGone ? `Only ${qty} remaining` : `${qty} in stock`}
+          </div>
+        </div>
+      </div>
+
+      {/* DB description (admin-controlled copy) */}
+      {listing.description && (
+        <div style={{ fontSize: '.85rem', color: 'var(--text-secondary)', lineHeight: 1.75, padding: '14px 0', borderTop: '1px solid var(--border)', marginBottom: 16 }}>
+          {listing.description}
+        </div>
+      )}
+
+      {/* What's inside */}
+      <div style={{ background: 'var(--bg-card)', border: `1px solid ${meta.accent}22`, borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.1px', color: 'var(--text-muted)', marginBottom: 14 }}>
+          What's Inside
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {meta.highlights.map((h, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: meta.accent, flexShrink: 0, marginTop: 7 }} />
+              <span style={{ fontSize: '.86rem', color: 'var(--text-primary)', lineHeight: 1.55 }}>{h}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pull tiers */}
+      {meta.tiers && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.1px', color: 'var(--text-muted)', marginBottom: 12 }}>
+            Pull Tiers
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {meta.tiers.map((t, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: `${t.color}10`, border: `1px solid ${t.color}28`, borderRadius: 10 }}>
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ fontSize: '.75rem', fontWeight: 800, color: t.color }}>{t.label}</div>
+                  {t.note && <div style={{ fontSize: '.6rem', color: t.color, opacity: .7 }}>{t.note}</div>}
+                </div>
+                <div style={{ width: 1, height: 28, background: `${t.color}30`, flexShrink: 0 }} />
+                <div style={{ fontSize: '.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{t.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add to cart */}
+      <button
+        onClick={() => !outOfStock && onAdd(listing)}
+        disabled={outOfStock}
+        style={{
+          width: '100%', padding: '16px',
+          background: btnBg, color: btnColor,
+          border: inCart && !outOfStock ? `1.5px solid ${meta.accent}` : 'none',
+          borderRadius: 14, fontWeight: 800, fontSize: '1rem',
+          cursor: outOfStock ? 'not-allowed' : 'pointer',
+          letterSpacing: '.3px', transition: 'opacity .15s',
+        }}
+      >
+        {outOfStock ? 'Out of Stock'
+          : inCart ? `✓ Added to Cart — ${fmt(listing.price)}`
+          : `Add to Cart — ${fmt(listing.price)}`}
+      </button>
+    </div>
+  )
+}
+
 // ── Product detail modal (sealed / resealed — no Scryfall data) ───────────────
 function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
   const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
@@ -1503,25 +1727,37 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         </div>
       )}
 
-      {/* ── Card / product grid ── */}
+      {/* ── Card / product grid (or full-width resealed sections) ── */}
       {!loading && filtered.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: category === 'single'
-            ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
-            : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
-          gap: 12,
-        }}>
-          {filtered.map(listing =>
-            category === 'single' ? (
-              <ListingCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
-            ) : category === 'sealed' ? (
-              <SealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
-            ) : (
-              <ResealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
-            )
-          )}
-        </div>
+        category === 'resealed' ? (
+          /* Resealed products are full-width hybrid sections, not a grid */
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {filtered.map((listing, i) => (
+              <div key={listing.id}>
+                <ResealedSection listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} />
+                {i < filtered.length - 1 && (
+                  <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 36px' }} />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: category === 'single'
+              ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
+              : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
+            gap: 12,
+          }}>
+            {filtered.map(listing =>
+              category === 'single' ? (
+                <ListingCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+              ) : (
+                <SealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+              )
+            )}
+          </div>
+        )
       )}
 
       {/* ── Out-of-stock / waitlist section ── */}
