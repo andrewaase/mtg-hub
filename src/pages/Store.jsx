@@ -1155,7 +1155,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
     })
   }, [showFilters, category, listings.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch active listings — also include out-of-stock for waitlist
+  // Fetch active listings + subscribe to real-time changes so prices/qty stay live
   useEffect(() => {
     supabase
       .from('store_listings')
@@ -1166,6 +1166,34 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         setListings(data || [])
         setLoading(false)
       })
+
+    const channel = supabase
+      .channel('store-listings-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_listings' }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          setListings(prev => {
+            // If the row was deactivated, remove it from the list
+            if (!payload.new.active) return prev.filter(l => l.id !== payload.new.id)
+            const idx = prev.findIndex(l => l.id === payload.new.id)
+            if (idx >= 0) {
+              const next = [...prev]
+              next[idx] = payload.new
+              return next
+            }
+            // New row became active — insert and keep sorted
+            return [...prev, payload.new].sort((a, b) => a.name.localeCompare(b.name))
+          })
+        } else if (payload.eventType === 'INSERT') {
+          if (payload.new.active) {
+            setListings(prev => [...prev, payload.new].sort((a, b) => a.name.localeCompare(b.name)))
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setListings(prev => prev.filter(l => l.id !== payload.old.id))
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   // Shareable URL: read ?product=<id> on mount, auto-open modal

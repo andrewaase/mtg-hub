@@ -586,7 +586,13 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
   const [printings, setPrintings]  = useState([])
   const [printLoad, setPrintLoad]  = useState(false)
   const [recentCards, setRecentCards] = useState(loadRecentlyViewed)
+  const [hoverInfo,   setHoverInfo]   = useState(null) // { img, name, price, set, x, y }
   const prevView = useRef(ssGetView() === 'card' ? 'home' : ssGetView())
+
+  // Upgrade a stored /small/ Scryfall URL to /normal/ for the hover preview
+  function toNormalImg(url) {
+    return url ? url.replace('/small/', '/normal/') : null
+  }
 
   // Wrappers that persist to sessionStorage so open-card state survives any remount
   const setView = useCallback((v) => { setViewRaw(v); ssSaveView(v) }, [])
@@ -626,7 +632,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
           'expansion', 'core', 'masters', 'draft_innovation',
           'commander', 'duel_deck', 'funny', 'starter', 'box',
           'from_the_vault', 'spellbook', 'planechase', 'archenemy',
-          'memorabilia', 'masterpiece',
+          'masterpiece',
         ])
         const mainSets = all.filter(s =>
           MAIN_TYPES.has(s.set_type) && !s.digital && s.card_count >= 1
@@ -766,6 +772,11 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
               <div
                 key={rc.id}
                 onClick={() => openCardDetail(rc.name)}
+                onMouseEnter={e => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setHoverInfo({ img: toNormalImg(rc.img), name: rc.name, price: rc.price, set: rc.set, x: rect.left + rect.width / 2, y: rect.top })
+                }}
+                onMouseLeave={() => setHoverInfo(null)}
                 style={{ flexShrink: 0, width: '80px', cursor: 'pointer' }}
               >
                 {rc.img
@@ -781,6 +792,42 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
               </div>
             ))}
           </div>
+
+          {/* Hover preview portal */}
+          {hoverInfo && (() => {
+            const PREVIEW_W = 200
+            const PREVIEW_H = 310
+            const left = Math.max(8, Math.min(hoverInfo.x - PREVIEW_W / 2, window.innerWidth - PREVIEW_W - 8))
+            const top  = hoverInfo.y > PREVIEW_H + 20
+              ? hoverInfo.y - PREVIEW_H - 10   // show above the strip
+              : hoverInfo.y + 130 + 10          // show below (below the thumbnail)
+            return (
+              <div style={{
+                position: 'fixed', left, top,
+                width: PREVIEW_W,
+                background: '#111',
+                border: '1px solid #2a2a2a',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                zIndex: 1000,
+                boxShadow: '0 16px 64px rgba(0,0,0,.95)',
+                pointerEvents: 'none',
+                animation: 'fadeInUp .12s ease',
+              }}>
+                {hoverInfo.img
+                  ? <img src={hoverInfo.img} alt={hoverInfo.name} style={{ width: '100%', display: 'block' }} />
+                  : <div style={{ width: '100%', aspectRatio: '0.716', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>🃏</div>
+                }
+                <div style={{ padding: '10px 12px 12px' }}>
+                  <div style={{ color: '#e8e8e8', fontWeight: 700, fontSize: '.82rem', marginBottom: '2px', lineHeight: 1.3 }}>{hoverInfo.name}</div>
+                  {hoverInfo.set && <div style={{ fontSize: '.64rem', color: '#555', marginBottom: '5px' }}>{hoverInfo.set}</div>}
+                  <div style={{ fontSize: '.88rem', fontWeight: 700, color: 'var(--accent-gold)' }}>
+                    {hoverInfo.price ? `$${parseFloat(hoverInfo.price).toFixed(2)}` : '—'}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
