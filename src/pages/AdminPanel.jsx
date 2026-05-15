@@ -1568,6 +1568,7 @@ function MetaTab() {
   const [csvText,       setCsvText]       = useState('')
   const [moversRunning, setMoversRunning] = useState(false)
   const [moversResult,  setMoversResult]  = useState(null)
+  const [modalOpen,     setModalOpen]     = useState(false)
 
   // ── Art card picker state ───────────────────────────────────────────────────
   const [artPickerOpen, setArtPickerOpen]   = useState(false)
@@ -1682,6 +1683,7 @@ function MetaTab() {
     if (e) { setErr(e.message); return }
     setForm(BLANK_DECK)
     setEditId(null)
+    setModalOpen(false)
     load()
   }
 
@@ -1720,6 +1722,11 @@ function MetaTab() {
       key_cards_raw: keyCardsArr.join(', '),
       decklist_raw:  decklistRaw !== 'Deck' ? decklistRaw : '',
     })
+    setErr(null)
+    setArtPickerOpen(false)
+    setArtQuery('')
+    setArtResults([])
+    setModalOpen(true)
   }
 
   const handleDelete = async (id) => {
@@ -1842,161 +1849,15 @@ function MetaTab() {
         </button>
       </div>
 
-      {/* Add / Edit form */}
-      <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-        <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', marginBottom: 14 }}>
-          {editId ? '✏️ Edit Entry' : '➕ Add Entry'}
-        </div>
-        {err && <div style={{ marginBottom: 12, fontSize: '.78rem', color: '#f87171', background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)', borderRadius: 8, padding: '8px 12px' }}>{err}</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
-          {F('Format',
-            <select value={form.format} onChange={e => setForm(p => ({ ...p, format: e.target.value }))} style={selectStyle}>
-              {META_FORMATS_ADMIN.map(f => <option key={f}>{f}</option>)}
-            </select>
-          )}
-          {F('Deck Name',
-            <input value={form.deck_name} onChange={e => setForm(p => ({ ...p, deck_name: e.target.value }))} placeholder="e.g. Mono-Red Aggro" style={inputStyle} />
-          )}
-          {F('Archetype',
-            <select value={form.archetype} onChange={e => setForm(p => ({ ...p, archetype: e.target.value }))} style={selectStyle}>
-              <option value="">—</option>
-              {META_ARCHETYPES.map(a => <option key={a}>{a}</option>)}
-            </select>
-          )}
-          {F('Win Rate %',
-            <input type="number" step="0.1" min="0" max="100" value={form.win_rate} onChange={e => setForm(p => ({ ...p, win_rate: e.target.value }))} placeholder="e.g. 58.3" style={inputStyle} />
-          )}
-          {F('Meta Share %',
-            <input type="number" step="0.1" min="0" max="100" value={form.meta_share} onChange={e => setForm(p => ({ ...p, meta_share: e.target.value }))} placeholder="e.g. 12.5" style={inputStyle} />
-          )}
-          {F('Avg Price $',
-            <input type="number" step="1" min="0" value={form.avg_price} onChange={e => setForm(p => ({ ...p, avg_price: e.target.value }))} placeholder="e.g. 350" style={inputStyle} />
-          )}
-          {F('Source',
-            <select value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} style={selectStyle}>
-              {META_SOURCES.map(s => <option key={s}>{s}</option>)}
-            </select>
-          )}
-          {F('Updated At',
-            <input type="date" value={form.updated_at} onChange={e => setForm(p => ({ ...p, updated_at: e.target.value }))} style={inputStyle} />
-          )}
-          {F('Notes (optional)',
-            <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Short note…" style={inputStyle} />
-          )}
-          {F('Art Card (tile background)',
-            <div>
-              {/* Text input + Pick button row */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  value={form.art_card}
-                  onChange={e => setForm(p => ({ ...p, art_card: e.target.value }))}
-                  placeholder="e.g. Lightning Bolt"
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => { setArtPickerOpen(o => !o); setArtQuery(''); setArtResults([]) }}
-                  style={{
-                    padding: '8px 12px', borderRadius: 8, flexShrink: 0,
-                    border: `1px solid ${artPickerOpen ? '#f59e0b' : 'rgba(255,255,255,.15)'}`,
-                    background: artPickerOpen ? 'rgba(245,158,11,.12)' : 'rgba(255,255,255,.05)',
-                    color: artPickerOpen ? '#f59e0b' : '#e2e8f0',
-                    cursor: 'pointer', fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap',
-                    transition: 'all .15s',
-                  }}
-                >
-                  🖼 Pick
-                </button>
-              </div>
-
-              {/* Current art preview (shown when picker is closed) */}
-              {artPreviewUrl && !artPickerOpen && (
-                <div style={{ marginTop: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)' }}>
-                  <img
-                    src={artPreviewUrl}
-                    alt={form.art_card}
-                    style={{ width: '100%', maxHeight: 110, objectFit: 'cover', display: 'block' }}
-                  />
-                </div>
-              )}
-
-              {/* Picker panel */}
-              {artPickerOpen && (
-                <div style={{ marginTop: 8, background: '#08080e', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, padding: '12px' }}>
-                  <input
-                    autoFocus
-                    value={artQuery}
-                    onChange={e => searchArtCards(e.target.value)}
-                    placeholder="Search card name…"
-                    style={{ ...inputStyle, marginBottom: 10 }}
-                  />
-                  {artSearching && (
-                    <div style={{ textAlign: 'center', color: '#64748b', fontSize: '.72rem', padding: '10px 0' }}>Searching…</div>
-                  )}
-                  {!artSearching && artQuery && artResults.length === 0 && (
-                    <div style={{ textAlign: 'center', color: '#64748b', fontSize: '.72rem', padding: '10px 0' }}>No cards found</div>
-                  )}
-                  {!artQuery && (
-                    <div style={{ textAlign: 'center', color: '#475569', fontSize: '.7rem', padding: '6px 0' }}>Type a card name to search</div>
-                  )}
-                  {artResults.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                      {artResults.map(card => (
-                        <div
-                          key={card.name}
-                          onClick={() => selectArtCard(card.name)}
-                          title={card.name}
-                          style={{
-                            cursor: 'pointer', borderRadius: 6, overflow: 'hidden',
-                            border: '2px solid transparent', transition: 'border-color .12s',
-                            aspectRatio: '4/3', background: '#111',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.borderColor = '#f59e0b'}
-                          onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
-                        >
-                          {card.img
-                            ? <img src={card.img} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.6rem', color: '#64748b', padding: '4px', textAlign: 'center' }}>{card.name}</div>
-                          }
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {F('Colors (e.g. UR, WUB, G)',
-            <input value={form.colors} onChange={e => setForm(p => ({ ...p, colors: e.target.value }))} placeholder="e.g. UR" style={inputStyle} />
-          )}
-          {F('Key Cards (comma-separated, max 3)',
-            <input value={form.key_cards_raw} onChange={e => setForm(p => ({ ...p, key_cards_raw: e.target.value }))} placeholder="e.g. Ragavan, Dragon's Rage Channeler, Murktide Regent" style={inputStyle} />
-          )}
-        </div>
-        {F('Decklist (Arena format — paste from MTGGoldfish / Moxfield)',
-          <textarea
-            value={form.decklist_raw}
-            onChange={e => setForm(p => ({ ...p, decklist_raw: e.target.value }))}
-            placeholder={'Deck\n4 Lightning Bolt\n4 Monastery Swiftspear\n...\n\nSideboard\n2 Smash to Smithereens'}
-            rows={10}
-            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '.72rem', lineHeight: 1.5, marginTop: 4 }}
-          />
-        )}
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', borderRadius: 8, background: '#f59e0b', border: 'none', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
-            {saving ? 'Saving…' : editId ? 'Update' : 'Add Deck'}
-          </button>
-          {editId && (
-            <button onClick={() => { setEditId(null); setForm(BLANK_DECK); setErr(null) }} style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,.15)', color: '#94a3b8', fontWeight: 600, fontSize: '.82rem', cursor: 'pointer' }}>
-              Cancel
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Existing entries table */}
-      <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#94a3b8', marginBottom: 10 }}>
-        {decks.length} entries
+      {/* Entries header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#94a3b8' }}>{decks.length} entries</div>
+        <button
+          onClick={() => { setEditId(null); setForm(BLANK_DECK); setErr(null); setArtPickerOpen(false); setArtQuery(''); setArtResults([]); setModalOpen(true) }}
+          style={{ padding: '7px 14px', borderRadius: 8, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.35)', color: '#f59e0b', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+        >
+          ➕ Add Deck
+        </button>
       </div>
       {loading ? (
         <div style={{ color: '#475569', fontSize: '.85rem', padding: '20px 0' }}>Loading…</div>
@@ -2016,6 +1877,191 @@ function MetaTab() {
               <button onClick={() => handleDelete(d.id)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#f87171', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Add / Edit Modal ──────────────────────────────────────────────── */}
+      {modalOpen && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false) } }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: '24px 16px',
+            background: 'rgba(0,0,0,.72)',
+            overflowY: 'auto',
+          }}
+        >
+          <div style={{
+            background: '#0d0d12', border: '1px solid rgba(255,255,255,.14)',
+            borderRadius: 14, padding: 24, width: '100%', maxWidth: 700,
+            boxShadow: '0 24px 80px rgba(0,0,0,.85)',
+            flexShrink: 0,
+          }}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div style={{ fontWeight: 800, fontSize: '.95rem', color: '#e2e8f0' }}>
+                {editId ? '✏️ Edit Deck' : '➕ Add Deck'}
+              </div>
+              <button
+                onClick={() => { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false) }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1, padding: 4 }}
+              >✕</button>
+            </div>
+
+            {err && (
+              <div style={{ marginBottom: 14, fontSize: '.78rem', color: '#f87171', background: 'rgba(248,113,113,.08)', border: '1px solid rgba(248,113,113,.2)', borderRadius: 8, padding: '8px 12px' }}>
+                {err}
+              </div>
+            )}
+
+            {/* Form grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12, marginBottom: 14 }}>
+              {F('Format',
+                <select value={form.format} onChange={e => setForm(p => ({ ...p, format: e.target.value }))} style={selectStyle}>
+                  {META_FORMATS_ADMIN.map(f => <option key={f}>{f}</option>)}
+                </select>
+              )}
+              {F('Deck Name',
+                <input value={form.deck_name} onChange={e => setForm(p => ({ ...p, deck_name: e.target.value }))} placeholder="e.g. Mono-Red Aggro" style={inputStyle} />
+              )}
+              {F('Archetype',
+                <select value={form.archetype} onChange={e => setForm(p => ({ ...p, archetype: e.target.value }))} style={selectStyle}>
+                  <option value="">—</option>
+                  {META_ARCHETYPES.map(a => <option key={a}>{a}</option>)}
+                </select>
+              )}
+              {F('Win Rate %',
+                <input type="number" step="0.1" min="0" max="100" value={form.win_rate} onChange={e => setForm(p => ({ ...p, win_rate: e.target.value }))} placeholder="e.g. 58.3" style={inputStyle} />
+              )}
+              {F('Meta Share %',
+                <input type="number" step="0.1" min="0" max="100" value={form.meta_share} onChange={e => setForm(p => ({ ...p, meta_share: e.target.value }))} placeholder="e.g. 12.5" style={inputStyle} />
+              )}
+              {F('Avg Price $',
+                <input type="number" step="1" min="0" value={form.avg_price} onChange={e => setForm(p => ({ ...p, avg_price: e.target.value }))} placeholder="e.g. 350" style={inputStyle} />
+              )}
+              {F('Source',
+                <select value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} style={selectStyle}>
+                  {META_SOURCES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              )}
+              {F('Updated At',
+                <input type="date" value={form.updated_at} onChange={e => setForm(p => ({ ...p, updated_at: e.target.value }))} style={inputStyle} />
+              )}
+              {F('Notes (optional)',
+                <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Short note…" style={inputStyle} />
+              )}
+              {F('Art Card (tile background)',
+                <div>
+                  {/* Pick button only — no text input */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ flex: 1, fontSize: '.78rem', color: form.art_card ? '#e2e8f0' : '#475569', fontStyle: form.art_card ? 'normal' : 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {form.art_card || 'No card selected'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setArtPickerOpen(o => !o); setArtQuery(''); setArtResults([]) }}
+                      style={{
+                        padding: '8px 12px', borderRadius: 8, flexShrink: 0,
+                        border: `1px solid ${artPickerOpen ? '#f59e0b' : 'rgba(255,255,255,.15)'}`,
+                        background: artPickerOpen ? 'rgba(245,158,11,.12)' : 'rgba(255,255,255,.05)',
+                        color: artPickerOpen ? '#f59e0b' : '#e2e8f0',
+                        cursor: 'pointer', fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap',
+                        transition: 'all .15s',
+                      }}
+                    >
+                      🖼 Pick
+                    </button>
+                  </div>
+
+                  {/* Current art preview */}
+                  {artPreviewUrl && !artPickerOpen && (
+                    <div style={{ marginTop: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)' }}>
+                      <img src={artPreviewUrl} alt={form.art_card} style={{ width: '100%', maxHeight: 110, objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  )}
+
+                  {/* Picker panel */}
+                  {artPickerOpen && (
+                    <div style={{ marginTop: 8, background: '#08080e', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, padding: '12px' }}>
+                      <input
+                        autoFocus
+                        value={artQuery}
+                        onChange={e => searchArtCards(e.target.value)}
+                        placeholder="Search card name…"
+                        style={{ ...inputStyle, marginBottom: 10 }}
+                      />
+                      {artSearching && (
+                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: '.72rem', padding: '10px 0' }}>Searching…</div>
+                      )}
+                      {!artSearching && artQuery && artResults.length === 0 && (
+                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: '.72rem', padding: '10px 0' }}>No cards found</div>
+                      )}
+                      {!artQuery && (
+                        <div style={{ textAlign: 'center', color: '#475569', fontSize: '.7rem', padding: '6px 0' }}>Type a card name to search</div>
+                      )}
+                      {artResults.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                          {artResults.map(card => (
+                            <div
+                              key={card.name}
+                              onClick={() => selectArtCard(card.name)}
+                              title={card.name}
+                              style={{
+                                cursor: 'pointer', borderRadius: 6, overflow: 'hidden',
+                                border: '2px solid transparent', transition: 'border-color .12s',
+                                aspectRatio: '4/3', background: '#111',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = '#f59e0b'}
+                              onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+                            >
+                              {card.img
+                                ? <img src={card.img} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.6rem', color: '#64748b', padding: '4px', textAlign: 'center' }}>{card.name}</div>
+                              }
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {F('Colors (e.g. UR, WUB, G)',
+                <input value={form.colors} onChange={e => setForm(p => ({ ...p, colors: e.target.value }))} placeholder="e.g. UR" style={inputStyle} />
+              )}
+              {F('Key Cards (comma-separated, max 3)',
+                <input value={form.key_cards_raw} onChange={e => setForm(p => ({ ...p, key_cards_raw: e.target.value }))} placeholder="e.g. Ragavan, Dragon's Rage Channeler, Murktide Regent" style={inputStyle} />
+              )}
+            </div>
+
+            {F('Decklist (Arena format — paste from MTGGoldfish / Moxfield)',
+              <textarea
+                value={form.decklist_raw}
+                onChange={e => setForm(p => ({ ...p, decklist_raw: e.target.value }))}
+                placeholder={'Deck\n4 Lightning Bolt\n4 Monastery Swiftspear\n...\n\nSideboard\n2 Smash to Smithereens'}
+                rows={10}
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '.72rem', lineHeight: 1.5, marginTop: 4 }}
+              />
+            )}
+
+            {/* Save / Cancel */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{ padding: '9px 22px', borderRadius: 8, background: saving ? 'rgba(245,158,11,.4)' : '#f59e0b', border: 'none', color: '#000', fontWeight: 700, fontSize: '.85rem', cursor: saving ? 'not-allowed' : 'pointer' }}
+              >
+                {saving ? 'Saving…' : editId ? 'Update Deck' : 'Add Deck'}
+              </button>
+              <button
+                onClick={() => { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false) }}
+                style={{ padding: '9px 18px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,.15)', color: '#94a3b8', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

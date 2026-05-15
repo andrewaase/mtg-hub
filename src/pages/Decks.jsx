@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, Component } from 'react'
 import { createPortal } from 'react-dom'
 import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
 import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
@@ -213,14 +213,16 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
 
       {activeTab === 'explore' ? (
         selectedMetaDeck ? (
-          <MetaDeckDetail
-            deck={selectedMetaDeck}
-            onBack={() => setSelectedMetaDeck(null)}
-            onSave={handleSave}
-            showToast={showToast}
-            openCardSearch={openCardSearch}
-            user={user}
-          />
+          <MetaDetailErrorBoundary onBack={() => setSelectedMetaDeck(null)}>
+            <MetaDeckDetail
+              deck={selectedMetaDeck}
+              onBack={() => setSelectedMetaDeck(null)}
+              onSave={handleSave}
+              showToast={showToast}
+              openCardSearch={openCardSearch}
+              user={user}
+            />
+          </MetaDetailErrorBoundary>
         ) : (
         <div style={{ paddingBottom: 32 }}>
           {/* Format filter pills */}
@@ -489,6 +491,48 @@ function MetaTile({ deck, onClick }) {
       </div>
     </div>
   )
+}
+
+// ── Error boundary for MetaDeckDetail ────────────────────────────────────────
+class MetaDetailErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, errorMsg: '' }
+  }
+  static getDerivedStateFromError(err) {
+    return { hasError: true, errorMsg: err?.message || 'Unknown error' }
+  }
+  componentDidCatch(err, info) {
+    console.error('[MetaDeckDetail] render error:', err, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ paddingBottom: 40 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={this.props.onBack}
+            style={{ marginBottom: 16 }}
+          >
+            ← Back to Meta
+          </button>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid rgba(248,113,113,.3)',
+            borderRadius: 12, padding: '32px 20px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontWeight: 700, color: '#f87171', marginBottom: 6 }}>
+              Something went wrong loading this deck
+            </div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>
+              {this.state.errorMsg}
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 // ── Meta deck detail (full-page view) ────────────────────────────────────────
@@ -806,8 +850,6 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
               cards={sideboard}
               cardValues={cardPrices}
               openCardSearch={openCardSearch}
-              onCardHover={showHover}
-              onCardLeave={hideHover}
             />
           )}
         </>
