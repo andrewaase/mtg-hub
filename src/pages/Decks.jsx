@@ -242,9 +242,9 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
           </div>
 
           {metaLoading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
               {[...Array(6)].map((_, i) => (
-                <div key={i} style={{ aspectRatio: '3/4', borderRadius: 12, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div key={i} style={{ aspectRatio: '3/4', maxHeight: 220, borderRadius: 10, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (() => {
@@ -281,7 +281,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                 </div>
 
                 {/* Tile grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                   {filteredMeta.map(deck => (
                     <MetaTile key={deck.id} deck={deck} onClick={() => setSelectedMetaDeck(deck)} />
                   ))}
@@ -419,12 +419,12 @@ function DeckArtTile({ deck, collection, onClick, onEdit, onDelete, priceVersion
 }
 
 // ── Mana symbol pip ──────────────────────────────────────────────────────────
-function ManaSymbol({ c }) {
+function ManaSymbol({ c, size = 16 }) {
   return (
     <img
       src={`https://svgs.scryfall.io/card-symbols/${c.toUpperCase()}.svg`}
       alt={c}
-      style={{ width: 16, height: 16, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.8))' }}
+      style={{ width: size, height: size, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,.8))' }}
     />
   )
 }
@@ -478,50 +478,51 @@ function MetaTile({ deck, onClick }) {
     <div
       onClick={onClick}
       style={{
-        position: 'relative', cursor: 'pointer', borderRadius: 12,
+        position: 'relative', cursor: 'pointer', borderRadius: 10,
         overflow: 'hidden', aspectRatio: '3/4',
         background: 'var(--bg-card)', border: '1px solid var(--border)',
         transition: 'transform .15s, box-shadow .15s',
+        maxHeight: 220,
       }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.025)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,0,0,.7)' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.7)' }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }}
     >
       {/* Art background */}
       {artUrl
-        ? <img src={artUrl} alt={deck.deck_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        ? <img src={artUrl} alt={deck.deck_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', objectPosition: 'center 20%' }} />
         : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a2e, #0d0d1a)' }} />
       }
 
-      {/* Gradient overlay: transparent top → black bottom */}
+      {/* Gradient overlay */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.92) 100%)',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.95) 100%)',
       }} />
 
-      {/* Content */}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 10px 10px' }}>
+      {/* Content anchored to bottom */}
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '8px 8px 6px' }}>
 
         {/* Color pips */}
         {colors.length > 0 && (
-          <div style={{ display: 'flex', gap: 3, marginBottom: 5 }}>
-            {colors.map((c, i) => <ManaSymbol key={i} c={c} />)}
+          <div style={{ display: 'flex', gap: 2, marginBottom: 3 }}>
+            {colors.map((c, i) => <ManaSymbol key={i} c={c} size={13} />)}
           </div>
         )}
 
         {/* Deck name */}
         <div style={{
-          fontWeight: 800, fontSize: '.88rem', lineHeight: 1.2, marginBottom: 4,
-          color: nameColor, textShadow: '0 1px 6px rgba(0,0,0,.9)',
+          fontWeight: 800, fontSize: '.75rem', lineHeight: 1.2, marginBottom: 3,
+          color: nameColor, textShadow: '0 1px 5px rgba(0,0,0,.95)',
           overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
         }}>
           {deck.deck_name}
         </div>
 
-        {/* Key cards */}
+        {/* Key cards — only show if they fit (limit to 2 on small tiles) */}
         {keyCards.length > 0 && (
-          <div style={{ marginBottom: 6 }}>
-            {keyCards.map((name, i) => (
-              <div key={i} style={{ fontSize: '.62rem', color: 'rgba(255,255,255,.75)', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ marginBottom: 4 }}>
+            {keyCards.slice(0, 2).map((name, i) => (
+              <div key={i} style={{ fontSize: '.55rem', color: 'rgba(255,255,255,.7)', lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {name}
               </div>
             ))}
@@ -531,13 +532,13 @@ function MetaTile({ deck, onClick }) {
         {/* Bottom bar: META% left, price right */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          borderTop: '1px solid rgba(255,255,255,.15)', paddingTop: 6, marginTop: 2,
+          borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: 4, marginTop: 1,
         }}>
-          <div style={{ fontSize: '.65rem', fontWeight: 700, color: 'var(--accent-gold)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
+          <div style={{ fontSize: '.58rem', fontWeight: 700, color: 'var(--accent-gold)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
             {share > 0 ? `${share.toFixed(1)}% META` : deck.format || ''}
           </div>
           {price && (
-            <div style={{ fontSize: '.65rem', fontWeight: 700, color: 'rgba(255,255,255,.8)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
+            <div style={{ fontSize: '.58rem', fontWeight: 700, color: 'rgba(255,255,255,.75)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>
               ~${price.toFixed(0)}
             </div>
           )}
@@ -609,6 +610,12 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
             if (price != null) {
               prices[card.name] = price
               if (frontName !== card.name) prices[frontName] = price
+            }
+            // Pre-populate the module-level IMG_CACHE so CardRow hover is instant
+            const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || null
+            if (img) {
+              IMG_CACHE.set(card.name, img)
+              if (frontName !== card.name) IMG_CACHE.set(frontName, img)
             }
           }
           return { types, prices }
@@ -856,6 +863,8 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
               cards={sideboard}
               cardValues={cardPrices}
               openCardSearch={openCardSearch}
+              onCardHover={showHover}
+              onCardLeave={hideHover}
             />
           )}
         </>
