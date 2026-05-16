@@ -10,7 +10,7 @@ import ImportDeckModal from '../modals/ImportDeckModal'
 import UpgradeModal from '../components/UpgradeModal'
 
 // ── Meta Explore constants ────────────────────────────────────────────────────
-const META_FORMATS = ['All', 'Standard', 'Pioneer', 'Modern', 'Legacy', 'Pauper', 'Commander', 'Brawl']
+const META_FORMATS = ['Standard', 'Pioneer', 'Modern', 'Legacy', 'Pauper', 'Commander', 'Brawl']
 const ARCHETYPE_COLOR = {
   Aggro:     { bg: 'rgba(248,113,113,.12)', border: '#f87171', text: '#f87171' },
   Control:   { bg: 'rgba(99,163,255,.12)',  border: '#63a3ff', text: '#63a3ff' },
@@ -63,7 +63,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   // ── Meta Explore state ──
   const [metaDecks,        setMetaDecks]        = useState([])
   const [metaLoading,      setMetaLoading]      = useState(false)
-  const [metaFormat,       setMetaFormat]       = useState('All')
+  const [metaFormat,       setMetaFormat]       = useState('Standard')
   const [metaLoaded,       setMetaLoaded]       = useState(false)
   const [selectedMetaDeck, setSelectedMetaDeck] = useState(null)
 
@@ -250,7 +250,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
               ))}
             </div>
           ) : (() => {
-            const filteredMeta = metaDecks.filter(d => metaFormat === 'All' || d.format === metaFormat)
+            const filteredMeta = metaDecks.filter(d => d.format === metaFormat)
             const lastUpdated = filteredMeta.length > 0
               ? filteredMeta.reduce((latest, d) => (!latest || d.updated_at > latest ? d.updated_at : latest), null)
               : null
