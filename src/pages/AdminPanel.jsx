@@ -1701,11 +1701,42 @@ function MetaTab() {
     setErr(null)
     if (!form.deck_name.trim()) { setErr('Deck name is required'); return }
     setSaving(true)
+
+    // Auto-fetch decklist from link if link is set but cards haven't been imported yet
+    let decklistRawFinal = form.decklist_raw
+    const link = form.decklist_link?.trim()
+    if (link && !form.decklist_raw?.trim()) {
+      try {
+        setFetchDecklistMsg({ ok: true, text: '⏳ Fetching decklist from link…' })
+        const res  = await fetch('/.netlify/functions/fetch-decklist', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ url: link }),
+        })
+        const json = await res.json()
+        if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`)
+        const parsed    = parseArenaDecklist(json.text)
+        const mainCount = (parsed.mainboard || []).reduce((s, c) => s + c.qty, 0)
+        const sideCount = (parsed.sideboard || []).reduce((s, c) => s + c.qty, 0)
+        if (mainCount > 0) {
+          decklistRawFinal = [
+            'Deck',
+            ...(parsed.mainboard || []).map(c => `${c.qty} ${c.name}`),
+            ...(sideCount > 0 ? ['', 'Sideboard', ...parsed.sideboard.map(c => `${c.qty} ${c.name}`)] : []),
+          ].join('\n')
+          setFetchDecklistMsg({ ok: true, text: `✓ Auto-imported ${mainCount} cards${sideCount > 0 ? ` + ${sideCount} sideboard` : ''}` })
+        }
+      } catch (fetchErr) {
+        // Non-fatal: save without decklist rather than blocking the whole save
+        setFetchDecklistMsg({ ok: false, text: `Could not fetch decklist: ${fetchErr.message}` })
+      }
+    }
+
     const keyCardsArr = form.key_cards_raw
       ? form.key_cards_raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 3)
       : []
-    const decklistParsed = form.decklist_raw
-      ? parseArenaDecklist(form.decklist_raw)
+    const decklistParsed = decklistRawFinal
+      ? parseArenaDecklist(decklistRawFinal)
       : { mainboard: [], sideboard: [] }
     const payload = {
       format:        form.format,
@@ -1714,7 +1745,7 @@ function MetaTab() {
       meta_share:    form.meta_share !== '' ? parseFloat(form.meta_share) : null,
       avg_price:     form.avg_price !== '' ? parseFloat(form.avg_price) : null,
       updated_at:    form.updated_at || new Date().toISOString().slice(0, 10),
-      decklist_link: form.decklist_link.trim() || null,
+      decklist_link: link || null,
       art_card:      form.art_card.trim() || null,
       colors:        form.colors.trim() || null,
       key_cards:     keyCardsArr,

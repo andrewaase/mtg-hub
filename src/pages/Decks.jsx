@@ -788,17 +788,6 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
         >
           🌊 Buy on ManaPool
         </button>
-        {deck.decklist_link && (
-          <a
-            href={deck.decklist_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-ghost btn-sm"
-            style={{ fontSize: '.78rem', color: '#a78bfa', textDecoration: 'none' }}
-          >
-            🔗 View Full Decklist
-          </a>
-        )}
       </div>
 
       {/* Decklist */}
