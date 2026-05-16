@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { upsertStoreListing } from '../lib/db'
+import { parseArenaDecklist } from '../lib/deckUtils'
 
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1542,27 +1543,6 @@ const BLANK_DECK = {
   art_card: '', colors: '', key_cards_raw: '', decklist_raw: '',
 }
 
-function parseArenaDecklist(text) {
-  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean)
-  const mainboard = [], sideboard = []
-  let inSide = false
-  for (const line of lines) {
-    if (['Deck', 'Commander', 'Companion'].includes(line)) continue
-    if (line === 'Sideboard') { inSide = true; continue }
-    if (line.startsWith('//')) continue
-    // Handles formats:
-    //   "4 Card Name"              (Arena / MTGGoldfish)
-    //   "4 Card Name (SET) 123"    (Arena with set code)
-    //   "4x Card Name"             (MTGO / Tappedout)
-    //   "4 x Card Name"            (Archidekt)
-    const m = line.match(/^(\d+)(?:\s*[xX]\s+|\s+)(.+?)(?:\s+\([A-Z0-9]+\)\s+\d+)?$/)
-    if (m) {
-      const entry = { qty: parseInt(m[1]), name: m[2].trim() }
-      ;(inSide ? sideboard : mainboard).push(entry)
-    }
-  }
-  return { mainboard, sideboard }
-}
 
 function MetaTab() {
   const [decks,         setDecks]         = useState([])

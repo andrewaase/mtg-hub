@@ -134,6 +134,12 @@ export function deckToText(deck) {
   return lines.join('\n')
 }
 
+// ── Meta decklist parser (MTGGoldfish / Arena / MTGO / Archidekt) ─────────
+// Alias of parseDeckText with a name that makes call-sites self-documenting.
+export function parseArenaDecklist(text) {
+  return parseDeckText(text)
+}
+
 // ── Format badge colours ───────────────────────────────────────────────────
 
 export const FORMAT_COLORS = {

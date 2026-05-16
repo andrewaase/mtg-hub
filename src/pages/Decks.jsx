@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, Component } from 'react'
 import { createPortal } from 'react-dom'
 import { getDecks, saveDeck, deleteDeck, bulkAddCards } from '../lib/db'
-import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS } from '../lib/deckUtils'
+import { toArenaFormat, countCards, isCommanderFormat, FORMAT_COLORS, parseArenaDecklist } from '../lib/deckUtils'
 import { getDeckValueSync, fetchUnknownDeckPrices, prefetchDeckPrices, getCachedPrice } from '../lib/pricing'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
@@ -537,21 +537,51 @@ class MetaDetailErrorBoundary extends Component {
 
 // ── Meta deck detail (full-page view) ────────────────────────────────────────
 function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user }) {
-  const [artUrl,        setArtUrl]        = useState(null)
-  const [cardTypes,     setCardTypes]     = useState({})
-  const [cardPrices,    setCardPrices]    = useState({})
-  const [typesLoading,  setTypesLoading]  = useState(false)
-  const [saving,        setSaving]        = useState(false)
+  const [artUrl,           setArtUrl]           = useState(null)
+  const [cardTypes,        setCardTypes]        = useState({})
+  const [cardPrices,       setCardPrices]       = useState({})
+  const [typesLoading,     setTypesLoading]     = useState(false)
+  const [saving,           setSaving]           = useState(false)
+  const [liveDeck,         setLiveDeck]         = useState(null)  // fetched on-the-fly
+  const [deckFetching,     setDeckFetching]     = useState(false)
   const artFetchedRef = useRef(false)
 
   // Parse decklist from stored JSON
-  const decklist = (() => {
+  const storedDecklist = (() => {
     if (!deck.decklist) return { mainboard: [], sideboard: [] }
     if (typeof deck.decklist === 'object') return deck.decklist
     try { return JSON.parse(deck.decklist) } catch { return { mainboard: [], sideboard: [] } }
   })()
+
+  // Use live-fetched decklist when available, otherwise fall back to stored
+  const decklist = liveDeck || storedDecklist
   const mainboard = decklist.mainboard || []
   const sideboard = decklist.sideboard || []
+
+  // Auto-fetch decklist from link when no cards are stored
+  useEffect(() => {
+    const link = deck.decklist_link?.trim()
+    if (!link) return
+    if ((storedDecklist.mainboard || []).length > 0) return  // already have cards
+    setDeckFetching(true)
+    fetch('/.netlify/functions/fetch-decklist', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ url: link }),
+    })
+      .then(r => r.json())
+      .then(json => {
+        if (json.error) throw new Error(json.error)
+        const parsed = parseArenaDecklist(json.text)
+        if ((parsed.mainboard || []).length > 0) {
+          setLiveDeck(parsed)
+          // Write back to Supabase so next load is instant
+          supabase.from('meta_decks').update({ decklist: parsed }).eq('id', deck.id).then(() => {})
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDeckFetching(false))
+  }, [deck.id, deck.decklist_link]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const colors = deck.colors ? deck.colors.split('') : []
 
@@ -797,7 +827,7 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
           borderRadius: 12, padding: '40px 20px', textAlign: 'center',
           color: 'var(--text-muted)', fontSize: '.85rem',
         }}>
-          No decklist available for this deck yet.
+          {deckFetching ? '⏳ Loading decklist…' : 'No decklist available for this deck yet.'}
         </div>
       ) : (
         <>
