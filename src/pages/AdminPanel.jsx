@@ -1531,7 +1531,7 @@ const TABS = [
 
 // ── Meta Tracker admin tab ──────────────────────────────────────────────────
 
-const META_FORMATS_ADMIN  = ['Standard','Pioneer','Modern','Legacy','Pauper','Commander','Brawl','Vintage','Explorer']
+const META_FORMATS_ADMIN  = ['Standard','Pioneer','Modern','Legacy','Pauper','Commander','Brawl','Vintage','Explorer','Premodern']
 const META_ARCHETYPES     = ['Aggro','Control','Midrange','Combo','Tempo','Ramp','Prison','Reanimator','Other']
 const META_SOURCES        = ['MTGGoldfish','MTGTop8','MTGArena','Untapped.gg','Other']
 
@@ -1924,7 +1924,10 @@ function MetaTab() {
           {decks.map(d => (
             <div key={d.id} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.deck_name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.deck_name}</div>
+                  <span title={d.art_card ? `Art: ${d.art_card}` : 'No image set'} style={{ fontSize: '.8rem', opacity: d.art_card ? 1 : 0.25, flexShrink: 0 }}>🖼</span>
+                </div>
                 <div style={{ fontSize: '.7rem', color: '#475569', marginTop: 2 }}>
                   {d.format}{d.archetype ? ` · ${d.archetype}` : ''}{d.meta_share != null ? ` · ${d.meta_share}% meta` : ''}{d.avg_price != null ? ` · $${d.avg_price}` : ''}{d.decklist_link ? ' · 🔗' : ''}
                 </div>

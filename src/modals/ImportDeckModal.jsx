@@ -3,7 +3,7 @@ import { parseDeckText, isCommanderFormat } from '../lib/deckUtils'
 
 const FORMATS = [
   'Standard', 'Pioneer', 'Modern', 'Legacy', 'Vintage',
-  'Commander', 'Brawl', 'Historic Brawl', 'Pauper', 'Alchemy', 'Explorer'
+  'Commander', 'Brawl', 'Historic Brawl', 'Pauper', 'Alchemy', 'Explorer', 'Premodern'
 ]
 
 export default function ImportDeckModal({ onClose, onSave, existingDeck }) {

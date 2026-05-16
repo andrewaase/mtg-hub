@@ -154,4 +154,5 @@ export const FORMAT_COLORS = {
   Pauper:         { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' },
   Alchemy:        { bg: 'rgba(0,188,212,.15)',   color: '#4dd0e1' },
   Explorer:       { bg: 'rgba(0,150,136,.15)',   color: '#4db6ac' },
+  Premodern:      { bg: 'rgba(139,90,43,.18)',   color: '#c4a265' },
 }

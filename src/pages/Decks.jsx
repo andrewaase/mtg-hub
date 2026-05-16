@@ -10,7 +10,7 @@ import ImportDeckModal from '../modals/ImportDeckModal'
 import UpgradeModal from '../components/UpgradeModal'
 
 // ── Meta Explore constants ────────────────────────────────────────────────────
-const META_FORMATS = ['Standard', 'Pioneer', 'Modern', 'Legacy', 'Pauper', 'Commander', 'Brawl']
+const META_FORMATS = ['Standard', 'Pioneer', 'Modern', 'Legacy', 'Pauper', 'Commander', 'Brawl', 'Premodern']
 const ARCHETYPE_COLOR = {
   Aggro:     { bg: 'rgba(248,113,113,.12)', border: '#f87171', text: '#f87171' },
   Control:   { bg: 'rgba(99,163,255,.12)',  border: '#63a3ff', text: '#63a3ff' },
@@ -670,6 +670,13 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
     }
     return sum
   }, [mainboard, cardPrices])
+
+  // Write computed price back to Supabase so the tile shows it next visit
+  useEffect(() => {
+    if (totalPrice <= 0) return
+    if (deck.avg_price != null) return  // already has a manually set price
+    supabase.from('meta_decks').update({ avg_price: Math.round(totalPrice) }).eq('id', deck.id).then(() => {})
+  }, [totalPrice, deck.id, deck.avg_price])
 
   // Copy Arena format to clipboard
   const handleCopyArena = async () => {
