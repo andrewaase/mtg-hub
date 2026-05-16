@@ -1772,8 +1772,13 @@ function MetaTab() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this meta entry?')) return
     await supabase.from('meta_decks').delete().eq('id', id)
+    load()
+  }
+
+  const handleDeleteAll = async () => {
+    if (!confirm('Delete ALL meta decks? This cannot be undone.')) return
+    await supabase.from('meta_decks').delete().gte('id', 0)
     load()
   }
 
@@ -1917,6 +1922,18 @@ function MetaTab() {
               <button onClick={() => handleDelete(d.id)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#f87171', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Remove All ───────────────────────────────────────────────────── */}
+      {decks.length > 0 && (
+        <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={handleDeleteAll}
+            style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: '#f87171', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            🗑 Remove All
+          </button>
         </div>
       )}
 
