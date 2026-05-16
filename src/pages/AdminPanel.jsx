@@ -1572,9 +1572,11 @@ function MetaTab() {
   const [saving,        setSaving]        = useState(false)
   const [err,           setErr]           = useState(null)
   const [csvText,       setCsvText]       = useState('')
-  const [moversRunning, setMoversRunning] = useState(false)
-  const [moversResult,  setMoversResult]  = useState(null)
-  const [modalOpen,     setModalOpen]     = useState(false)
+  const [moversRunning,    setMoversRunning]    = useState(false)
+  const [moversResult,     setMoversResult]     = useState(null)
+  const [modalOpen,        setModalOpen]        = useState(false)
+  const [fetchingDecklist, setFetchingDecklist] = useState(false)
+  const [fetchDecklistMsg, setFetchDecklistMsg] = useState(null)
 
   // ── Art card picker state ───────────────────────────────────────────────────
   const [artPickerOpen, setArtPickerOpen]   = useState(false)
@@ -1622,6 +1624,44 @@ function MetaTab() {
     setArtPickerOpen(false)
     setArtQuery('')
     setArtResults([])
+  }
+
+  const handleFetchDecklist = async () => {
+    const url = form.decklist_link?.trim()
+    if (!url) return
+    setFetchingDecklist(true)
+    setFetchDecklistMsg(null)
+    try {
+      const res  = await fetch('/.netlify/functions/fetch-decklist', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ url }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`)
+
+      const parsed    = parseArenaDecklist(json.text)
+      const mainCount = (parsed.mainboard  || []).reduce((s, c) => s + c.qty, 0)
+      const sideCount = (parsed.sideboard  || []).reduce((s, c) => s + c.qty, 0)
+      if (mainCount === 0) throw new Error('No cards found — is this a valid decklist page?')
+
+      // Rebuild arena-format text to populate the textarea
+      const arenaText = [
+        'Deck',
+        ...(parsed.mainboard || []).map(c => `${c.qty} ${c.name}`),
+        ...(sideCount > 0 ? ['', 'Sideboard', ...parsed.sideboard.map(c => `${c.qty} ${c.name}`)] : []),
+      ].join('\n')
+
+      setForm(p => ({ ...p, decklist_raw: arenaText }))
+      setFetchDecklistMsg({
+        ok:   true,
+        text: `✓ Imported ${mainCount} cards${sideCount > 0 ? ` + ${sideCount} sideboard` : ''}`,
+      })
+    } catch (e) {
+      setFetchDecklistMsg({ ok: false, text: e.message })
+    } finally {
+      setFetchingDecklist(false)
+    }
   }
 
   const runMarketMovers = async () => {
@@ -1883,7 +1923,7 @@ function MetaTab() {
       {/* ── Add / Edit Modal ──────────────────────────────────────────────── */}
       {modalOpen && (
         <div
-          onClick={e => { if (e.target === e.currentTarget) { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false) } }}
+          onClick={e => { if (e.target === e.currentTarget) { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false); setFetchDecklistMsg(null) } }}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
@@ -1904,7 +1944,7 @@ function MetaTab() {
                 {editId ? '✏️ Edit Deck' : '➕ Add Deck'}
               </div>
               <button
-                onClick={() => { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false) }}
+                onClick={() => { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false); setFetchDecklistMsg(null) }}
                 style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1, padding: 4 }}
               >✕</button>
             </div>
@@ -1939,15 +1979,6 @@ function MetaTab() {
               )}
               {F('Updated At',
                 <input type="date" value={form.updated_at} onChange={e => setForm(p => ({ ...p, updated_at: e.target.value }))} style={inputStyle} />
-              )}
-              {F('Decklist Link (URL)',
-                <input
-                  value={form.decklist_link}
-                  onChange={e => setForm(p => ({ ...p, decklist_link: e.target.value }))}
-                  placeholder="https://www.mtggoldfish.com/archetype/..."
-                  style={inputStyle}
-                  type="url"
-                />
               )}
               {F('Art Card (tile background)',
                 <div>
@@ -2033,7 +2064,45 @@ function MetaTab() {
               )}
             </div>
 
-            {F('Decklist (Arena format — paste from MTGGoldfish / Moxfield)',
+            {/* Decklist Link — full width with auto-import button */}
+            {F('Decklist Link (URL)',
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={form.decklist_link}
+                    onChange={e => { setForm(p => ({ ...p, decklist_link: e.target.value })); setFetchDecklistMsg(null) }}
+                    placeholder="https://www.mtggoldfish.com/archetype/... or /deck/..."
+                    style={{ ...inputStyle, flex: 1 }}
+                    type="url"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleFetchDecklist}
+                    disabled={!form.decklist_link?.trim() || fetchingDecklist}
+                    style={{
+                      padding: '8px 14px', borderRadius: 8, flexShrink: 0,
+                      border: '1px solid rgba(99,102,241,.4)',
+                      background: fetchingDecklist ? 'rgba(99,102,241,.1)' : 'rgba(99,102,241,.2)',
+                      color: '#a5b4fc',
+                      cursor: (!form.decklist_link?.trim() || fetchingDecklist) ? 'not-allowed' : 'pointer',
+                      fontSize: '.78rem', fontWeight: 700,
+                      opacity: !form.decklist_link?.trim() ? 0.5 : 1,
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {fetchingDecklist ? '⏳ Fetching…' : '⬇ Import Cards'}
+                  </button>
+                </div>
+                {fetchDecklistMsg && (
+                  <div style={{ fontSize: '.72rem', color: fetchDecklistMsg.ok ? '#4ade80' : '#f87171', paddingLeft: 2 }}>
+                    {fetchDecklistMsg.text}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Decklist textarea — populated by import or manual paste */}
+            {F('Decklist (auto-filled above, or paste Arena format manually)',
               <textarea
                 value={form.decklist_raw}
                 onChange={e => setForm(p => ({ ...p, decklist_raw: e.target.value }))}
@@ -2053,7 +2122,7 @@ function MetaTab() {
                 {saving ? 'Saving…' : editId ? 'Update Deck' : 'Add Deck'}
               </button>
               <button
-                onClick={() => { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false) }}
+                onClick={() => { setModalOpen(false); setForm(BLANK_DECK); setEditId(null); setErr(null); setArtPickerOpen(false); setFetchDecklistMsg(null) }}
                 style={{ padding: '9px 18px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,.15)', color: '#94a3b8', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer' }}
               >
                 Cancel
