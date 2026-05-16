@@ -645,7 +645,7 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
       setCardPrices(Object.assign({}, ...results.map(r => r.prices)))
       setTypesLoading(false)
     })
-  }, [deck.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deck.id, mainboard.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build type groups for mainboard
   const typeGroups = useMemo(() => {
