@@ -689,9 +689,7 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
   }
 
   const share = parseFloat(deck.meta_share) || 0
-  const wr    = parseFloat(deck.win_rate) || null
   const price = parseFloat(deck.avg_price) || null
-  const wrColor = wr == null ? 'var(--text-muted)' : wr >= 55 ? '#4ade80' : wr >= 50 ? '#fbbf24' : '#f87171'
 
   return (
     <div style={{ paddingBottom: 40 }}>
@@ -742,9 +740,8 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
         borderRadius: 12, overflow: 'hidden', marginBottom: 14,
       }}>
         {[
-          { label: 'META', value: share > 0 ? `${share.toFixed(1)}%` : '—', color: 'var(--accent-gold)' },
-          { label: 'WIN RATE', value: wr != null ? `${wr.toFixed(1)}%` : '—', color: wrColor },
-          { label: 'AVG PRICE', value: price ? `~$${price.toFixed(0)}` : '—', color: 'var(--text-primary)' },
+          { label: 'META SHARE', value: share > 0 ? `${share.toFixed(1)}%` : '—', color: 'var(--accent-gold)' },
+          { label: 'AVG PRICE',  value: price ? `~$${price.toFixed(0)}` : '—',     color: 'var(--text-primary)' },
         ].map((stat, i) => (
           <div key={stat.label} style={{
             flex: 1, padding: '12px 8px', textAlign: 'center',
@@ -791,6 +788,17 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
         >
           🌊 Buy on ManaPool
         </button>
+        {deck.decklist_link && (
+          <a
+            href={deck.decklist_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: '.78rem', color: '#a78bfa', textDecoration: 'none' }}
+          >
+            🔗 View Full Decklist
+          </a>
+        )}
       </div>
 
       {/* Decklist */}
@@ -855,11 +863,6 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
         </>
       )}
 
-      {deck.notes && (
-        <div style={{ marginTop: 14, fontSize: '.78rem', color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-          {deck.notes}
-        </div>
-      )}
     </div>
   )
 }

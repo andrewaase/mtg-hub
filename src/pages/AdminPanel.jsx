@@ -1536,8 +1536,9 @@ const META_SOURCES        = ['MTGGoldfish','MTGTop8','MTGArena','Untapped.gg','O
 
 const BLANK_DECK = {
   format: 'Standard', deck_name: '', archetype: 'Midrange',
-  win_rate: '', meta_share: '', avg_price: '', source: 'MTGGoldfish',
-  notes: '', updated_at: new Date().toISOString().slice(0, 10),
+  meta_share: '', avg_price: '',
+  updated_at: new Date().toISOString().slice(0, 10),
+  decklist_link: '',
   art_card: '', colors: '', key_cards_raw: '', decklist_raw: '',
 }
 
@@ -1667,19 +1668,17 @@ function MetaTab() {
       ? parseArenaDecklist(form.decklist_raw)
       : { mainboard: [], sideboard: [] }
     const payload = {
-      format:     form.format,
-      deck_name:  form.deck_name.trim(),
-      archetype:  form.archetype || null,
-      win_rate:   form.win_rate  !== '' ? parseFloat(form.win_rate)  : null,
-      meta_share: form.meta_share !== '' ? parseFloat(form.meta_share) : null,
-      avg_price:  form.avg_price !== '' ? parseFloat(form.avg_price) : null,
-      source:     form.source    || null,
-      notes:      form.notes     || null,
-      updated_at: form.updated_at || new Date().toISOString().slice(0, 10),
-      art_card:   form.art_card.trim() || null,
-      colors:     form.colors.trim() || null,
-      key_cards:  keyCardsArr,
-      decklist:   decklistParsed,
+      format:        form.format,
+      deck_name:     form.deck_name.trim(),
+      archetype:     form.archetype || null,
+      meta_share:    form.meta_share !== '' ? parseFloat(form.meta_share) : null,
+      avg_price:     form.avg_price !== '' ? parseFloat(form.avg_price) : null,
+      updated_at:    form.updated_at || new Date().toISOString().slice(0, 10),
+      decklist_link: form.decklist_link.trim() || null,
+      art_card:      form.art_card.trim() || null,
+      colors:        form.colors.trim() || null,
+      key_cards:     keyCardsArr,
+      decklist:      decklistParsed,
     }
     const { error: e } = editId
       ? await supabase.from('meta_decks').update(payload).eq('id', editId)
@@ -1713,17 +1712,15 @@ function MetaTab() {
       try { return JSON.parse(deck.key_cards) } catch { return [] }
     })()
     setForm({
-      format:        deck.format     || 'Standard',
-      deck_name:     deck.deck_name  || '',
-      archetype:     deck.archetype  || '',
-      win_rate:      deck.win_rate   ?? '',
-      meta_share:    deck.meta_share ?? '',
-      avg_price:     deck.avg_price  ?? '',
-      source:        deck.source     || 'MTGGoldfish',
-      notes:         deck.notes      || '',
-      updated_at:    deck.updated_at || new Date().toISOString().slice(0, 10),
-      art_card:      deck.art_card   || '',
-      colors:        deck.colors     || '',
+      format:        deck.format        || 'Standard',
+      deck_name:     deck.deck_name     || '',
+      archetype:     deck.archetype     || '',
+      meta_share:    deck.meta_share    ?? '',
+      avg_price:     deck.avg_price     ?? '',
+      updated_at:    deck.updated_at    || new Date().toISOString().slice(0, 10),
+      decklist_link: deck.decklist_link || '',
+      art_card:      deck.art_card      || '',
+      colors:        deck.colors        || '',
       key_cards_raw: keyCardsArr.join(', '),
       decklist_raw:  decklistRaw !== 'Deck' ? decklistRaw : '',
     })
@@ -1753,15 +1750,13 @@ function MetaTab() {
       const obj = {}
       headers.forEach((h, i) => { obj[h] = vals[i] || '' })
       return {
-        format:     obj.format     || 'Standard',
-        deck_name:  obj.deck_name  || obj.name || '',
-        archetype:  obj.archetype  || null,
-        win_rate:   obj.win_rate   ? parseFloat(obj.win_rate)   : null,
-        meta_share: obj.meta_share ? parseFloat(obj.meta_share) : null,
-        avg_price:  obj.avg_price  || obj.price ? parseFloat(obj.avg_price || obj.price) : null,
-        source:     obj.source     || 'MTGGoldfish',
-        notes:      obj.notes      || null,
-        updated_at: obj.updated_at || obj.date || new Date().toISOString().slice(0, 10),
+        format:        obj.format        || 'Standard',
+        deck_name:     obj.deck_name     || obj.name || '',
+        archetype:     obj.archetype     || null,
+        meta_share:    obj.meta_share    ? parseFloat(obj.meta_share)                      : null,
+        avg_price:     (obj.avg_price || obj.price) ? parseFloat(obj.avg_price || obj.price) : null,
+        updated_at:    obj.updated_at    || obj.date || new Date().toISOString().slice(0, 10),
+        decklist_link: obj.decklist_link || obj.link || obj.url || null,
       }
     }).filter(r => r.deck_name)
     if (rows.length === 0) { setErr('No valid rows found in CSV'); return }
@@ -1830,7 +1825,7 @@ function MetaTab() {
       <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: '.78rem', color: '#a5b4fc', lineHeight: 1.6 }}>
         <strong>📋 Workflow:</strong> Fill in your Google Sheet using columns:
         <code style={{ display: 'block', marginTop: 6, background: 'rgba(0,0,0,.3)', padding: '6px 10px', borderRadius: 6, fontSize: '.72rem', color: '#94a3b8', letterSpacing: '.3px' }}>
-          format, deck_name, archetype, win_rate, meta_share, avg_price, source, updated_at, notes
+          format, deck_name, archetype, meta_share, avg_price, updated_at, decklist_link
         </code>
         Then paste the CSV below to bulk import, or add decks one by one using the form.
       </div>
@@ -1841,7 +1836,7 @@ function MetaTab() {
         <textarea
           value={csvText}
           onChange={e => setCsvText(e.target.value)}
-          placeholder={'format,deck_name,archetype,win_rate,meta_share,avg_price,source,updated_at,notes\nStandard,Mono-Red Aggro,Aggro,58.2,14.5,180,MTGGoldfish,2025-05-10,Fast aggro deck'}
+          placeholder={'format,deck_name,archetype,meta_share,avg_price,updated_at,decklist_link\nStandard,Mono-Red Aggro,Aggro,14.5,180,2025-05-10,https://www.mtggoldfish.com/archetype/mono-red-aggro'}
           rows={5}
           style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '.72rem', lineHeight: 1.5 }}
         />
@@ -1875,7 +1870,7 @@ function MetaTab() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.deck_name}</div>
                 <div style={{ fontSize: '.7rem', color: '#475569', marginTop: 2 }}>
-                  {d.format}{d.archetype ? ` · ${d.archetype}` : ''}{d.meta_share != null ? ` · ${d.meta_share}% meta` : ''}{d.win_rate != null ? ` · ${d.win_rate}% wr` : ''}{d.source ? ` · ${d.source}` : ''}
+                  {d.format}{d.archetype ? ` · ${d.archetype}` : ''}{d.meta_share != null ? ` · ${d.meta_share}% meta` : ''}{d.avg_price != null ? ` · $${d.avg_price}` : ''}{d.decklist_link ? ' · 🔗' : ''}
                 </div>
               </div>
               <button onClick={() => handleEdit(d)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.25)', color: '#f59e0b', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
@@ -1936,25 +1931,23 @@ function MetaTab() {
                   {META_ARCHETYPES.map(a => <option key={a}>{a}</option>)}
                 </select>
               )}
-              {F('Win Rate %',
-                <input type="number" step="0.1" min="0" max="100" value={form.win_rate} onChange={e => setForm(p => ({ ...p, win_rate: e.target.value }))} placeholder="e.g. 58.3" style={inputStyle} />
-              )}
               {F('Meta Share %',
                 <input type="number" step="0.1" min="0" max="100" value={form.meta_share} onChange={e => setForm(p => ({ ...p, meta_share: e.target.value }))} placeholder="e.g. 12.5" style={inputStyle} />
               )}
               {F('Avg Price $',
                 <input type="number" step="1" min="0" value={form.avg_price} onChange={e => setForm(p => ({ ...p, avg_price: e.target.value }))} placeholder="e.g. 350" style={inputStyle} />
               )}
-              {F('Source',
-                <select value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} style={selectStyle}>
-                  {META_SOURCES.map(s => <option key={s}>{s}</option>)}
-                </select>
-              )}
               {F('Updated At',
                 <input type="date" value={form.updated_at} onChange={e => setForm(p => ({ ...p, updated_at: e.target.value }))} style={inputStyle} />
               )}
-              {F('Notes (optional)',
-                <input value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Short note…" style={inputStyle} />
+              {F('Decklist Link (URL)',
+                <input
+                  value={form.decklist_link}
+                  onChange={e => setForm(p => ({ ...p, decklist_link: e.target.value }))}
+                  placeholder="https://www.mtggoldfish.com/archetype/..."
+                  style={inputStyle}
+                  type="url"
+                />
               )}
               {F('Art Card (tile background)',
                 <div>
