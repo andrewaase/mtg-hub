@@ -1809,7 +1809,7 @@ function MetaTab() {
 
   const handleDeleteAll = async () => {
     if (!confirm('Delete ALL meta decks? This cannot be undone.')) return
-    await supabase.from('meta_decks').delete().gte('id', 0)
+    await supabase.from('meta_decks').delete().not('id', 'is', null)
     load()
   }
 
