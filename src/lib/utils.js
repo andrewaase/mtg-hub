@@ -70,12 +70,21 @@ export async function searchScryfall(query) {
 }
 
 export async function getCardDetails(cardName) {
+  if (!cardName?.trim()) return null
+  const name = cardName.trim()
   try {
-    // Use fuzzy matching so deck-imported names with minor formatting differences
-    // (split-card spacing, Unicode characters, etc.) still resolve correctly
-    const res = await fetchWithTimeout(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`)
-    if (!res.ok) return null
-    return await res.json()
+    // Primary: fuzzy match — handles minor spelling differences and full DFC names
+    const res = await fetchWithTimeout(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`)
+    if (res.ok) return await res.json()
+
+    // Fallback: for double-faced cards stored as "Front // Back", try just the front face
+    const frontFace = name.split(' // ')[0].trim()
+    if (frontFace && frontFace !== name) {
+      const res2 = await fetchWithTimeout(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(frontFace)}`)
+      if (res2.ok) return await res2.json()
+    }
+
+    return null
   } catch {
     return null
   }

@@ -1549,7 +1549,12 @@ function parseArenaDecklist(text) {
     if (['Deck', 'Commander', 'Companion'].includes(line)) continue
     if (line === 'Sideboard') { inSide = true; continue }
     if (line.startsWith('//')) continue
-    const m = line.match(/^(\d+)\s+(.+?)(?:\s+\([A-Z0-9]+\)\s+\d+)?$/)
+    // Handles formats:
+    //   "4 Card Name"              (Arena / MTGGoldfish)
+    //   "4 Card Name (SET) 123"    (Arena with set code)
+    //   "4x Card Name"             (MTGO / Tappedout)
+    //   "4 x Card Name"            (Archidekt)
+    const m = line.match(/^(\d+)(?:\s*[xX]\s+|\s+)(.+?)(?:\s+\([A-Z0-9]+\)\s+\d+)?$/)
     if (m) {
       const entry = { qty: parseInt(m[1]), name: m[2].trim() }
       ;(inSide ? sideboard : mainboard).push(entry)
