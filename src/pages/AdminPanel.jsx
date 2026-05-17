@@ -1557,6 +1557,7 @@ function MetaTab() {
   const [modalOpen,        setModalOpen]        = useState(false)
   const [fetchingDecklist, setFetchingDecklist] = useState(false)
   const [fetchDecklistMsg, setFetchDecklistMsg] = useState(null)
+  const [adminFormatFilter, setAdminFormatFilter] = useState('All')
 
   // ── Art card picker state ───────────────────────────────────────────────────
   const [artPickerOpen, setArtPickerOpen]   = useState(false)
@@ -1915,13 +1916,32 @@ function MetaTab() {
           ➕ Add Deck
         </button>
       </div>
+
+      {/* Format filter pills */}
+      {decks.length > 0 && (() => {
+        const formats = ['All', ...Array.from(new Set(decks.map(d => d.format).filter(Boolean))).sort()]
+        return (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {formats.map(f => (
+              <button key={f} onClick={() => setAdminFormatFilter(f)} style={{
+                padding: '4px 11px', borderRadius: 99, fontSize: '.7rem', fontWeight: 600,
+                background: adminFormatFilter === f ? 'rgba(245,158,11,.18)' : 'transparent',
+                border: `1px solid ${adminFormatFilter === f ? 'rgba(245,158,11,.5)' : 'rgba(255,255,255,.1)'}`,
+                color: adminFormatFilter === f ? '#f59e0b' : '#64748b',
+                cursor: 'pointer', transition: 'all .15s',
+              }}>{f}</button>
+            ))}
+          </div>
+        )
+      })()}
+
       {loading ? (
         <div style={{ color: '#475569', fontSize: '.85rem', padding: '20px 0' }}>Loading…</div>
       ) : decks.length === 0 ? (
         <div style={{ color: '#334155', fontSize: '.82rem', padding: '20px 0', textAlign: 'center' }}>No meta decks added yet.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {decks.map(d => (
+          {decks.filter(d => adminFormatFilter === 'All' || d.format === adminFormatFilter).map(d => (
             <div key={d.id} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

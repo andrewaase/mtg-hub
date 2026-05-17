@@ -45,6 +45,70 @@ function getTypeBucket(typeLine) {
 // Module-level card image cache (survives re-renders)
 const IMG_CACHE = new Map()
 
+// Batch-fetch Scryfall prices for all meta decks that have a stored decklist.
+// Returns { [deckId]: totalPrice } for every deck we could price.
+async function batchFetchMetaPrices(decks) {
+  // Collect unique card names across all decklists
+  const nameSet = new Set()
+  decks.forEach(d => {
+    const dl = (() => {
+      if (!d.decklist) return null
+      if (typeof d.decklist === 'object') return d.decklist
+      try { return JSON.parse(d.decklist) } catch { return null }
+    })()
+    if (!dl) return
+    ;(dl.mainboard || []).forEach(c => nameSet.add(c.name))
+  })
+
+  if (nameSet.size === 0) return {}
+
+  // Scryfall /cards/collection: up to 75 identifiers per request
+  const names = [...nameSet]
+  const BATCH = 75
+  const priceMap = {} // cardName → usd price
+  for (let i = 0; i < names.length; i += BATCH) {
+    const batch = names.slice(i, i + BATCH)
+    try {
+      const res = await fetch('https://api.scryfall.com/cards/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers: batch.map(n => ({ name: n })) }),
+      })
+      if (!res.ok) continue
+      const { data = [] } = await res.json()
+      data.forEach(card => {
+        const p = parseFloat(card.prices?.usd)
+        if (p > 0) {
+          priceMap[card.name] = p
+          // Also index by front face so "A // B" stored cards resolve
+          const front = card.name.split(' // ')[0]
+          if (front !== card.name) priceMap[front] = p
+        }
+      })
+    } catch { /* non-fatal */ }
+    // Brief pause between batches to respect Scryfall rate limits
+    if (i + BATCH < names.length) await new Promise(r => setTimeout(r, 100))
+  }
+
+  // Compute per-deck totals
+  const result = {}
+  decks.forEach(d => {
+    const dl = (() => {
+      if (!d.decklist) return null
+      if (typeof d.decklist === 'object') return d.decklist
+      try { return JSON.parse(d.decklist) } catch { return null }
+    })()
+    if (!dl) return
+    let total = 0
+    ;(dl.mainboard || []).forEach(c => {
+      const p = priceMap[c.name]
+      if (p) total += p * c.qty
+    })
+    if (total > 0) result[d.id] = total
+  })
+  return result
+}
+
 // ── Main Decks page ───────────────────────────────────────────────────────────
 export default function Decks({ user, collection, showToast, setDeckModalOpen, openCardSearch, membership, setPage }) {
   const [decks, setDecks]           = useState([])
@@ -66,6 +130,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
   const [metaFormat,       setMetaFormat]       = useState('Standard')
   const [metaLoaded,       setMetaLoaded]       = useState(false)
   const [selectedMetaDeck, setSelectedMetaDeck] = useState(null)
+  const [metaDeckPrices,   setMetaDeckPrices]   = useState({}) // id → computed price
 
   useEffect(() => {
     getDecks(user?.id).then(d => {
@@ -91,9 +156,20 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
       .select('*')
       .order('meta_share', { ascending: false })
       .then(({ data }) => {
-        setMetaDecks(data || [])
+        const decks = data || []
+        setMetaDecks(decks)
         setMetaLoaded(true)
         setMetaLoading(false)
+        // Batch-fetch Scryfall prices for all decks that have a stored decklist
+        batchFetchMetaPrices(decks).then(prices => {
+          setMetaDeckPrices(prices)
+          // Write computed prices back to Supabase for decks that don't have avg_price yet
+          decks.forEach(d => {
+            if (d.avg_price == null && prices[d.id] > 0) {
+              supabase.from('meta_decks').update({ avg_price: Math.round(prices[d.id]) }).eq('id', d.id).then(() => {})
+            }
+          })
+        })
       })
       .catch(() => setMetaLoading(false))
   }, [activeTab, metaLoaded])
@@ -285,7 +361,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
                 {/* Tile grid — uses same CSS as My Decks for consistent sizing */}
                 <div className="deck-art-grid">
                   {filteredMeta.map(deck => (
-                    <MetaTile key={deck.id} deck={deck} onClick={() => setSelectedMetaDeck(deck)} />
+                    <MetaTile key={deck.id} deck={deck} computedPrice={metaDeckPrices[deck.id]} onClick={() => setSelectedMetaDeck(deck)} />
                   ))}
                 </div>
               </>
@@ -441,7 +517,7 @@ const MONO_COLOR_TEXT = {
 }
 
 // ── Meta tile — matches DeckArtTile exactly, adds META% in the subtitle ──────
-function MetaTile({ deck, onClick }) {
+function MetaTile({ deck, computedPrice, onClick }) {
   const [artUrl, setArtUrl] = useState(null)
   const fetchedRef = useRef(false)
 
@@ -460,7 +536,9 @@ function MetaTile({ deck, onClick }) {
   }, [deck.art_card, deck.deck_name])
 
   const share = parseFloat(deck.meta_share) || 0
-  const price = parseFloat(deck.avg_price) || null
+  // Prefer the DB-stored avg_price (fast, always available), fall back to the
+  // batch-computed price that arrives a few seconds after the explore tab loads
+  const price = parseFloat(deck.avg_price) || computedPrice || null
   const priceLabel = price
     ? price >= 1000 ? `$${(price / 1000).toFixed(1)}k` : `$${price.toFixed(0)}`
     : null
