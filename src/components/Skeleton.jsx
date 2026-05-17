@@ -88,6 +88,27 @@ export function CollectionSkeleton() {
   )
 }
 
+// Generic page skeleton — used for any page that doesn't have a custom skeleton
+// Prevents the black screen that occurs while Supabase auth/data resolves on refresh
+export function PageSkeleton() {
+  return (
+    <div style={{ padding: '16px' }}>
+      <SkeletonBlock width="40%"  height="28px" style={{ borderRadius: '8px', marginBottom: '20px' }} />
+      <SkeletonBlock width="100%" height="14px" style={{ borderRadius: '6px', marginBottom: '10px' }} />
+      <SkeletonBlock width="85%"  height="14px" style={{ borderRadius: '6px', marginBottom: '10px' }} />
+      <SkeletonBlock width="92%"  height="14px" style={{ borderRadius: '6px', marginBottom: '24px' }} />
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <SkeletonBlock width="100px" height="34px" style={{ borderRadius: '8px' }} />
+        <SkeletonBlock width="100px" height="34px" style={{ borderRadius: '8px' }} />
+        <SkeletonBlock width="100px" height="34px" style={{ borderRadius: '8px' }} />
+      </div>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <SkeletonCard key={i} style={{ marginBottom: '10px' }} />
+      ))}
+    </div>
+  )
+}
+
 // A full-page skeleton for the decks grid
 export function DecksSkeleton() {
   return (

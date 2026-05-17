@@ -26,7 +26,7 @@ import Store from './pages/Store'
 import About from './pages/About'
 import Membership from './pages/Membership'
 import OnboardingTutorial from './components/OnboardingTutorial'
-import { CollectionSkeleton, DecksSkeleton } from './components/Skeleton'
+import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
 
 const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin']
@@ -376,7 +376,7 @@ export default function App() {
             /* Show a contextual skeleton while data loads */
             page === 'collection' ? <CollectionSkeleton /> :
             page === 'decks'      ? <DecksSkeleton />      :
-            null
+            <PageSkeleton />
           ) : (
             /* Pages are lazily mounted on first visit, then kept mounted (hidden with
                display:none) so scroll position, search state, and open card details
