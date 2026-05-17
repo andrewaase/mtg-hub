@@ -241,10 +241,10 @@ export default function Membership({ user, showToast, membership, onMembershipCh
               {[
                 { icon: '📷', label: 'Unlimited card scans' },
                 { icon: '📚', label: 'Unlimited decks' },
+                { icon: '🏷️', label: 'Sell Binder + buylist prices' },
                 { icon: '🃏', label: 'Hand simulator' },
                 { icon: '🎁', label: 'Free months on orders $20+' },
                 { icon: '⚡', label: 'All future Pro features' },
-                { icon: '💬', label: 'Priority support' },
               ].map(f => (
                 <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '.85rem' }}>
                   <span>{f.icon}</span>
@@ -293,6 +293,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
         {[
           { feature: 'Card scans',      free: '100 / day',  pro: 'Unlimited' },
           { feature: 'Decks',           free: '10 total',   pro: 'Unlimited' },
+          { feature: 'Sell Binder',     free: '✗',          pro: '✓' },
           { feature: 'Hand simulator',  free: '✗',          pro: '✓' },
           { feature: 'Collection sync', free: '✓',          pro: '✓' },
           { feature: 'Match tracking',  free: '✓',          pro: '✓' },

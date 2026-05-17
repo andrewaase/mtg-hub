@@ -657,7 +657,7 @@ function writeBinders(map) {
   try { localStorage.setItem(BINDER_LS_KEY, JSON.stringify(map)) } catch {}
 }
 
-export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast }) {
+export default function Collection({ collection, setCollection, user, openAddCard, openCamera, showToast, membership, setPage }) {
   const [view,         setView]         = useState('all')
   const [search,       setSearch]       = useState('')
   const [showFilters,  setShowFilters]  = useState(false)
@@ -1034,7 +1034,13 @@ export default function Collection({ collection, setCollection, user, openAddCar
         ].map(([id, label]) => (
           <button
             key={id}
-            onClick={() => setView(id)}
+            onClick={() => {
+              if (id === 'sell' && membership?.loaded && !membership?.isPro) {
+                setView('sell') // show the upsell state
+              } else {
+                setView(id)
+              }
+            }}
             style={{
               padding: '10px 14px',
               background: 'none', border: 'none', cursor: 'pointer',
@@ -1044,7 +1050,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
               marginBottom: '-1px', whiteSpace: 'nowrap', transition: 'color .15s',
             }}
           >
-            {label}
+            {label}{id === 'sell' && membership?.loaded && !membership?.isPro ? ' ⚡' : ''}
           </button>
         ))}
 
@@ -1262,7 +1268,34 @@ export default function Collection({ collection, setCollection, user, openAddCar
           <button className="btn btn-ghost" onClick={clearFilters} style={{ marginTop: '12px' }}>Clear filters</button>
         </div>
       )}
-      {view === 'sell' && filtered.length === 0 && !search && activeFilterCount === 0 && (
+      {/* ── Sell Binder Pro gate ── */}
+      {view === 'sell' && membership?.loaded && !membership?.isPro && (
+        <div style={{
+          margin: '32px 0', padding: '36px 24px', borderRadius: 16, textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(201,168,76,.08), rgba(99,102,241,.08))',
+          border: '1px solid rgba(201,168,76,.25)',
+        }}>
+          <div style={{ fontSize: '2.4rem', marginBottom: 12 }}>⚡</div>
+          <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--accent-gold)', marginBottom: 8 }}>
+            Sell Binder is a Pro Feature
+          </div>
+          <div style={{ fontSize: '.84rem', color: 'var(--text-muted)', marginBottom: 20, maxWidth: 340, margin: '0 auto 20px' }}>
+            Track cards you want to sell, see live Card Kingdom, ABU, and Star City Games buylist prices, and find the best offer in one place.
+          </div>
+          <button
+            onClick={() => setPage?.('membership')}
+            style={{
+              padding: '10px 26px', borderRadius: 99, fontWeight: 700, fontSize: '.88rem',
+              background: 'linear-gradient(135deg, #c9a84c, #f59e0b)',
+              color: '#0d0d12', border: 'none', cursor: 'pointer',
+            }}
+          >
+            Upgrade to Pro
+          </button>
+        </div>
+      )}
+
+      {view === 'sell' && (!membership?.loaded || membership?.isPro) && filtered.length === 0 && !search && activeFilterCount === 0 && (
         <div className="empty-state" style={{ padding: '60px 20px' }}>
           <div className="empty-icon">🏷️</div>
           <p>Sell binder is empty.<br />Click any card and tap <strong>Sell Binder</strong> to add it.</p>
@@ -1437,7 +1470,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
       })()}
 
       {/* ── Sell List ── */}
-      {view === 'sell' && filtered.length > 0 && (
+      {view === 'sell' && filtered.length > 0 && (!membership?.loaded || membership?.isPro) && (
         <div style={{ display: 'grid', gap: '10px', marginTop: '16px' }}>
           <div style={{
             background: 'var(--bg-secondary)', border: '1px solid var(--border)',

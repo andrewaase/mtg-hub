@@ -16,9 +16,14 @@ exports.handler = async () => {
       }
     }
 
-    const res = await fetch('https://api.cardkingdom.com/api/pricelist')
+    const res = await fetch('https://api.cardkingdom.com/api/pricelist', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json, */*',
+      },
+    })
     if (!res.ok) {
-      return { statusCode: 502, body: JSON.stringify({ error: 'CK API unavailable' }) }
+      return { statusCode: 502, body: JSON.stringify({ error: `CK API returned ${res.status}` }) }
     }
 
     const body = await res.text()

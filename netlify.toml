@@ -45,9 +45,9 @@
     #   script-src  : our own bundle + Stripe.js (loaded by @stripe/stripe-js)
     #   style-src   : our own styles + 'unsafe-inline' (required for React inline styles)
     #   img-src     : our own assets, base64 data URIs, and any HTTPS image (card art, thumbnails)
-    #   connect-src : Supabase REST + realtime WS, Scryfall API, Stripe API, our own functions
+    #   connect-src : Supabase REST + realtime WS, Scryfall API, Stripe API, Card Kingdom API, our own functions
     #   frame-src   : Stripe payment iframe
     #   object-src  : blocked entirely (no Flash / plugins)
     #   base-uri    : locked to self (prevents base-tag injection attacks)
     #   form-action : locked to self (prevents form hijacking)
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.scryfall.com https://svgs.scryfall.io https://api.stripe.com https://js.stripe.com; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.scryfall.com https://svgs.scryfall.io https://api.stripe.com https://js.stripe.com https://api.cardkingdom.com; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';"
