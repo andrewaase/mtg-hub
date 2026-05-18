@@ -298,7 +298,6 @@ export default function Membership({ user, showToast, membership, onMembershipCh
           { feature: 'Collection tracker',                free: '✓',          pro: '✓' },
           { feature: 'Card Lookup',                       free: 'Unlimited',  pro: 'Unlimited' },
           { feature: 'Price history',                     free: '✓',          pro: '✓' },
-          { feature: 'Camera scanning',                   free: '100 / day',  pro: 'Unlimited' },
           { feature: 'Multiple price sources',            free: '✓',          pro: '✓' },
           { feature: 'Wishlist & alerts',                 free: '✓',          pro: '✓' },
           { feature: 'Match log',                         free: '✓',          pro: '✓' },
@@ -307,7 +306,6 @@ export default function Membership({ user, showToast, membership, onMembershipCh
           { feature: 'Set releases',                      free: '✓',          pro: '✓' },
           { feature: 'MTG news feed',                     free: '✓',          pro: '✓' },
           { feature: 'Cross-device sync',                 free: '✓',          pro: '✓' },
-          { feature: 'Free months on orders $20+',        free: '✗',          pro: '✓' },
           { feature: 'All future Pro features',           free: '✗',          pro: '✓' },
         ].map((row, i) => (
           <div
