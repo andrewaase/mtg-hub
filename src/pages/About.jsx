@@ -3,11 +3,13 @@ const FEATURES = [
     icon: '🏪',
     title: 'Card Shop',
     desc: 'Browse singles, sealed product, and curated resealed packs, all in one store. Filter by price range, condition, or foil status. Share any listing with a direct link.',
+    to: 'store',
   },
   {
     icon: '🎴',
     title: 'Sealed & Resealed Products',
     desc: 'Pick up booster boxes, collector packs, and our exclusive resealed packs like Vaulted Rarities and Relics Awakened. Hand-curated surprises at every price point.',
+    to: 'store',
   },
   {
     icon: '💳',
@@ -18,66 +20,79 @@ const FEATURES = [
     icon: '🔔',
     title: 'Restock Waitlist',
     desc: 'Sold out on something you want? Hit "Notify Me" and we\'ll email you the second it\'s back in stock. No account required.',
+    to: 'store',
   },
   {
     icon: '📦',
     title: 'Collection Tracker',
     desc: 'Add cards by search or camera scan. Tap any card for full oracle text, type line, mana cost, flavor text, and live market value, all from one view.',
+    to: 'collection',
   },
   {
     icon: '📈',
     title: 'Price History',
     desc: 'Every card in the store shows a 90-day price chart with 7-day change, all-time high, and all-time low. Your collection value is always up to date.',
+    to: 'cards',
   },
   {
     icon: '🃏',
     title: 'Deck Builder',
     desc: 'Import Arena decklists, browse cards by type, and track the market value of every deck you own.',
+    to: 'decks',
   },
   {
     icon: '⚔️',
     title: 'Match Log',
     desc: 'Log your games and track win rates by deck, format, and opponent. Know what\'s working.',
+    to: 'log',
   },
   {
     icon: '🎯',
     title: 'Wishlist & Previews',
     desc: 'Save cards you\'re hunting. Click any thumbnail for a full-size card preview with live market price. Great for quick buy decisions.',
+    to: 'wishlist',
   },
   {
     icon: '🔍',
     title: 'Card Lookup',
     desc: 'Search any card for rulings, format legality, set printings, and live prices. One click sends it straight to the shop to buy from us.',
+    to: 'cards',
   },
   {
     icon: '📸',
     title: 'Camera Scanning',
     desc: 'Point your phone at a card and it\'s added to your collection instantly. No typing required.',
+    to: 'collection',
   },
   {
     icon: '💰',
     title: 'Multiple Price Sources',
     desc: 'Compare prices across TCGPlayer, CardMarket, Card Kingdom, and Cardhoarder side by side.',
+    to: 'cards',
   },
   {
     icon: '👥',
     title: 'Friends & Trades',
     desc: 'Add friends, browse each other\'s collections, and coordinate trades directly in the app.',
+    to: 'friends',
   },
   {
     icon: '📅',
     title: 'Set Releases',
     desc: 'Stay ahead of the curve with upcoming set release dates and spoiler tracking.',
+    to: 'releases',
   },
   {
     icon: '📰',
     title: 'MTG News Feed',
     desc: 'The latest Magic news, announcements, and tournament results pulled in one place.',
+    to: 'news',
   },
   {
     icon: '📊',
     title: 'Stats & Analytics',
     desc: 'Deep win-rate charts, color matchup breakdowns, and performance trends over any time range.',
+    to: 'stats',
   },
   {
     icon: '☁️',
@@ -86,18 +101,22 @@ const FEATURES = [
   },
 ]
 
-function FeatureCard({ icon, title, desc }) {
+function FeatureCard({ icon, title, desc, to, onNavigate }) {
+  const clickable = Boolean(to && onNavigate)
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border)',
-      borderRadius: 14,
-      padding: '20px 18px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10,
-      transition: 'border-color .15s, box-shadow .15s',
-    }}
+    <div
+      onClick={clickable ? () => onNavigate(to) : undefined}
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderRadius: 14,
+        padding: '20px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        transition: 'border-color .15s, box-shadow .15s',
+        cursor: clickable ? 'pointer' : undefined,
+      }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = 'rgba(201,168,76,.45)'
         e.currentTarget.style.boxShadow = '0 4px 20px rgba(201,168,76,.08)'
@@ -107,14 +126,20 @@ function FeatureCard({ icon, title, desc }) {
         e.currentTarget.style.boxShadow = 'none'
       }}
     >
-      {/* Icon box */}
       <div style={{
-        width: 44, height: 44, borderRadius: 10,
-        background: 'linear-gradient(135deg,#c9a84c,#f0c060)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.25rem', flexShrink: 0,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
       }}>
-        {icon}
+        <div style={{
+          width: 44, height: 44, borderRadius: 10,
+          background: 'linear-gradient(135deg,#c9a84c,#f0c060)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.25rem', flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+        {clickable && (
+          <span style={{ color: 'rgba(201,168,76,.5)', fontSize: '.75rem', marginTop: 2 }}>→</span>
+        )}
       </div>
 
       <div>
@@ -129,7 +154,7 @@ function FeatureCard({ icon, title, desc }) {
   )
 }
 
-export default function About() {
+export default function About({ setPage }) {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', paddingBottom: 80 }}>
 
@@ -196,7 +221,7 @@ export default function About() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           gap: 12,
         }}>
-          {FEATURES.map(f => <FeatureCard key={f.title} {...f} />)}
+          {FEATURES.map(f => <FeatureCard key={f.title} {...f} onNavigate={setPage} />)}
         </div>
       </div>
 

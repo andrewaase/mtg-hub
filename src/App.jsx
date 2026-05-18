@@ -394,7 +394,7 @@ export default function App() {
               {mountedPages.has('wishlist')   && <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>}
               {mountedPages.has('store')      && <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} /></div>}
               {mountedPages.has('membership') && <div style={{ display: page === 'membership' ? undefined : 'none' }}><Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} /></div>}
-              {mountedPages.has('about')      && <div style={{ display: page === 'about'      ? undefined : 'none' }}><About /></div>}
+              {mountedPages.has('about')      && <div style={{ display: page === 'about'      ? undefined : 'none' }}><About setPage={setPage} /></div>}
               {mountedPages.has('admin')      && <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>}
             </>
           )}

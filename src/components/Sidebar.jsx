@@ -75,12 +75,18 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
 
       <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
         {user ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            onClick={onAuthClick}
+            title="Account settings"
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: 10, padding: '6px 8px', margin: '-6px -8px', transition: 'background .15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.05)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
             <div className="user-avatar" style={{ backgroundColor: '#c9a84c' }}>
               {user.email?.[0]?.toUpperCase()}
             </div>
-            <div style={{ fontSize: '.8rem' }}>
-              <div style={{ fontWeight: 600 }}>{user.email?.split('@')[0]}</div>
+            <div style={{ fontSize: '.8rem', minWidth: 0 }}>
+              <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email?.split('@')[0]}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: '.7rem' }}>Signed in</div>
             </div>
           </div>
