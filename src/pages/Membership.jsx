@@ -291,14 +291,24 @@ export default function Membership({ user, showToast, membership, onMembershipCh
           Free vs Pro
         </div>
         {[
-          { feature: 'Card scans',      free: '100 / day',  pro: 'Unlimited' },
-          { feature: 'Decks',           free: '10 total',   pro: 'Unlimited' },
-          { feature: 'Sell Binder',     free: '✗',          pro: '✓' },
-          { feature: 'Hand simulator',  free: '✗',          pro: '✓' },
-          { feature: 'Collection sync', free: '✓',          pro: '✓' },
-          { feature: 'Match tracking',  free: '✓',          pro: '✓' },
-          { feature: 'Wishlist alerts', free: '✓',          pro: '✓' },
-          { feature: 'Store access',    free: '✓',          pro: '✓' },
+          { feature: 'Card scans',                        free: '100 / day',  pro: 'Unlimited' },
+          { feature: 'Decks',                             free: '10 total',   pro: 'Unlimited' },
+          { feature: 'Sell Binder (Buylist Assistant)',   free: '✗',          pro: '✓' },
+          { feature: 'Hand simulator',                    free: '✗',          pro: '✓' },
+          { feature: 'Collection tracker',                free: '✓',          pro: '✓' },
+          { feature: 'Card Lookup',                       free: 'Unlimited',  pro: 'Unlimited' },
+          { feature: 'Price history',                     free: '✓',          pro: '✓' },
+          { feature: 'Camera scanning',                   free: '100 / day',  pro: 'Unlimited' },
+          { feature: 'Multiple price sources',            free: '✓',          pro: '✓' },
+          { feature: 'Wishlist & alerts',                 free: '✓',          pro: '✓' },
+          { feature: 'Match log',                         free: '✓',          pro: '✓' },
+          { feature: 'Stats & analytics',                 free: '✓',          pro: '✓' },
+          { feature: 'Friends & trades',                  free: '✓',          pro: '✓' },
+          { feature: 'Set releases',                      free: '✓',          pro: '✓' },
+          { feature: 'MTG news feed',                     free: '✓',          pro: '✓' },
+          { feature: 'Cross-device sync',                 free: '✓',          pro: '✓' },
+          { feature: 'Free months on orders $20+',        free: '✗',          pro: '✓' },
+          { feature: 'All future Pro features',           free: '✗',          pro: '✓' },
         ].map((row, i) => (
           <div
             key={row.feature}

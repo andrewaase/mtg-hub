@@ -43,7 +43,7 @@ const PAGE_TITLES = {
   decks:      'My Decks | Vaulted Singles',
   wishlist:   'Wishlist | Vaulted Singles',
   store:      'Buy MTG Singles | Vaulted Singles Card Shop',
-  membership: 'Pro Membership | Vaulted Singles',
+  membership: 'VS Pro | Vaulted Singles',
   about:      'About | Vaulted Singles',
   admin:      'Control Center | Vaulted Singles',
 }

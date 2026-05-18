@@ -6,7 +6,7 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
   const navItems = [
     { id: 'dashboard',  icon: '🏠', label: 'Dashboard',        section: 'Main'      },
     { id: 'store',      icon: '🏪', label: 'Store',             section: 'Main'      },
-    { id: 'membership', icon: '⚡', label: 'Membership',        section: 'Main'      },
+    { id: 'membership', icon: '⚡', label: 'VS Pro',             section: 'Main'      },
     { id: 'about',      icon: '💬', label: 'About Us',          section: 'Main'      },
     { id: 'cards',      icon: '🔍', label: 'Card Lookup',       section: 'Resources' },
     { id: 'releases',   icon: '📅', label: 'Set Releases',      section: 'Resources' },
