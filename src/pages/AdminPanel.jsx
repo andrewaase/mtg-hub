@@ -959,7 +959,7 @@ function ListingsTab() {
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('store_listings').select('*').order('created_at', { ascending: true })
+    const { data } = await supabase.from('store_listings').select('*').order('created_at', { ascending: false })
     setListings(data || [])
     setLoading(false)
   }, [])

@@ -85,21 +85,26 @@ export async function addCard(card, userId) {
       return collectionRowToCard(data)
     }
     // Explicit column mapping — avoids camelCase/snake_case mismatches
-    const { data, error: insertErr } = await supabase
-      .from('collection').insert({
-        user_id:       userId,
-        name:          card.name,
-        qty:           card.qty,
-        condition:     card.condition   ?? 'NM',
-        set_name:      card.setName     ?? null,
-        img:           card.img         ?? null,
-        colors:        card.colors      ?? [],
-        price:         card.price       ?? null,
-        tcgplayer_url: card.tcgplayerUrl ?? null,
-        // scryfall_id / is_foil only included when non-null — columns must exist in table first
-        ...(card.scryfallId     ? { scryfall_id: card.scryfallId }  : {}),
-        ...(card.isFoil != null ? { is_foil: !!card.isFoil }        : {}),
-      }).select().single()
+    const baseRow = {
+      user_id:       userId,
+      name:          card.name,
+      qty:           card.qty,
+      condition:     card.condition   ?? 'NM',
+      set_name:      card.setName     ?? null,
+      img:           card.img         ?? null,
+      colors:        card.colors      ?? [],
+      price:         card.price       ?? null,
+      tcgplayer_url: card.tcgplayerUrl ?? null,
+      ...(card.scryfallId ? { scryfall_id: card.scryfallId } : {}),
+      ...(card.isFoil === true ? { is_foil: true } : {}),
+    }
+    let { data, error: insertErr } = await supabase.from('collection').insert(baseRow).select().single()
+    if (insertErr?.message?.includes('is_foil')) {
+      // is_foil column not yet in DB schema — retry without it
+      const { is_foil: _f, ...rowWithoutFoil } = baseRow
+      const { data: d2, error: e2 } = await supabase.from('collection').insert(rowWithoutFoil).select().single()
+      data = d2; insertErr = e2
+    }
     if (insertErr) {
       console.error('[db] collection insert error:', insertErr)
       throw new Error(insertErr.message)
@@ -159,15 +164,22 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
           colors:        card.colors        ?? [],
           price:         card.price         ?? null,
           tcgplayer_url: card.tcgplayerUrl  ?? null,
-          ...(card.scryfallId     ? { scryfall_id: card.scryfallId } : {}),
-          ...(card.isFoil != null ? { is_foil: !!card.isFoil }       : {}),
+          ...(card.scryfallId   ? { scryfall_id: card.scryfallId } : {}),
+          ...(card.isFoil === true ? { is_foil: true }             : {}),
         })
       }
     }
 
     // Batch insert all new cards in one request
     if (toInsert.length > 0) {
-      const { error } = await supabase.from('collection').insert(toInsert)
+      let { error } = await supabase.from('collection').insert(toInsert)
+      if (error?.message?.includes('is_foil')) {
+        // is_foil column not in DB — strip it and retry
+        const { error: e2 } = await supabase.from('collection').insert(
+          toInsert.map(({ is_foil: _f, ...r }) => r)
+        )
+        error = e2
+      }
       if (error) throw new Error(error.message)
     }
     onProgress?.(toInsert.length, cards.length)

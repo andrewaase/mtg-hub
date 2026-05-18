@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { addCard } from '../lib/db'
+import { addCard, upsertStoreListing } from '../lib/db'
 import { searchScryfall, getAllPrintings } from '../lib/utils'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ function cardImg(card) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function AddCardModal({ onClose, prefill, user, collection, setCollection, showToast }) {
+export default function AddCardModal({ onClose, prefill, user, isAdmin, collection, setCollection, showToast }) {
   // Step 1 — name search
   const [cardName,      setCardName]      = useState(prefill?.name || '')
   const [suggestions,   setSuggestions]   = useState([])
@@ -125,17 +125,13 @@ export default function AddCardModal({ onClose, prefill, user, collection, setCo
 
   const canSubmit = !!selectedCard
 
-  // ── Submit ──
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!canSubmit) return
-
+  // ── Build card object from current form state ──
+  function buildCard() {
     const finishes = selectedCard.finishes || ['nonfoil']
     const price    = isFoil
-      ? parseFloat(selectedCard.prices?.usd_foil)  || null
-      : parseFloat(selectedCard.prices?.usd)       || null
-
-    const card = {
+      ? parseFloat(selectedCard.prices?.usd_foil) || null
+      : parseFloat(selectedCard.prices?.usd)      || null
+    return {
       name:         selectedCard.name,
       qty:          parseInt(qty, 10) || 1,
       condition,
@@ -147,7 +143,13 @@ export default function AddCardModal({ onClose, prefill, user, collection, setCo
       tcgplayerUrl: selectedCard.purchase_uris?.tcgplayer || null,
       scryfallId:   selectedCard.id || null,
     }
+  }
 
+  // ── Submit ──
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!canSubmit) return
+    const card = buildCard()
     try {
       const saved = await addCard(card, user?.id)
       setCollection(prev => {
@@ -158,6 +160,36 @@ export default function AddCardModal({ onClose, prefill, user, collection, setCo
         return [...prev, { ...card, id: saved?.id ?? Date.now() }]
       })
       showToast('Card added!')
+      onClose()
+    } catch (err) {
+      showToast(`Save failed: ${err.message}`)
+    }
+  }
+
+  // ── Admin: Add to collection + list in store ──
+  async function handleSubmitAndList(e) {
+    e.preventDefault()
+    if (!canSubmit) return
+    const card = buildCard()
+    try {
+      const saved = await addCard(card, user?.id)
+      setCollection(prev => {
+        const i = prev.findIndex(c => c.scryfallId === card.scryfallId)
+        if (i >= 0) {
+          const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + card.qty }; return next
+        }
+        return [...prev, { ...card, id: saved?.id ?? Date.now() }]
+      })
+      const { merged } = await upsertStoreListing({
+        name:        selectedCard.name,
+        set_name:    selectedCard.set_name || null,
+        condition,
+        is_foil:     card.isFoil,
+        price:       card.price ?? 0,
+        img_url:     selectedCard.image_uris?.normal || selectedCard.card_faces?.[0]?.image_uris?.normal || null,
+        scryfall_id: selectedCard.id || null,
+      })
+      showToast(merged ? `✓ Added & stocked +1 ${selectedCard.name}` : `✓ Added & listed ${selectedCard.name}`)
       onClose()
     } catch (err) {
       showToast(`Save failed: ${err.message}`)
@@ -371,6 +403,17 @@ export default function AddCardModal({ onClose, prefill, user, collection, setCo
           {/* ── Actions ── */}
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            {isAdmin && (
+              <button
+                type="button"
+                className="btn"
+                style={{ background: 'rgba(201,168,76,.15)', color: 'var(--accent-gold)', border: '1px solid rgba(201,168,76,.3)' }}
+                disabled={!canSubmit}
+                onClick={handleSubmitAndList}
+              >
+                🏪 Add &amp; List
+              </button>
+            )}
             <button type="submit" className="btn btn-primary" disabled={!canSubmit}>
               Add Card
             </button>
