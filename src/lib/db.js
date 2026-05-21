@@ -321,24 +321,30 @@ export async function acceptFriendRequest(requestId) {
   await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId)
 }
 
-// Accept by looking up the row from both user IDs — works even when requestId wasn't stored
-export async function acceptFriendRequestByUsers(requesterId, recipientId) {
-  if (!hasSupabase) return false
-  const { data } = await supabase
-    .from('friendships').select('id')
-    .eq('user_id', requesterId).eq('friend_id', recipientId).eq('status', 'pending')
-    .maybeSingle()
-  if (!data?.id) return false
-  const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', data.id)
-  return !error
+// Accept via Netlify function (service key) so RLS doesn't block the recipient
+export async function acceptFriendRequestByUsers(requesterId, accessToken) {
+  try {
+    const res = await fetch('/.netlify/functions/accept-friend-request', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body:    JSON.stringify({ requesterId }),
+    })
+    const json = await res.json()
+    return !!json.ok
+  } catch {
+    return false
+  }
 }
 
-// Delete (deny) a pending request by user IDs
-export async function denyFriendRequestByUsers(requesterId, recipientId) {
-  if (!hasSupabase) return
-  await supabase.from('friendships')
-    .delete()
-    .eq('user_id', requesterId).eq('friend_id', recipientId).eq('status', 'pending')
+// Deny via Netlify function (service key) so RLS doesn't block the recipient
+export async function denyFriendRequestByUsers(requesterId, accessToken) {
+  try {
+    await fetch('/.netlify/functions/accept-friend-request', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body:    JSON.stringify({ requesterId, action: 'deny' }),
+    })
+  } catch { /* non-critical */ }
 }
 
 // ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
