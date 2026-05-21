@@ -85,12 +85,12 @@ export default function Friends({ user, showToast }) {
       showToast(`You're already friends with ${foundUser.displayName}`)
     } else {
       showToast('Friend request sent!')
-      // Notify the recipient
+      // Notify the recipient — include requestId so they can accept from the bell
       createNotification(
         foundUser.id, 'friend_request',
         `${senderName} sent you a friend request`,
-        `Tap to view and accept in Friends & Trades.`,
-        { fromUserId: user.id },
+        `Tap Accept to connect.`,
+        { fromUserId: user.id, requestId: result.requestId, fromName: senderName },
         token,
       )
     }
