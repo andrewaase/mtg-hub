@@ -33,15 +33,31 @@ export default function Friends({ user, showToast, isActive }) {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
+    console.log('[loadFriendsData] userId:', user.id, 'hasToken:', !!token)
     const [f, p, w] = await Promise.all([
       getFriends(user.id, token),
       getPendingRequests(user.id, token),
       getWantList(user.id),
     ])
+    console.log('[loadFriendsData] result — friends:', f, 'pending:', p)
     setFriends(f)
     setPendingRequests(p)
     setWantList(w)
     setLoading(false)
+
+    // Debug: also call the raw debug endpoint so we can see the DB state
+    if (token) {
+      try {
+        const dbg = await fetch('/.netlify/functions/debug-friends', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        const dbgText = await dbg.text()
+        console.log('[debug-friends] status:', dbg.status, 'body:', dbgText)
+      } catch (e) {
+        console.error('[debug-friends] error:', e)
+      }
+    }
   }
 
   const handleFindUser = async () => {
