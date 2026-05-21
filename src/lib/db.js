@@ -270,11 +270,14 @@ export async function removeCard(id, userId) {
 // ── FRIENDS (Supabase only) ───────────────────────────
 export async function getFriends(userId) {
   if (!hasSupabase || !userId) return []
-  const { data } = await supabase.from('friendships').select(`
-    *,
-    friend:profiles!friendships_friend_id_fkey(id, username, avatar_color)
-  `).eq('user_id', userId).eq('status', 'accepted')
-  return data || []
+  // Query both directions — user may be the sender or the recipient
+  const [sent, received] = await Promise.all([
+    supabase.from('friendships').select('*, friend:profiles!friendships_friend_id_fkey(id, username, avatar_color)')
+      .eq('user_id', userId).eq('status', 'accepted'),
+    supabase.from('friendships').select('*, friend:profiles!friendships_user_id_fkey(id, username, avatar_color)')
+      .eq('friend_id', userId).eq('status', 'accepted'),
+  ])
+  return [...(sent.data || []), ...(received.data || [])]
 }
 
 export async function getPendingRequests(userId) {
