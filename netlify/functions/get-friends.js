@@ -40,9 +40,9 @@ exports.handler = async (event) => {
   // Fetch all friendships involving this user, plus all auth users (for emails)
   // We use the admin users endpoint so we can show emails when profile rows are missing.
   const [sentRes, receivedRes, pendingRes, usersRes, profilesRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/friendships?user_id=eq.${userId}&status=eq.accepted&select=id,status,friend_id`, { headers: adminHeaders }),
-    fetch(`${SUPABASE_URL}/rest/v1/friendships?friend_id=eq.${userId}&status=eq.accepted&select=id,status,user_id`, { headers: adminHeaders }),
-    fetch(`${SUPABASE_URL}/rest/v1/friendships?friend_id=eq.${userId}&status=eq.pending&select=id,status,user_id`, { headers: adminHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/friends?user_id=eq.${userId}&status=eq.accepted&select=id,status,friend_id`, { headers: adminHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/friends?friend_id=eq.${userId}&status=eq.accepted&select=id,status,user_id`, { headers: adminHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/friends?friend_id=eq.${userId}&status=eq.pending&select=id,status,user_id`, { headers: adminHeaders }),
     fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: adminHeaders }),
     fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,username,avatar_color`, { headers: adminHeaders }),
   ])

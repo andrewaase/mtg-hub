@@ -35,8 +35,8 @@ exports.handler = async (event) => {
 
   // Get every friendship row involving this user (both directions, all statuses)
   const [sentRes, recRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/friendships?user_id=eq.${caller.id}&select=*`, { headers: adminHeaders }),
-    fetch(`${SUPABASE_URL}/rest/v1/friendships?friend_id=eq.${caller.id}&select=*`, { headers: adminHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/friends?user_id=eq.${caller.id}&select=*`, { headers: adminHeaders }),
+    fetch(`${SUPABASE_URL}/rest/v1/friends?friend_id=eq.${caller.id}&select=*`, { headers: adminHeaders }),
   ])
   const sent = sentRes.ok ? await sentRes.json() : { error: await sentRes.text(), status: sentRes.status }
   const received = recRes.ok ? await recRes.json() : { error: await recRes.text(), status: recRes.status }

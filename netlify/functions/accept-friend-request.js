@@ -50,7 +50,7 @@ exports.handler = async (event) => {
 
   // Find the pending friendship row (requester → recipient)
   const findRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/friendships?user_id=eq.${requesterId}&friend_id=eq.${recipientId}&status=eq.pending&select=id&limit=1`,
+    `${SUPABASE_URL}/rest/v1/friends?user_id=eq.${requesterId}&friend_id=eq.${recipientId}&status=eq.pending&select=id&limit=1`,
     { headers: adminHeaders }
   )
   if (!findRes.ok) return fail('Failed to look up friendship', 500)
@@ -64,7 +64,7 @@ exports.handler = async (event) => {
 
   if (action === 'accept') {
     const updateRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/friendships?id=eq.${rowId}`,
+      `${SUPABASE_URL}/rest/v1/friends?id=eq.${rowId}`,
       {
         method:  'PATCH',
         headers: { ...adminHeaders, Prefer: 'return=minimal' },
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
   } else {
     // deny — delete the row
     const deleteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/friendships?id=eq.${rowId}`,
+      `${SUPABASE_URL}/rest/v1/friends?id=eq.${rowId}`,
       { method: 'DELETE', headers: adminHeaders }
     )
     if (!deleteRes.ok) {
