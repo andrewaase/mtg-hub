@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react'
-import { hasSupabase } from '../lib/supabase'
-import { getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest, searchUsers, getFriendCollection, getWantList, addWant, removeWant } from '../lib/db'
+import { hasSupabase, supabase } from '../lib/supabase'
+import { getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest, findUserByEmail, getFriendCollection, getWantList, addWant, removeWant } from '../lib/db'
+
+function displayName(friend) {
+  return friend?.username || friend?.email?.split('@')[0] || friend?.displayName || '(unknown)'
+}
+
+function initials(friend) {
+  return (displayName(friend)[0] || '?').toUpperCase()
+}
 
 export default function Friends({ user, showToast }) {
   const [tab, setTab] = useState('friends')
@@ -9,15 +17,16 @@ export default function Friends({ user, showToast }) {
   const [selectedFriend, setSelectedFriend] = useState(null)
   const [friendCollection, setFriendCollection] = useState([])
   const [wantList, setWantList] = useState([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState([])
+  const [emailInput, setEmailInput] = useState('')
+  const [foundUser, setFoundUser] = useState(null)   // { id, displayName, email }
+  const [findStatus, setFindStatus] = useState('')    // '' | 'searching' | 'found' | 'not-found' | 'self' | 'already'
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (user && hasSupabase) {
       loadFriendsData()
     }
-  }, [user, tab])
+  }, [user, tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadFriendsData = async () => {
     if (!user) return
@@ -33,18 +42,33 @@ export default function Friends({ user, showToast }) {
     setLoading(false)
   }
 
-  const handleSearch = async (query) => {
-    setSearchQuery(query)
-    if (query.length < 2) { setSearchResults([]); return }
-    const results = await searchUsers(query)
-    setSearchResults(results.filter(r => r.id !== user?.id))
+  const handleFindUser = async () => {
+    const email = emailInput.trim().toLowerCase()
+    if (!email || !email.includes('@')) { showToast('Enter a valid email address'); return }
+    setFindStatus('searching')
+    setFoundUser(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const result = await findUserByEmail(email, session.access_token)
+      if (result.self) { setFindStatus('self'); return }
+      if (!result.found) { setFindStatus('not-found'); return }
+      // Check if already a friend or request already sent
+      const alreadyFriend = friends.some(f => f.friend?.id === result.user.id)
+      if (alreadyFriend) { setFindStatus('already'); setFoundUser(result.user); return }
+      setFoundUser(result.user)
+      setFindStatus('found')
+    } catch {
+      setFindStatus('not-found')
+    }
   }
 
-  const handleSendRequest = async (friendId) => {
-    await sendFriendRequest(user.id, friendId)
+  const handleSendRequest = async () => {
+    if (!foundUser) return
+    await sendFriendRequest(user.id, foundUser.id)
     showToast('Friend request sent!')
-    setSearchQuery('')
-    setSearchResults([])
+    setEmailInput('')
+    setFoundUser(null)
+    setFindStatus('')
   }
 
   const handleAcceptRequest = async (requestId) => {
@@ -117,37 +141,76 @@ export default function Friends({ user, showToast }) {
 
       {tab === 'friends' && (
         <div>
+          {/* ── Add friend by email ── */}
           <div className="card" style={{ marginBottom: '20px' }}>
             <div className="section-title">Add Friend</div>
-            <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <input
-                type="text"
+                type="email"
                 className="form-input"
-                placeholder="Search by username..."
-                value={searchQuery}
-                onChange={e => handleSearch(e.target.value)}
+                placeholder="Enter their email address…"
+                value={emailInput}
+                onChange={e => { setEmailInput(e.target.value); setFindStatus(''); setFoundUser(null) }}
+                onKeyDown={e => e.key === 'Enter' && handleFindUser()}
+                style={{ flex: 1 }}
               />
-              {searchResults.length > 0 && (
-                <div className="ac-dropdown">
-                  {searchResults.map(user => (
-                    <div key={user.id} className="ac-item">
-                      <span>{user.username}</span>
-                      <button className="btn btn-primary btn-sm" onClick={() => handleSendRequest(user.id)} style={{ marginLeft: 'auto', fontSize: '.7rem', padding: '4px 8px' }}>
-                        + Add
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleFindUser}
+                disabled={findStatus === 'searching'}
+                style={{ flexShrink: 0 }}
+              >
+                {findStatus === 'searching' ? '…' : 'Find'}
+              </button>
             </div>
+
+            {/* Result feedback */}
+            {findStatus === 'not-found' && (
+              <div style={{ marginTop: '10px', fontSize: '.82rem', color: '#f87171' }}>
+                No account found with that email address.
+              </div>
+            )}
+            {findStatus === 'self' && (
+              <div style={{ marginTop: '10px', fontSize: '.82rem', color: 'var(--text-muted)' }}>
+                That's you!
+              </div>
+            )}
+            {findStatus === 'already' && foundUser && (
+              <div style={{ marginTop: '10px', fontSize: '.82rem', color: 'var(--text-muted)' }}>
+                You're already friends with {foundUser.displayName}.
+              </div>
+            )}
+            {findStatus === 'found' && foundUser && (
+              <div style={{
+                marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(74,222,128,.06)', border: '1px solid rgba(74,222,128,.2)',
+              }}>
+                <div className="user-avatar" style={{ backgroundColor: '#c9a84c', width: 36, height: 36, fontSize: '.9rem' }}>
+                  {initials(foundUser)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{foundUser.displayName}</div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{foundUser.email}</div>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={handleSendRequest}>
+                  + Add Friend
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* ── Friends list ── */}
           <div>
             <div className="section-title">My Friends</div>
-            {friends.length === 0 ? (
+            {loading ? (
+              <div className="card">
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+              </div>
+            ) : friends.length === 0 ? (
               <div className="card">
                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No friends yet. Search and add some!
+                  No friends yet. Add someone by their email above!
                 </div>
               </div>
             ) : (
@@ -155,10 +218,10 @@ export default function Friends({ user, showToast }) {
                 {friends.map(f => (
                   <div key={f.id} className="friend-card">
                     <div className="user-avatar" style={{ backgroundColor: f.friend?.avatar_color || '#c9a84c' }}>
-                      {f.friend?.username[0]?.toUpperCase()}
+                      {initials(f.friend)}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{f.friend?.username}</div>
+                      <div style={{ fontWeight: 600 }}>{displayName(f.friend)}</div>
                     </div>
                   </div>
                 ))}
@@ -166,6 +229,7 @@ export default function Friends({ user, showToast }) {
             )}
           </div>
 
+          {/* ── Pending requests ── */}
           {pendingRequests.length > 0 && (
             <div style={{ marginTop: '24px' }}>
               <div className="section-title">Pending Requests</div>
@@ -173,10 +237,10 @@ export default function Friends({ user, showToast }) {
                 {pendingRequests.map(req => (
                   <div key={req.id} className="friend-card">
                     <div className="user-avatar" style={{ backgroundColor: req.requester?.avatar_color || '#c9a84c' }}>
-                      {req.requester?.username[0]?.toUpperCase()}
+                      {initials(req.requester)}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{req.requester?.username}</div>
+                      <div style={{ fontWeight: 600 }}>{displayName(req.requester)}</div>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={() => handleAcceptRequest(req.id)}>
                       Accept
@@ -200,7 +264,7 @@ export default function Friends({ user, showToast }) {
             >
               <option value="">Choose a friend...</option>
               {friends.map(f => (
-                <option key={f.id} value={f.friend.id}>{f.friend.username}</option>
+                <option key={f.id} value={f.friend.id}>{displayName(f.friend)}</option>
               ))}
             </select>
           </div>

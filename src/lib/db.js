@@ -302,6 +302,15 @@ export async function searchUsers(query) {
   return data || []
 }
 
+export async function findUserByEmail(email, accessToken) {
+  const res = await fetch('/.netlify/functions/find-user-by-email', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body:    JSON.stringify({ email }),
+  })
+  return res.json()
+}
+
 export async function getFriendCollection(friendId) {
   if (!hasSupabase) return []
   const { data } = await supabase.from('collection').select('*').eq('user_id', friendId)
