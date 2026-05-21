@@ -67,13 +67,6 @@ export default function NotificationBell({ user, setPage }) {
         setNotifications(prev => prev.filter(x => x.id !== n.id))
         return
       }
-      // Replace in list with a success state
-      await markNotificationRead(n.id)
-      setNotifications(prev => prev.map(x =>
-        x.id === n.id
-          ? { ...x, read: true, type: 'friend_accepted', title: `You and ${fromName} are now friends!`, body: null }
-          : x
-      ))
       // Notify the requester
       const myName = user.email?.split('@')[0] || 'Someone'
       const { data: { session } } = await supabase.auth.getSession()
@@ -86,6 +79,11 @@ export default function NotificationBell({ user, setPage }) {
           session.access_token,
         )
       }
+      // Remove notification and navigate to friends so the list refreshes
+      await deleteNotification(n.id)
+      setNotifications(prev => prev.filter(x => x.id !== n.id))
+      setOpen(false)
+      setPage('friends')
     } finally {
       setActing(null)
     }

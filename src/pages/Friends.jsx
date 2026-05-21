@@ -10,7 +10,7 @@ function initials(friend) {
   return (displayName(friend)[0] || '?').toUpperCase()
 }
 
-export default function Friends({ user, showToast }) {
+export default function Friends({ user, showToast, isActive }) {
   const [tab, setTab] = useState('friends')
   const [friends, setFriends] = useState([])
   const [pendingRequests, setPendingRequests] = useState([])
@@ -26,7 +26,7 @@ export default function Friends({ user, showToast }) {
     if (user && hasSupabase) {
       loadFriendsData()
     }
-  }, [user, tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, tab, isActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadFriendsData = async () => {
     if (!user) return

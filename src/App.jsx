@@ -409,7 +409,7 @@ export default function App() {
               {mountedPages.has('cards')      && <div style={{ display: page === 'cards'      ? undefined : 'none' }}><CardLookup {...pageProps} initialSearch={cardSearch} onSearchUsed={() => setCardSearch('')} /></div>}
               {mountedPages.has('collection') && <div style={{ display: page === 'collection' ? undefined : 'none' }}><Collection {...pageProps} /></div>}
               {mountedPages.has('releases')   && <div style={{ display: page === 'releases'   ? undefined : 'none' }}><SetReleases /></div>}
-              {mountedPages.has('friends')    && <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} /></div>}
+              {mountedPages.has('friends')    && <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} isActive={page === 'friends'} /></div>}
               {mountedPages.has('decks')      && <div style={{ display: page === 'decks'      ? undefined : 'none' }}><Decks {...pageProps} /></div>}
               {mountedPages.has('wishlist')   && <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>}
               {mountedPages.has('store')      && <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} /></div>}
