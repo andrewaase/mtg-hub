@@ -14,7 +14,7 @@ function lsSet(data) {
 // ── MATCHES ──────────────────────────────────────────
 export async function getMatches(userId) {
   if (hasSupabase && userId) {
-    const { data } = await supabase.from('matches').select('*').eq('user_id', userId).order('date', { ascending: false })
+    const { data } = await supabase.from('matches').select('*').eq('user_id', userId).order('created_at', { ascending: false })
     return data || []
   }
   return lsGet().matches || []
@@ -429,13 +429,15 @@ export async function getFriendCollection(friendId) {
 
 export async function getWantList(userId) {
   if (!hasSupabase || !userId) return []
-  const { data } = await supabase.from('trade_wants').select('*').eq('user_id', userId)
+  const { data, error } = await supabase.from('trade_wants').select('*').eq('user_id', userId)
+  if (error) return []
   return data || []
 }
 
 export async function addWant(cardName, userId) {
   if (!hasSupabase || !userId) return
-  await supabase.from('trade_wants').upsert({ user_id: userId, card_name: cardName })
+  const { error } = await supabase.from('trade_wants').upsert({ user_id: userId, card_name: cardName })
+  if (error) console.warn('[db] trade_wants table missing — trade matching not yet set up')
 }
 
 export async function removeWant(cardName, userId) {
