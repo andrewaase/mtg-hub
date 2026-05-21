@@ -312,16 +312,16 @@ export async function sendFriendRequest(userId, friendId) {
   if (!hasSupabase) return { mutual: false }
   // Check if the other person already sent us a request (mutual → auto-accept)
   const { data: existing } = await supabase
-    .from('friendships').select('id, status')
+    .from('friends').select('id, status')
     .eq('user_id', friendId).eq('friend_id', userId).maybeSingle()
   if (existing?.status === 'accepted') return { mutual: false, alreadyFriends: true }
   if (existing) {
     // Mutual request — accept theirs and we're done (no second row needed)
-    await supabase.from('friendships').update({ status: 'accepted' }).eq('id', existing.id)
+    await supabase.from('friends').update({ status: 'accepted' }).eq('id', existing.id)
     return { mutual: true, requestId: existing.id }
   }
   const { data } = await supabase
-    .from('friendships')
+    .from('friends')
     .insert({ user_id: userId, friend_id: friendId, status: 'pending' })
     .select().single()
   return { mutual: false, requestId: data?.id }
@@ -329,7 +329,7 @@ export async function sendFriendRequest(userId, friendId) {
 
 export async function acceptFriendRequest(requestId) {
   if (!hasSupabase) return
-  await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId)
+  await supabase.from('friends').update({ status: 'accepted' }).eq('id', requestId)
 }
 
 // Accept via Netlify function (service key) so RLS doesn't block the recipient
