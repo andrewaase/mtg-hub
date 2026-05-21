@@ -270,14 +270,22 @@ export async function removeCard(id, userId) {
 // ── FRIENDS (Supabase only) ───────────────────────────
 export async function getFriends(userId) {
   if (!hasSupabase || !userId) return []
-  // Query both directions — user may be the sender or the recipient
+  // Query both directions separately to avoid relying on FK alias names
   const [sent, received] = await Promise.all([
-    supabase.from('friendships').select('*, friend:profiles!friendships_friend_id_fkey(id, username, avatar_color)')
-      .eq('user_id', userId).eq('status', 'accepted'),
-    supabase.from('friendships').select('*, friend:profiles!friendships_user_id_fkey(id, username, avatar_color)')
-      .eq('friend_id', userId).eq('status', 'accepted'),
+    supabase.from('friendships').select('id, status, friend_id').eq('user_id', userId).eq('status', 'accepted'),
+    supabase.from('friendships').select('id, status, user_id').eq('friend_id', userId).eq('status', 'accepted'),
   ])
-  return [...(sent.data || []), ...(received.data || [])]
+  const friendIds = [
+    ...(sent.data || []).map(r => r.friend_id),
+    ...(received.data || []).map(r => r.user_id),
+  ]
+  if (friendIds.length === 0) return []
+  const { data: profiles } = await supabase.from('profiles').select('id, username, avatar_color').in('id', friendIds)
+  const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+  return [
+    ...(sent.data || []).map(r => ({ id: r.id, status: r.status, friend: profileMap[r.friend_id] || { id: r.friend_id } })),
+    ...(received.data || []).map(r => ({ id: r.id, status: r.status, friend: profileMap[r.user_id] || { id: r.user_id } })),
+  ]
 }
 
 export async function getPendingRequests(userId) {
