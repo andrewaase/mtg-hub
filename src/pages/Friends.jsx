@@ -31,9 +31,11 @@ export default function Friends({ user, showToast, isActive }) {
   const loadFriendsData = async () => {
     if (!user) return
     setLoading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
     const [f, p, w] = await Promise.all([
-      getFriends(user.id),
-      getPendingRequests(user.id),
+      getFriends(user.id, token),
+      getPendingRequests(user.id, token),
       getWantList(user.id),
     ])
     setFriends(f)
