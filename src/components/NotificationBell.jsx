@@ -60,7 +60,11 @@ export default function NotificationBell({ user, setPage }) {
     if (!fromUserId) return
     setActing(n.id)
     try {
-      const ok = await acceptFriendRequestByUsers(fromUserId, user.id)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
+
+      const ok = await acceptFriendRequestByUsers(fromUserId, token)
       if (!ok) {
         // Request may no longer exist — just dismiss the notification
         await deleteNotification(n.id)
@@ -69,16 +73,13 @@ export default function NotificationBell({ user, setPage }) {
       }
       // Notify the requester
       const myName = user.email?.split('@')[0] || 'Someone'
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.access_token) {
-        createNotification(
-          fromUserId, 'friend_accepted',
-          `${myName} accepted your friend request`,
-          `You and ${myName} are now friends.`,
-          { fromUserId: user.id },
-          session.access_token,
-        )
-      }
+      createNotification(
+        fromUserId, 'friend_accepted',
+        `${myName} accepted your friend request`,
+        `You and ${myName} are now friends.`,
+        { fromUserId: user.id },
+        token,
+      )
       // Remove notification and navigate to friends so the list refreshes
       await deleteNotification(n.id)
       setNotifications(prev => prev.filter(x => x.id !== n.id))
@@ -95,7 +96,10 @@ export default function NotificationBell({ user, setPage }) {
     const fromUserId = n.data?.fromUserId
     setActing(n.id)
     try {
-      if (fromUserId) await denyFriendRequestByUsers(fromUserId, user.id)
+      if (fromUserId) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) await denyFriendRequestByUsers(fromUserId, session.access_token)
+      }
       await deleteNotification(n.id)
       setNotifications(prev => prev.filter(x => x.id !== n.id))
     } finally {
