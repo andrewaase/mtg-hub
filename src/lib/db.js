@@ -272,13 +272,26 @@ export async function removeCard(id, userId) {
 // because RLS on `friendships` blocks the recipient from reading rows they don't own.
 async function fetchFriendsBundle(accessToken) {
   try {
+    console.log('[friends] fetching bundle, token present:', !!accessToken)
     const res = await fetch('/.netlify/functions/get-friends', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     })
-    if (!res.ok) return { friends: [], pendingRequests: [] }
-    return await res.json()
-  } catch {
+    console.log('[friends] response status:', res.status)
+    const text = await res.text()
+    console.log('[friends] response body:', text)
+    if (!res.ok) {
+      console.error('[friends] function returned non-OK:', res.status, text)
+      return { friends: [], pendingRequests: [] }
+    }
+    try {
+      return JSON.parse(text)
+    } catch (e) {
+      console.error('[friends] failed to parse JSON:', e, text)
+      return { friends: [], pendingRequests: [] }
+    }
+  } catch (err) {
+    console.error('[friends] network error:', err)
     return { friends: [], pendingRequests: [] }
   }
 }
@@ -322,14 +335,19 @@ export async function acceptFriendRequest(requestId) {
 // Accept via Netlify function (service key) so RLS doesn't block the recipient
 export async function acceptFriendRequestByUsers(requesterId, accessToken) {
   try {
+    console.log('[accept] sending to function, requesterId:', requesterId, 'token present:', !!accessToken)
     const res = await fetch('/.netlify/functions/accept-friend-request', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body:    JSON.stringify({ requesterId }),
     })
-    const json = await res.json()
+    const text = await res.text()
+    console.log('[accept] response status:', res.status, 'body:', text)
+    if (!res.ok) return false
+    const json = JSON.parse(text)
     return !!json.ok
-  } catch {
+  } catch (err) {
+    console.error('[accept] error:', err)
     return false
   }
 }
