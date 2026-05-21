@@ -313,6 +313,26 @@ export async function acceptFriendRequest(requestId) {
   await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId)
 }
 
+// Accept by looking up the row from both user IDs — works even when requestId wasn't stored
+export async function acceptFriendRequestByUsers(requesterId, recipientId) {
+  if (!hasSupabase) return false
+  const { data } = await supabase
+    .from('friendships').select('id')
+    .eq('user_id', requesterId).eq('friend_id', recipientId).eq('status', 'pending')
+    .maybeSingle()
+  if (!data?.id) return false
+  const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', data.id)
+  return !error
+}
+
+// Delete (deny) a pending request by user IDs
+export async function denyFriendRequestByUsers(requesterId, recipientId) {
+  if (!hasSupabase) return
+  await supabase.from('friendships')
+    .delete()
+    .eq('user_id', requesterId).eq('friend_id', recipientId).eq('status', 'pending')
+}
+
 // ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
 
 export async function getNotifications(userId) {
@@ -334,6 +354,16 @@ export async function markNotificationRead(id) {
 export async function markAllNotificationsRead(userId) {
   if (!hasSupabase) return
   await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+}
+
+export async function deleteNotification(id) {
+  if (!hasSupabase) return
+  await supabase.from('notifications').delete().eq('id', id)
+}
+
+export async function deleteAllNotifications(userId) {
+  if (!hasSupabase) return
+  await supabase.from('notifications').delete().eq('user_id', userId)
 }
 
 export async function createNotification(targetUserId, type, title, bodyText, data, accessToken) {
