@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { hasSupabase, supabase } from '../lib/supabase'
-import { getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest, findUserByEmail, getFriendCollection, getWantList, addWant, removeWant } from '../lib/db'
+import { getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest, findUserByEmail, getFriendCollection, getWantList, addWant, removeWant, createNotification } from '../lib/db'
 
 function displayName(friend) {
   return friend?.username || friend?.email?.split('@')[0] || friend?.displayName || '(unknown)'
@@ -64,17 +64,62 @@ export default function Friends({ user, showToast }) {
 
   const handleSendRequest = async () => {
     if (!foundUser) return
-    await sendFriendRequest(user.id, foundUser.id)
-    showToast('Friend request sent!')
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    const senderName = user.email?.split('@')[0] || 'Someone'
+
+    const result = await sendFriendRequest(user.id, foundUser.id)
+
+    if (result.mutual) {
+      // Both users had pending requests — auto-accepted
+      showToast(`✅ You and ${foundUser.displayName} are now friends!`)
+      // Notify the other person their request was accepted
+      createNotification(
+        foundUser.id, 'friend_accepted',
+        `${senderName} accepted your friend request`,
+        `You and ${senderName} are now friends.`,
+        { fromUserId: user.id },
+        token,
+      )
+    } else if (result.alreadyFriends) {
+      showToast(`You're already friends with ${foundUser.displayName}`)
+    } else {
+      showToast('Friend request sent!')
+      // Notify the recipient
+      createNotification(
+        foundUser.id, 'friend_request',
+        `${senderName} sent you a friend request`,
+        `Tap to view and accept in Friends & Trades.`,
+        { fromUserId: user.id },
+        token,
+      )
+    }
+
     setEmailInput('')
     setFoundUser(null)
     setFindStatus('')
+    loadFriendsData()
   }
 
-  const handleAcceptRequest = async (requestId) => {
+  const handleAcceptRequest = async (requestId, requesterId) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    const myName = user.email?.split('@')[0] || 'Someone'
+
     await acceptFriendRequest(requestId)
     loadFriendsData()
     showToast('Friend request accepted!')
+
+    // Notify the person whose request was accepted
+    if (requesterId) {
+      createNotification(
+        requesterId, 'friend_accepted',
+        `${myName} accepted your friend request`,
+        `You and ${myName} are now friends.`,
+        { fromUserId: user.id },
+        token,
+      )
+    }
   }
 
   const handleSelectFriend = async (friendId) => {
@@ -242,7 +287,7 @@ export default function Friends({ user, showToast }) {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600 }}>{displayName(req.requester)}</div>
                     </div>
-                    <button className="btn btn-primary btn-sm" onClick={() => handleAcceptRequest(req.id)}>
+                    <button className="btn btn-primary btn-sm" onClick={() => handleAcceptRequest(req.id, req.requester?.id)}>
                       Accept
                     </button>
                   </div>

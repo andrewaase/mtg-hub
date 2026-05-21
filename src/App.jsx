@@ -305,11 +305,11 @@ export default function App() {
       // Daily portfolio snapshot (no-op if already taken today)
       if (c.length > 0) takeSnapshot(c)
 
-      // Wishlist price alert check
+      // Wishlist price alert check — toast + DB notification (deduped per card per day)
       try {
         const stored = JSON.parse(localStorage.getItem('mtg-hub-v1') || '{}')
-        const wishlist = stored.wishlist || []
-        const alerts = wishlist.filter(i =>
+        const wl = stored.wishlist || []
+        const alerts = wl.filter(i =>
           i.targetPrice != null && i.currentPrice != null && i.currentPrice <= i.targetPrice
         )
         if (alerts.length > 0) {
@@ -317,6 +317,26 @@ export default function App() {
             `🎯 ${alerts.length} wishlist card${alerts.length > 1 ? 's' : ''} at or below target price!`,
             5000
           ), 1500)
+          // Create DB notifications for new alerts (skip if already notified today)
+          if (user && hasSupabase) {
+            const today = new Date().toISOString().slice(0, 10)
+            const notifiedKey = `vs-price-alerted-${today}`
+            const already = JSON.parse(localStorage.getItem(notifiedKey) || '[]')
+            const { data: { session } } = await supabase.auth.getSession()
+            const { createNotification } = await import('./lib/db')
+            for (const item of alerts) {
+              if (already.includes(item.name)) continue
+              await createNotification(
+                user.id, 'price_alert',
+                `💰 ${item.name} hit your target price`,
+                `Now $${Number(item.currentPrice).toFixed(2)} — your target was $${Number(item.targetPrice).toFixed(2)}.`,
+                { cardName: item.name, currentPrice: item.currentPrice, targetPrice: item.targetPrice },
+                session?.access_token,
+              )
+              already.push(item.name)
+            }
+            localStorage.setItem(notifiedKey, JSON.stringify(already))
+          }
         }
       } catch { /* ignore */ }
     }
@@ -370,7 +390,7 @@ export default function App() {
       <Sidebar page={page} setPage={setPage} user={user} isAdmin={isAdmin} onAuthClick={() => setShowAuth(true)} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div id="overlay" className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
       <div id="main">
-        <TopBar page={page} user={user} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} />
+        <TopBar page={page} user={user} setPage={setPage} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} />
         <div id="content">
           {loading ? (
             /* Show a contextual skeleton while data loads */

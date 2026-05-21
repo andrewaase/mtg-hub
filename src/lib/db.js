@@ -287,13 +287,60 @@ export async function getPendingRequests(userId) {
 }
 
 export async function sendFriendRequest(userId, friendId) {
-  if (!hasSupabase) return
-  await supabase.from('friendships').insert({ user_id: userId, friend_id: friendId, status: 'pending' })
+  if (!hasSupabase) return { mutual: false }
+  // Check if the other person already sent us a request (mutual → auto-accept)
+  const { data: existing } = await supabase
+    .from('friendships').select('id, status')
+    .eq('user_id', friendId).eq('friend_id', userId).maybeSingle()
+  if (existing?.status === 'accepted') return { mutual: false, alreadyFriends: true }
+  if (existing) {
+    // Mutual request — accept theirs and we're done (no second row needed)
+    await supabase.from('friendships').update({ status: 'accepted' }).eq('id', existing.id)
+    return { mutual: true, requestId: existing.id }
+  }
+  const { data } = await supabase
+    .from('friendships')
+    .insert({ user_id: userId, friend_id: friendId, status: 'pending' })
+    .select().single()
+  return { mutual: false, requestId: data?.id }
 }
 
 export async function acceptFriendRequest(requestId) {
   if (!hasSupabase) return
   await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId)
+}
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+
+export async function getNotifications(userId) {
+  if (!hasSupabase || !userId) return []
+  const { data } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(30)
+  return data || []
+}
+
+export async function markNotificationRead(id) {
+  if (!hasSupabase) return
+  await supabase.from('notifications').update({ read: true }).eq('id', id)
+}
+
+export async function markAllNotificationsRead(userId) {
+  if (!hasSupabase) return
+  await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+}
+
+export async function createNotification(targetUserId, type, title, bodyText, data, accessToken) {
+  try {
+    await fetch('/.netlify/functions/create-notification', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body:    JSON.stringify({ targetUserId, type, title, bodyText, data }),
+    })
+  } catch { /* non-critical, don't block the caller */ }
 }
 
 export async function searchUsers(query) {

@@ -1,7 +1,8 @@
 import { hasSupabase } from '../lib/supabase'
 import logoPng from '../assets/vaulted_singles_logo.png'
+import NotificationBell from './NotificationBell'
 
-export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClick, onLogoClick }) {
+export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, onMenuClick, onLogoClick }) {
   return (
     <div id="topbar">
       <div className="topbar-left">
@@ -40,6 +41,7 @@ export default function TopBar({ page, user, onLogMatch, onAuthClick, onMenuClic
             Sign In
           </button>
         )}
+        {user && hasSupabase && <NotificationBell user={user} setPage={setPage} />}
         {user && (
           <div
             className="user-avatar"
