@@ -403,10 +403,18 @@ export async function findUserByEmail(email, accessToken) {
   return res.json()
 }
 
-export async function getFriendCollection(friendId) {
+export async function getFriendCollection(friendId, accessToken) {
   if (!hasSupabase) return []
-  const { data } = await supabase.from('collection').select('*').eq('user_id', friendId)
-  return (data || []).map(collectionRowToCard)
+  try {
+    const res = await fetch('/.netlify/functions/get-friend-collection', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body:    JSON.stringify({ friendId }),
+    })
+    if (!res.ok) return []
+    const { cards } = await res.json()
+    return (cards || []).map(collectionRowToCard)
+  } catch { return [] }
 }
 
 export async function removeFriend(friendRowId, accessToken) {

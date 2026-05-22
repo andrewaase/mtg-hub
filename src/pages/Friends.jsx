@@ -151,7 +151,8 @@ export default function Friends({ user, showToast, isActive }) {
     setCollectionSearch('')
     setTab('browse')
     setCollectionLoading(true)
-    const data = await getFriendCollection(friendRow.friend.id)
+    const token = await getToken()
+    const data = await getFriendCollection(friendRow.friend.id, token)
     setFriendCollection(data)
     setCollectionLoading(false)
   }
