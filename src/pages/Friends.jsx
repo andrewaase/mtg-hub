@@ -54,6 +54,12 @@ export default function Friends({ user, showToast, isActive }) {
   }, [user, isActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    function handleTabEvent(e) { setTab(e.detail) }
+    window.addEventListener('friends-set-tab', handleTabEvent)
+    return () => window.removeEventListener('friends-set-tab', handleTabEvent)
+  }, [])
+
+  useEffect(() => {
     if (tab === 'trades' && user && hasSupabase && !tradesLoaded) loadTrades()
   }, [tab, user]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -376,19 +382,21 @@ export default function Friends({ user, showToast, isActive }) {
                   {filteredCollection.map((card, i) => {
                     const inCart = cart.find(c => c.id === card.id)
                     return (
-                      <div key={i} style={{ background: 'var(--bg-card)', border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      <div key={i} style={{ background: 'var(--bg-card)', border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {card.img
                           ? <img src={card.img} alt={card.name} style={{ width: '100%', aspectRatio: '63/88', objectFit: 'cover' }} />
                           : <div style={{ aspectRatio: '63/88', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.7rem', color: 'var(--text-muted)' }}>No image</div>
                         }
-                        <div style={{ padding: '8px 8px 10px' }}>
+                        <div style={{ padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                           <div style={{ fontSize: '.75rem', fontWeight: 600, lineHeight: 1.3, marginBottom: 4 }}>{card.name}</div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
                             {card.condition && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{card.condition}</span>}
                             {card.isFoil   && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'rgba(201,168,76,.15)', color: 'var(--accent-gold)' }}>Foil</span>}
                             <span style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>×{card.qty}</span>
                           </div>
-                          {card.price != null && <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 6 }}>{fmt(card.price)}</div>}
+                          <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 6, minHeight: '1em' }}>
+                            {card.price != null ? fmt(card.price) : ''}
+                          </div>
                           <button
                             onClick={() => !inCart && handleAddToCart(card)}
                             style={{
@@ -397,7 +405,7 @@ export default function Friends({ user, showToast, isActive }) {
                               background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
                               border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'transparent'}`,
                               color: inCart ? 'var(--accent-gold)' : '#000',
-                              transition: 'all .15s',
+                              transition: 'all .15s', marginTop: 'auto',
                             }}
                           >
                             {inCart ? '✓ In Trade' : '+ Add to Trade'}
