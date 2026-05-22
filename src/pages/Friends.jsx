@@ -361,73 +361,8 @@ export default function Friends({ user, showToast, isActive }) {
                 onChange={e => setCollectionSearch(e.target.value)}
                 style={{ marginBottom: 16, width: '100%' }} />
 
-              {/* Cart bar — shown when cart has items */}
-              {cart.length > 0 && (
-                <div style={{ marginBottom: 16, borderRadius: 12, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.07)', overflow: 'hidden' }}>
-                  <div
-                    onClick={() => setCartOpen(o => !o)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }}
-                  >
-                    <span style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--accent-gold)' }}>
-                      🛒 {cart.length} card{cart.length !== 1 ? 's' : ''} · {fmt(cartTotal)}
-                    </span>
-                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{cartOpen ? '▲ Hide cart' : '▼ View cart'}</span>
-                  </div>
-
-                  {cartOpen && (
-                    <div style={{ borderTop: '1px solid rgba(201,168,76,.2)', padding: '12px 16px' }}>
-                      {/* Cart items */}
-                      {cart.map(c => (
-                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                          {c.img && <img src={c.img} alt={c.name} style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '.82rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
-                            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                              <select value={c.condition} onChange={e => handleUpdateCartItem(c.id, { condition: e.target.value })}
-                                style={{ fontSize: '.7rem', padding: '2px 4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-                                {CONDITIONS.map(cond => <option key={cond} value={cond}>{cond}</option>)}
-                              </select>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '.7rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                                <input type="checkbox" checked={c.isFoil} onChange={e => handleUpdateCartItem(c.id, { isFoil: e.target.checked })} style={{ width: 12, height: 12 }} />
-                                Foil
-                              </label>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <button onClick={() => handleUpdateCartItem(c.id, { selectedQty: Math.max(1, c.selectedQty - 1) })}
-                                  style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                                <span style={{ fontSize: '.78rem', minWidth: 16, textAlign: 'center' }}>{c.selectedQty}</span>
-                                <button onClick={() => handleUpdateCartItem(c.id, { selectedQty: Math.min(c.qty, c.selectedQty + 1) })}
-                                  style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <div style={{ fontSize: '.8rem', fontWeight: 600 }}>{c.price != null ? fmt(c.price * c.selectedQty) : '—'}</div>
-                            <button onClick={() => handleRemoveFromCart(c.id)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.7rem', color: '#f87171', marginTop: 2 }}>✕ Remove</button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Message + submit */}
-                      <div style={{ marginTop: 12 }}>
-                        <input className="form-input" placeholder="Add a message (optional)…" value={tradeMessage}
-                          onChange={e => setTradeMessage(e.target.value)}
-                          style={{ marginBottom: 10, fontSize: '.82rem' }} />
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontWeight: 700, fontSize: '.88rem' }}>Subtotal: {fmt(cartTotal)}</span>
-                          <button
-                            onClick={handleProposeTrade}
-                            disabled={proposing}
-                            style={{ padding: '7px 18px', borderRadius: 8, background: 'var(--accent-gold)', border: 'none', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: proposing ? 'wait' : 'pointer', opacity: proposing ? 0.7 : 1 }}
-                          >
-                            {proposing ? 'Sending…' : '🤝 Propose Trade'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* spacer so cards aren't hidden behind the fixed bar */}
+              {cart.length > 0 && <div style={{ height: 80 }} />}
 
               {/* Collection grid */}
               {collectionLoading ? (
@@ -455,18 +390,17 @@ export default function Friends({ user, showToast, isActive }) {
                           </div>
                           {card.price != null && <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 6 }}>{fmt(card.price)}</div>}
                           <button
-                            onClick={() => handleAddToCart(card)}
-                            disabled={inCart && inCart.selectedQty >= card.qty}
+                            onClick={() => !inCart && handleAddToCart(card)}
                             style={{
-                              width: '100%', padding: '5px 0', borderRadius: 7, fontSize: '.72rem', fontWeight: 700,
-                              cursor: (inCart && inCart.selectedQty >= card.qty) ? 'default' : 'pointer',
-                              background: inCart ? 'rgba(201,168,76,.15)' : 'rgba(201,168,76,.1)',
-                              border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'rgba(201,168,76,.25)'}`,
-                              color: inCart ? 'var(--accent-gold)' : 'var(--text-secondary)',
-                              opacity: (inCart && inCart.selectedQty >= card.qty) ? 0.5 : 1,
+                              width: '100%', padding: '7px 0', borderRadius: 7, fontSize: '.72rem', fontWeight: 700,
+                              cursor: inCart ? 'default' : 'pointer',
+                              background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                              border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'transparent'}`,
+                              color: inCart ? 'var(--accent-gold)' : '#000',
+                              transition: 'all .15s',
                             }}
                           >
-                            {inCart ? `✓ In cart (${inCart.selectedQty})` : '+ Add to Trade'}
+                            {inCart ? '✓ In Trade' : '+ Add to Trade'}
                           </button>
                         </div>
                       </div>
@@ -477,6 +411,132 @@ export default function Friends({ user, showToast, isActive }) {
             </>
           )}
         </div>
+      )}
+
+      {/* ── Fixed trade cart bar ── */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 150,
+        transform: cart.length > 0 ? 'translateY(0)' : 'translateY(110%)',
+        transition: 'transform .3s cubic-bezier(.34,1.56,.64,1)',
+        pointerEvents: cart.length > 0 ? 'auto' : 'none',
+      }}>
+        <div style={{ maxWidth: 860, margin: '0 auto 12px', padding: '0 12px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'rgba(15,12,5,.92)',
+            border: '1px solid rgba(201,168,76,.45)',
+            borderRadius: 16, padding: '12px 16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(201,168,76,.15)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                background: 'var(--accent-gold)', color: '#000',
+                borderRadius: '50%', width: 28, height: 28,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '.72rem', fontWeight: 900, flexShrink: 0,
+              }}>{cart.length}</div>
+              <div>
+                <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', lineHeight: 1 }}>
+                  {cart.length === 1 ? '1 card' : `${cart.length} cards`}
+                </div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--accent-gold)', lineHeight: 1.3 }}>
+                  {fmt(cartTotal)}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setCartOpen(true)}
+              style={{
+                padding: '10px 22px', borderRadius: 12, border: 'none',
+                background: 'var(--accent-gold)', color: '#000',
+                fontWeight: 800, fontSize: '.88rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 12px rgba(201,168,76,.35)',
+              }}
+            >
+              🤝 View Trade →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Trade drawer ── */}
+      {cartOpen && (
+        <>
+          <div onClick={() => setCartOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 200 }} />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(380px, 100vw)',
+            background: 'var(--bg-card)', borderLeft: '1px solid var(--border)',
+            zIndex: 201, display: 'flex', flexDirection: 'column',
+            boxShadow: '-8px 0 32px rgba(0,0,0,.4)',
+          }}>
+            {/* Drawer header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '1rem' }}>🤝 Trade Proposal</div>
+                {browsingFriend && <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: 2 }}>for {displayName(browsingFriend.friend)}</div>}
+              </div>
+              <button onClick={() => setCartOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+
+            {/* Drawer items */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+              {cart.map(c => (
+                <div key={c.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  {c.img && <img src={c.img} alt={c.name} style={{ width: 44, height: 62, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '.85rem', fontWeight: 600, marginBottom: 6 }}>{c.name}</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <select value={c.condition} onChange={e => handleUpdateCartItem(c.id, { condition: e.target.value })}
+                        style={{ fontSize: '.72rem', padding: '3px 6px', borderRadius: 5, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                        {CONDITIONS.map(cond => <option key={cond} value={cond}>{cond}</option>)}
+                      </select>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.72rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={c.isFoil} onChange={e => handleUpdateCartItem(c.id, { isFoil: e.target.checked })} style={{ width: 13, height: 13 }} />
+                        Foil
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button onClick={() => handleUpdateCartItem(c.id, { selectedQty: Math.max(1, c.selectedQty - 1) })}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>−</button>
+                        <span style={{ fontSize: '.85rem', minWidth: 18, textAlign: 'center', fontWeight: 600 }}>{c.selectedQty}</span>
+                        <button onClick={() => handleUpdateCartItem(c.id, { selectedQty: Math.min(c.qty, c.selectedQty + 1) })}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>+</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <div style={{ fontSize: '.88rem', fontWeight: 700 }}>{c.price != null ? fmt(c.price * c.selectedQty) : '—'}</div>
+                    <button onClick={() => handleRemoveFromCart(c.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.72rem', color: '#f87171' }}>✕ Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Drawer footer */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <input className="form-input" placeholder="Add a message (optional)…" value={tradeMessage}
+                onChange={e => setTradeMessage(e.target.value)}
+                style={{ marginBottom: 12, fontSize: '.82rem', width: '100%' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>{cart.length} card{cart.length !== 1 ? 's' : ''}</span>
+                <span style={{ fontWeight: 800, fontSize: '1rem' }}>{fmt(cartTotal)}</span>
+              </div>
+              <button
+                onClick={handleProposeTrade}
+                disabled={proposing}
+                style={{
+                  width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
+                  background: 'var(--accent-gold)', color: '#000',
+                  fontWeight: 800, fontSize: '.95rem', cursor: proposing ? 'wait' : 'pointer',
+                  opacity: proposing ? 0.7 : 1,
+                }}
+              >
+                {proposing ? 'Sending…' : '🤝 Propose Trade'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ════════════════ TRADE PROPOSALS ════════════════ */}
