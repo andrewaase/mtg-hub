@@ -210,10 +210,10 @@ export default function Friends({ user, showToast, isActive }) {
   }
 
   // ── Respond to trade ──────────────────────────────────────────────────────
-  const handleRespondTrade = async (trade, action) => {
+  const handleRespondTrade = async (trade, action, opts = {}) => {
     const token = await getToken()
     const myName = user.email?.split('@')[0] || 'Someone'
-    const result = await respondTrade(trade.id, action, token)
+    const result = await respondTrade(trade.id, action, token, opts)
     if (result.ok) {
       setTrades(prev => prev.map(t => t.id === trade.id ? { ...t, status: action } : t))
       showToast(action === 'accepted' ? 'Trade accepted!' : 'Trade declined.')
@@ -588,6 +588,8 @@ export default function Friends({ user, showToast, isActive }) {
 }
 
 function TradeCard({ trade, perspective, onRespond }) {
+  const [removeFromMine, setRemoveFromMine] = useState(false)
+  const [addToTheirs, setAddToTheirs]       = useState(false)
   const total = (trade.items || []).reduce((s, i) => s + (i.price || 0) * i.qty, 0)
   const statusColor = { pending: '#facc15', accepted: '#4ade80', declined: '#f87171' }[trade.status] || 'var(--text-muted)'
 
@@ -627,19 +629,34 @@ function TradeCard({ trade, perspective, onRespond }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-          <span style={{ fontSize: '.82rem', fontWeight: 700 }}>Total: {fmt(total)}</span>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '.82rem', fontWeight: 700 }}>Total: {fmt(total)}</span>
+          </div>
+
           {perspective === 'recipient' && trade.status === 'pending' && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => onRespond(trade, 'accepted')}
-                style={{ padding: '5px 14px', borderRadius: 8, background: 'rgba(74,222,128,.15)', border: '1px solid rgba(74,222,128,.3)', color: '#4ade80', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer' }}>
-                ✓ Accept
-              </button>
-              <button onClick={() => onRespond(trade, 'declined')}
-                style={{ padding: '5px 14px', borderRadius: 8, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', color: '#f87171', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer' }}>
-                ✕ Decline
-              </button>
-            </div>
+            <>
+              <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '.76rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={removeFromMine} onChange={e => setRemoveFromMine(e.target.checked)} style={{ width: 13, height: 13, flexShrink: 0 }} />
+                  Remove from my collection
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '.76rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={addToTheirs} onChange={e => setAddToTheirs(e.target.checked)} style={{ width: 13, height: 13, flexShrink: 0 }} />
+                  Add to {trade.senderName}'s collection
+                </label>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button onClick={() => onRespond(trade, 'accepted', { removeFromMine, addToTheirs })}
+                  style={{ padding: '5px 14px', borderRadius: 8, background: 'rgba(74,222,128,.15)', border: '1px solid rgba(74,222,128,.3)', color: '#4ade80', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer' }}>
+                  ✓ Accept
+                </button>
+                <button onClick={() => onRespond(trade, 'declined')}
+                  style={{ padding: '5px 14px', borderRadius: 8, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', color: '#f87171', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer' }}>
+                  ✕ Decline
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
