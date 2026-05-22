@@ -1,6 +1,52 @@
 // netlify/functions/respond-trade.js
 // Accepts or declines a trade proposal. Only the recipient can respond.
+// Optionally syncs both users' collections when accepting.
 const { corsHeaders } = require('./_cors')
+
+async function adjustCollection(SUPABASE_URL, adminHeaders, userId, items, delta) {
+  // Fetch the user's full collection once, filter in memory (handles special chars in names)
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/collection?user_id=eq.${userId}&select=id,name,qty`,
+    { headers: adminHeaders }
+  )
+  const existing = res.ok ? await res.json() : []
+  const byName = Object.fromEntries(existing.map(r => [r.name.toLowerCase(), r]))
+
+  for (const item of items) {
+    const key  = (item.card_name || '').toLowerCase()
+    const row  = byName[key]
+    const diff = delta * (item.qty || 1)
+
+    if (row) {
+      const newQty = row.qty + diff
+      if (newQty <= 0) {
+        await fetch(`${SUPABASE_URL}/rest/v1/collection?id=eq.${row.id}`,
+          { method: 'DELETE', headers: adminHeaders })
+      } else {
+        await fetch(`${SUPABASE_URL}/rest/v1/collection?id=eq.${row.id}`, {
+          method: 'PATCH',
+          headers: { ...adminHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ qty: newQty }),
+        })
+      }
+    } else if (delta > 0) {
+      // Card doesn't exist yet — insert it
+      await fetch(`${SUPABASE_URL}/rest/v1/collection`, {
+        method: 'POST',
+        headers: { ...adminHeaders, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          user_id:   userId,
+          name:      item.card_name,
+          qty:       item.qty || 1,
+          condition: item.condition || 'NM',
+          is_foil:   item.is_foil || false,
+          price:     item.price || null,
+          img:       item.img || null,
+        }),
+      })
+    }
+  }
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(event) }
@@ -27,12 +73,12 @@ exports.handler = async (event) => {
 
   let body
   try { body = JSON.parse(event.body || '{}') } catch { return fail('Invalid JSON') }
-  const { tradeId, action } = body
+  const { tradeId, action, removeFromMine = false, addToTheirs = false } = body
   if (!tradeId || !['accepted', 'declined'].includes(action)) return fail('Invalid request')
 
   const adminHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }
 
-  // Verify caller is the recipient
+  // Verify caller is the recipient and fetch trade
   const findRes = await fetch(
     `${SUPABASE_URL}/rest/v1/trades?id=eq.${tradeId}&select=id,sender_id,recipient_id,status&limit=1`,
     { headers: adminHeaders }
@@ -43,11 +89,26 @@ exports.handler = async (event) => {
   if (trade.recipient_id !== caller.id) return fail('Forbidden', 403)
   if (trade.status !== 'pending') return fail('Trade already resolved')
 
+  // Update trade status
   await fetch(`${SUPABASE_URL}/rest/v1/trades?id=eq.${tradeId}`, {
     method: 'PATCH',
     headers: { ...adminHeaders, Prefer: 'return=minimal' },
     body: JSON.stringify({ status: action }),
   })
+
+  // Sync collections if accepting and flags are set
+  if (action === 'accepted' && (removeFromMine || addToTheirs)) {
+    const itemsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/trade_items?trade_id=eq.${tradeId}&select=*`,
+      { headers: adminHeaders }
+    )
+    const items = itemsRes.ok ? await itemsRes.json() : []
+
+    await Promise.all([
+      removeFromMine && adjustCollection(SUPABASE_URL, adminHeaders, trade.recipient_id, items, -1),
+      addToTheirs    && adjustCollection(SUPABASE_URL, adminHeaders, trade.sender_id,    items, +1),
+    ].filter(Boolean))
+  }
 
   return {
     statusCode: 200,

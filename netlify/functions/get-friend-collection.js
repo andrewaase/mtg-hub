@@ -32,7 +32,7 @@ exports.handler = async (event) => {
 
   const adminHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/collection?user_id=eq.${friendId}&select=*&order=name.asc`,
+    `${SUPABASE_URL}/rest/v1/collection?user_id=eq.${friendId}&in_trade_binder=eq.true&select=*&order=name.asc`,
     { headers: adminHeaders }
   )
   if (!res.ok) return fail('Failed to fetch collection', 500)
