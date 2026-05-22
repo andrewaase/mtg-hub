@@ -450,11 +450,11 @@ export async function getTrades(accessToken) {
   } catch { return [] }
 }
 
-export async function respondTrade(tradeId, action, accessToken) {
+export async function respondTrade(tradeId, action, accessToken, opts = {}) {
   const res = await fetch('/.netlify/functions/respond-trade', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-    body:    JSON.stringify({ tradeId, action }),
+    body:    JSON.stringify({ tradeId, action, ...opts }),
   })
   return res.json()
 }
