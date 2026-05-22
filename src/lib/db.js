@@ -272,26 +272,13 @@ export async function removeCard(id, userId) {
 // because RLS on `friendships` blocks the recipient from reading rows they don't own.
 async function fetchFriendsBundle(accessToken) {
   try {
-    console.log('[friends] fetching bundle, token present:', !!accessToken)
     const res = await fetch('/.netlify/functions/get-friends', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     })
-    console.log('[friends] response status:', res.status)
-    const text = await res.text()
-    console.log('[friends] response body:', text)
-    if (!res.ok) {
-      console.error('[friends] function returned non-OK:', res.status, text)
-      return { friends: [], pendingRequests: [] }
-    }
-    try {
-      return JSON.parse(text)
-    } catch (e) {
-      console.error('[friends] failed to parse JSON:', e, text)
-      return { friends: [], pendingRequests: [] }
-    }
-  } catch (err) {
-    console.error('[friends] network error:', err)
+    if (!res.ok) return { friends: [], pendingRequests: [] }
+    return await res.json()
+  } catch {
     return { friends: [], pendingRequests: [] }
   }
 }
@@ -332,22 +319,17 @@ export async function acceptFriendRequest(requestId) {
   await supabase.from('friends').update({ status: 'accepted' }).eq('id', requestId)
 }
 
-// Accept via Netlify function (service key) so RLS doesn't block the recipient
 export async function acceptFriendRequestByUsers(requesterId, accessToken) {
   try {
-    console.log('[accept] sending to function, requesterId:', requesterId, 'token present:', !!accessToken)
     const res = await fetch('/.netlify/functions/accept-friend-request', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body:    JSON.stringify({ requesterId }),
     })
-    const text = await res.text()
-    console.log('[accept] response status:', res.status, 'body:', text)
     if (!res.ok) return false
-    const json = JSON.parse(text)
+    const json = await res.json()
     return !!json.ok
-  } catch (err) {
-    console.error('[accept] error:', err)
+  } catch {
     return false
   }
 }
@@ -424,7 +406,49 @@ export async function findUserByEmail(email, accessToken) {
 export async function getFriendCollection(friendId) {
   if (!hasSupabase) return []
   const { data } = await supabase.from('collection').select('*').eq('user_id', friendId)
-  return data || []
+  return (data || []).map(collectionRowToCard)
+}
+
+export async function removeFriend(friendRowId, accessToken) {
+  try {
+    const res = await fetch('/.netlify/functions/remove-friend', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body:    JSON.stringify({ friendRowId }),
+    })
+    const json = await res.json()
+    return !!json.ok
+  } catch { return false }
+}
+
+export async function createTrade(recipientId, items, message, accessToken) {
+  const res = await fetch('/.netlify/functions/create-trade', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body:    JSON.stringify({ recipientId, items, message }),
+  })
+  return res.json()
+}
+
+export async function getTrades(accessToken) {
+  try {
+    const res = await fetch('/.netlify/functions/get-trades', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return []
+    const json = await res.json()
+    return json.trades || []
+  } catch { return [] }
+}
+
+export async function respondTrade(tradeId, action, accessToken) {
+  const res = await fetch('/.netlify/functions/respond-trade', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body:    JSON.stringify({ tradeId, action }),
+  })
+  return res.json()
 }
 
 export async function getWantList(userId) {

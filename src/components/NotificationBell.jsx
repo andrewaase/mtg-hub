@@ -9,6 +9,9 @@ const TYPE_ICON = {
   friend_request:  '🤝',
   friend_accepted: '✅',
   price_alert:     '🎯',
+  trade_proposed:  '↔️',
+  trade_accepted:  '🟢',
+  trade_declined:  '🔴',
 }
 
 function formatTimestamp(ts) {
@@ -128,6 +131,7 @@ export default function NotificationBell({ user, setPage }) {
     }
     if (n.type === 'friend_request' || n.type === 'friend_accepted') { setOpen(false); setPage('friends') }
     if (n.type === 'price_alert') { setOpen(false); setPage('wishlist') }
+    if (n.type === 'trade_proposed' || n.type === 'trade_accepted' || n.type === 'trade_declined') { setOpen(false); setPage('friends') }
   }
 
   if (!user) return null
