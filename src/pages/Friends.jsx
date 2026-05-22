@@ -1,383 +1,579 @@
 import { useState, useEffect } from 'react'
 import { hasSupabase, supabase } from '../lib/supabase'
-import { getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest, findUserByEmail, getFriendCollection, getWantList, addWant, removeWant, createNotification } from '../lib/db'
+import {
+  getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest,
+  findUserByEmail, getFriendCollection, createNotification,
+  removeFriend, createTrade, getTrades, respondTrade,
+} from '../lib/db'
 
-function displayName(friend) {
-  return friend?.username || friend?.email?.split('@')[0] || friend?.displayName || '(unknown)'
+function displayName(p) {
+  return p?.username || p?.email?.split('@')[0] || p?.displayName || '(unknown)'
+}
+function initials(p) { return (displayName(p)[0] || '?').toUpperCase() }
+function fmt(price) { return price != null ? '$' + Number(price).toFixed(2) : '—' }
+function fmtDate(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function initials(friend) {
-  return (displayName(friend)[0] || '?').toUpperCase()
-}
+const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG']
 
 export default function Friends({ user, showToast, isActive }) {
   const [tab, setTab] = useState('friends')
+
+  // Friends list
   const [friends, setFriends] = useState([])
   const [pendingRequests, setPendingRequests] = useState([])
-  const [selectedFriend, setSelectedFriend] = useState(null)
-  const [friendCollection, setFriendCollection] = useState([])
-  const [wantList, setWantList] = useState([])
-  const [emailInput, setEmailInput] = useState('')
-  const [foundUser, setFoundUser] = useState(null)   // { id, displayName, email }
-  const [findStatus, setFindStatus] = useState('')    // '' | 'searching' | 'found' | 'not-found' | 'self' | 'already'
   const [loading, setLoading] = useState(false)
 
+  // Add friend
+  const [emailInput, setEmailInput] = useState('')
+  const [foundUser, setFoundUser] = useState(null)
+  const [findStatus, setFindStatus] = useState('')
+
+  // Browse collection
+  const [browsingFriend, setBrowsingFriend] = useState(null)
+  const [friendCollection, setFriendCollection] = useState([])
+  const [collectionLoading, setCollectionLoading] = useState(false)
+  const [collectionSearch, setCollectionSearch] = useState('')
+
+  // Cart
+  const [cart, setCart] = useState([])
+  const [cartOpen, setCartOpen] = useState(false)
+  const [tradeMessage, setTradeMessage] = useState('')
+  const [proposing, setProposing] = useState(false)
+
+  // Trades tab
+  const [trades, setTrades] = useState([])
+  const [tradesLoading, setTradesLoading] = useState(false)
+  const [tradesLoaded, setTradesLoaded] = useState(false)
+
   useEffect(() => {
-    if (user && hasSupabase) {
-      loadFriendsData()
-    }
-  }, [user, tab, isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (user && hasSupabase) loadFriendsData()
+  }, [user, isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tab === 'trades' && user && hasSupabase && !tradesLoaded) loadTrades()
+  }, [tab, user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function getToken() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token
+  }
 
   const loadFriendsData = async () => {
     if (!user) return
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
-    console.log('[loadFriendsData] userId:', user.id, 'hasToken:', !!token)
-    const [f, p, w] = await Promise.all([
+    const token = await getToken()
+    const [f, p] = await Promise.all([
       getFriends(user.id, token),
       getPendingRequests(user.id, token),
-      getWantList(user.id),
     ])
-    console.log('[loadFriendsData] result — friends:', f, 'pending:', p)
     setFriends(f)
     setPendingRequests(p)
-    setWantList(w)
     setLoading(false)
-
-    // Debug: also call the raw debug endpoint so we can see the DB state
-    if (token) {
-      try {
-        const dbg = await fetch('/.netlify/functions/debug-friends', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        })
-        const dbgText = await dbg.text()
-        console.log('[debug-friends] status:', dbg.status, 'body:', dbgText)
-      } catch (e) {
-        console.error('[debug-friends] error:', e)
-      }
-    }
   }
 
+  const loadTrades = async () => {
+    setTradesLoading(true)
+    const token = await getToken()
+    const t = await getTrades(token)
+    setTrades(t)
+    setTradesLoaded(true)
+    setTradesLoading(false)
+  }
+
+  // ── Add friend ────────────────────────────────────────────────────────────
   const handleFindUser = async () => {
     const email = emailInput.trim().toLowerCase()
     if (!email || !email.includes('@')) { showToast('Enter a valid email address'); return }
     setFindStatus('searching')
     setFoundUser(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const result = await findUserByEmail(email, session.access_token)
+      const token = await getToken()
+      const result = await findUserByEmail(email, token)
       if (result.self) { setFindStatus('self'); return }
       if (!result.found) { setFindStatus('not-found'); return }
-      // Check if already a friend or request already sent
-      const alreadyFriend = friends.some(f => f.friend?.id === result.user.id)
-      if (alreadyFriend) { setFindStatus('already'); setFoundUser(result.user); return }
+      if (friends.some(f => f.friend?.id === result.user.id)) { setFindStatus('already'); setFoundUser(result.user); return }
       setFoundUser(result.user)
       setFindStatus('found')
-    } catch {
-      setFindStatus('not-found')
-    }
+    } catch { setFindStatus('not-found') }
   }
 
   const handleSendRequest = async () => {
     if (!foundUser) return
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getToken()
     const senderName = user.email?.split('@')[0] || 'Someone'
-
     const result = await sendFriendRequest(user.id, foundUser.id)
-
     if (result.mutual) {
-      // Both users had pending requests — auto-accepted
       showToast(`✅ You and ${foundUser.displayName} are now friends!`)
-      // Notify the other person their request was accepted
-      createNotification(
-        foundUser.id, 'friend_accepted',
-        `${senderName} accepted your friend request`,
-        `You and ${senderName} are now friends.`,
-        { fromUserId: user.id },
-        token,
-      )
+      createNotification(foundUser.id, 'friend_accepted', `${senderName} accepted your friend request`, `You and ${senderName} are now friends.`, { fromUserId: user.id }, token)
     } else if (result.alreadyFriends) {
       showToast(`You're already friends with ${foundUser.displayName}`)
     } else {
       showToast('Friend request sent!')
-      // Notify the recipient — include requestId so they can accept from the bell
-      createNotification(
-        foundUser.id, 'friend_request',
-        `${senderName} sent you a friend request`,
-        `Tap Accept to connect.`,
-        { fromUserId: user.id, requestId: result.requestId, fromName: senderName },
-        token,
-      )
+      createNotification(foundUser.id, 'friend_request', `${senderName} sent you a friend request`, 'Tap Accept to connect.', { fromUserId: user.id, requestId: result.requestId, fromName: senderName }, token)
     }
-
-    setEmailInput('')
-    setFoundUser(null)
-    setFindStatus('')
+    setEmailInput(''); setFoundUser(null); setFindStatus('')
     loadFriendsData()
   }
 
   const handleAcceptRequest = async (requestId, requesterId) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const token = await getToken()
     const myName = user.email?.split('@')[0] || 'Someone'
-
     await acceptFriendRequest(requestId)
     loadFriendsData()
     showToast('Friend request accepted!')
+    if (requesterId) createNotification(requesterId, 'friend_accepted', `${myName} accepted your friend request`, `You and ${myName} are now friends.`, { fromUserId: user.id }, token)
+  }
 
-    // Notify the person whose request was accepted
-    if (requesterId) {
+  // ── Remove friend ─────────────────────────────────────────────────────────
+  const handleRemoveFriend = async (friendRow) => {
+    if (!confirm(`Remove ${displayName(friendRow.friend)} from your friends?`)) return
+    const token = await getToken()
+    const ok = await removeFriend(friendRow.id, token)
+    if (ok) {
+      setFriends(prev => prev.filter(f => f.id !== friendRow.id))
+      if (browsingFriend?.id === friendRow.id) { setBrowsingFriend(null); setFriendCollection([]); setCart([]) }
+      showToast('Friend removed.')
+    } else {
+      showToast('Failed to remove friend.')
+    }
+  }
+
+  // ── Browse collection ─────────────────────────────────────────────────────
+  const handleBrowse = async (friendRow) => {
+    setBrowsingFriend(friendRow)
+    setCart([])
+    setCartOpen(false)
+    setTradeMessage('')
+    setCollectionSearch('')
+    setTab('browse')
+    setCollectionLoading(true)
+    const data = await getFriendCollection(friendRow.friend.id)
+    setFriendCollection(data)
+    setCollectionLoading(false)
+  }
+
+  // ── Cart ──────────────────────────────────────────────────────────────────
+  const handleAddToCart = (card) => {
+    setCart(prev => {
+      const existing = prev.find(c => c.id === card.id)
+      if (existing) {
+        return prev.map(c => c.id === card.id
+          ? { ...c, selectedQty: Math.min(c.selectedQty + 1, c.qty) }
+          : c)
+      }
+      return [...prev, { ...card, selectedQty: 1 }]
+    })
+  }
+
+  const handleRemoveFromCart = (cardId) => setCart(prev => prev.filter(c => c.id !== cardId))
+
+  const handleUpdateCartItem = (cardId, updates) =>
+    setCart(prev => prev.map(c => c.id === cardId ? { ...c, ...updates } : c))
+
+  const cartTotal = cart.reduce((sum, c) => sum + (c.price || 0) * c.selectedQty, 0)
+
+  const handleProposeTrade = async () => {
+    if (!cart.length || !browsingFriend || proposing) return
+    setProposing(true)
+    const token = await getToken()
+    const myName = user.email?.split('@')[0] || 'Someone'
+    const recipientId = browsingFriend.friend.id
+    try {
+      const result = await createTrade(
+        recipientId,
+        cart.map(c => ({ name: c.name, qty: c.selectedQty, condition: c.condition, isFoil: c.isFoil, price: c.price, img: c.img })),
+        tradeMessage,
+        token,
+      )
+      if (result.ok) {
+        const summary = cart.length === 1 ? cart[0].name : `${cart.length} cards`
+        createNotification(recipientId, 'trade_proposed', `${myName} proposed a trade`, `Requesting: ${summary} · ${fmt(cartTotal)}`, { fromUserId: user.id, fromName: myName, tradeId: result.tradeId }, token)
+        showToast('Trade proposal sent!')
+        setCart([]); setTradeMessage(''); setCartOpen(false)
+        setTradesLoaded(false) // force reload on next trades tab visit
+      } else {
+        showToast('Failed to send trade — make sure the trades table is set up in Supabase.')
+      }
+    } catch { showToast('Failed to send trade proposal.') }
+    setProposing(false)
+  }
+
+  // ── Respond to trade ──────────────────────────────────────────────────────
+  const handleRespondTrade = async (trade, action) => {
+    const token = await getToken()
+    const myName = user.email?.split('@')[0] || 'Someone'
+    const result = await respondTrade(trade.id, action, token)
+    if (result.ok) {
+      setTrades(prev => prev.map(t => t.id === trade.id ? { ...t, status: action } : t))
+      showToast(action === 'accepted' ? 'Trade accepted!' : 'Trade declined.')
       createNotification(
-        requesterId, 'friend_accepted',
-        `${myName} accepted your friend request`,
-        `You and ${myName} are now friends.`,
+        trade.sender_id,
+        action === 'accepted' ? 'trade_accepted' : 'trade_declined',
+        action === 'accepted' ? `${myName} accepted your trade proposal!` : `${myName} declined your trade proposal`,
+        action === 'accepted' ? 'Reach out to arrange the exchange.' : null,
         { fromUserId: user.id },
         token,
       )
     }
   }
 
-  const handleSelectFriend = async (friendId) => {
-    setSelectedFriend(friendId)
-    const [collection, wants] = await Promise.all([
-      getFriendCollection(friendId),
-      getWantList(friendId),
-    ])
-    setFriendCollection(collection)
-    setWantList(wants)
-  }
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const filteredCollection = friendCollection.filter(c =>
+    !collectionSearch || c.name?.toLowerCase().includes(collectionSearch.toLowerCase())
+  )
+  const incomingTrades = trades.filter(t => t.recipient_id === user?.id)
+  const outgoingTrades = trades.filter(t => t.sender_id === user?.id)
 
-  const handleAddWant = async (cardName) => {
-    await addWant(cardName, user.id)
-    loadFriendsData()
-    showToast('Added to want list!')
-  }
-
-  const handleRemoveWant = async (cardName) => {
-    await removeWant(cardName, user.id)
-    loadFriendsData()
-  }
-
-  if (!hasSupabase) {
-    return (
-      <div className="card">
-        <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '16px' }}>🤝</div>
-          <div style={{ fontSize: '.95rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            <strong>Friends & Trades</strong> requires a free account.
-          </div>
-          <p style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
-            This feature needs Supabase to sync data across devices and share with friends.<br/>
-            Set up your account to unlock: friend connections, collection sharing, and trade matching.
-          </p>
-        </div>
+  // ─────────────────────────────────────────────────────────────────────────
+  if (!hasSupabase) return (
+    <div className="card">
+      <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: 16 }}>🤝</div>
+        <div style={{ fontSize: '.95rem', color: 'var(--text-secondary)', marginBottom: 16 }}><strong>Friends & Trades</strong> requires a free account.</div>
       </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="card">
-        <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-          <p style={{ fontSize: '.95rem', color: 'var(--text-secondary)' }}>Sign in to access Friends & Trades</p>
-        </div>
-      </div>
-    )
-  }
+    </div>
+  )
+  if (!user) return (
+    <div className="card"><div style={{ padding: '40px 20px', textAlign: 'center' }}>
+      <p style={{ fontSize: '.95rem', color: 'var(--text-secondary)' }}>Sign in to access Friends & Trades</p>
+    </div></div>
+  )
 
   return (
     <div>
+      {/* ── Tabs ── */}
       <div className="tabs">
-        <button className={`tab ${tab === 'friends' ? 'active' : ''}`} onClick={() => setTab('friends')}>
-          👥 My Friends
-        </button>
-        <button className={`tab ${tab === 'collections' ? 'active' : ''}`} onClick={() => setTab('collections')}>
-          📦 Browse Collections
-        </button>
-        <button className={`tab ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>
-          ↔️ Trade Matcher
-        </button>
+        <button className={`tab ${tab === 'friends' ? 'active' : ''}`} onClick={() => setTab('friends')}>👥 My Friends</button>
+        <button className={`tab ${tab === 'browse' ? 'active' : ''}`} onClick={() => setTab('browse')}>📦 Browse & Trade</button>
+        <button className={`tab ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>↔️ Trade Proposals</button>
       </div>
 
+      {/* ════════════════ MY FRIENDS ════════════════ */}
       {tab === 'friends' && (
         <div>
-          {/* ── Add friend by email ── */}
-          <div className="card" style={{ marginBottom: '20px' }}>
+          {/* Add friend */}
+          <div className="card" style={{ marginBottom: 20 }}>
             <div className="section-title">Add Friend</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="email"
-                className="form-input"
-                placeholder="Enter their email address…"
-                value={emailInput}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="email" className="form-input" placeholder="Enter their email address…" value={emailInput}
                 onChange={e => { setEmailInput(e.target.value); setFindStatus(''); setFoundUser(null) }}
-                onKeyDown={e => e.key === 'Enter' && handleFindUser()}
-                style={{ flex: 1 }}
-              />
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handleFindUser}
-                disabled={findStatus === 'searching'}
-                style={{ flexShrink: 0 }}
-              >
+                onKeyDown={e => e.key === 'Enter' && handleFindUser()} style={{ flex: 1 }} />
+              <button className="btn btn-primary btn-sm" onClick={handleFindUser} disabled={findStatus === 'searching'} style={{ flexShrink: 0 }}>
                 {findStatus === 'searching' ? '…' : 'Find'}
               </button>
             </div>
-
-            {/* Result feedback */}
-            {findStatus === 'not-found' && (
-              <div style={{ marginTop: '10px', fontSize: '.82rem', color: '#f87171' }}>
-                No account found with that email address.
-              </div>
-            )}
-            {findStatus === 'self' && (
-              <div style={{ marginTop: '10px', fontSize: '.82rem', color: 'var(--text-muted)' }}>
-                That's you!
-              </div>
-            )}
-            {findStatus === 'already' && foundUser && (
-              <div style={{ marginTop: '10px', fontSize: '.82rem', color: 'var(--text-muted)' }}>
-                You're already friends with {foundUser.displayName}.
-              </div>
-            )}
-            {findStatus === 'found' && foundUser && (
-              <div style={{
-                marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '10px 14px', borderRadius: 10,
-                background: 'rgba(74,222,128,.06)', border: '1px solid rgba(74,222,128,.2)',
-              }}>
-                <div className="user-avatar" style={{ backgroundColor: '#c9a84c', width: 36, height: 36, fontSize: '.9rem' }}>
-                  {initials(foundUser)}
-                </div>
+            {findStatus === 'not-found' && <div style={{ marginTop: 10, fontSize: '.82rem', color: '#f87171' }}>No account found with that email.</div>}
+            {findStatus === 'self'      && <div style={{ marginTop: 10, fontSize: '.82rem', color: 'var(--text-muted)' }}>That's you!</div>}
+            {findStatus === 'already'   && foundUser && <div style={{ marginTop: 10, fontSize: '.82rem', color: 'var(--text-muted)' }}>Already friends with {foundUser.displayName}.</div>}
+            {findStatus === 'found'     && foundUser && (
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(74,222,128,.06)', border: '1px solid rgba(74,222,128,.2)' }}>
+                <div className="user-avatar" style={{ backgroundColor: '#c9a84c', width: 36, height: 36, fontSize: '.9rem' }}>{initials(foundUser)}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{foundUser.displayName}</div>
                   <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{foundUser.email}</div>
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={handleSendRequest}>
-                  + Add Friend
-                </button>
+                <button className="btn btn-primary btn-sm" onClick={handleSendRequest}>+ Add Friend</button>
               </div>
             )}
           </div>
 
-          {/* ── Friends list ── */}
-          <div>
-            <div className="section-title">My Friends</div>
-            {loading ? (
-              <div className="card">
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
-              </div>
-            ) : friends.length === 0 ? (
-              <div className="card">
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No friends yet. Add someone by their email above!
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: '12px' }}>
-                {friends.map(f => (
-                  <div key={f.id} className="friend-card">
-                    <div className="user-avatar" style={{ backgroundColor: f.friend?.avatar_color || '#c9a84c' }}>
-                      {initials(f.friend)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{displayName(f.friend)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── Pending requests ── */}
-          {pendingRequests.length > 0 && (
-            <div style={{ marginTop: '24px' }}>
-              <div className="section-title">Pending Requests</div>
-              <div style={{ display: 'grid', gap: '12px' }}>
-                {pendingRequests.map(req => (
-                  <div key={req.id} className="friend-card">
-                    <div className="user-avatar" style={{ backgroundColor: req.requester?.avatar_color || '#c9a84c' }}>
-                      {initials(req.requester)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{displayName(req.requester)}</div>
-                    </div>
-                    <button className="btn btn-primary btn-sm" onClick={() => handleAcceptRequest(req.id, req.requester?.id)}>
-                      Accept
+          {/* Friends list */}
+          <div className="section-title">My Friends</div>
+          {loading ? (
+            <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div></div>
+          ) : friends.length === 0 ? (
+            <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No friends yet. Add someone by their email above!</div></div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {friends.map(f => (
+                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                  <div className="user-avatar" style={{ backgroundColor: f.friend?.avatar_color || '#c9a84c' }}>{initials(f.friend)}</div>
+                  <div style={{ flex: 1, fontWeight: 600, fontSize: '.9rem' }}>{displayName(f.friend)}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      onClick={() => handleBrowse(f)}
+                      style={{ padding: '5px 12px', borderRadius: 8, background: 'rgba(201,168,76,.12)', border: '1px solid rgba(201,168,76,.3)', color: 'var(--accent-gold)', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
+                    >
+                      📦 Browse
+                    </button>
+                    <button
+                      onClick={() => handleRemoveFriend(f)}
+                      style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#f87171', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
+                    >
+                      Remove
                     </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      )}
 
-      {tab === 'collections' && (
-        <div>
-          <div className="card" style={{ marginBottom: '20px' }}>
-            <label className="form-label">Select Friend</label>
-            <select
-              className="form-select"
-              onChange={e => handleSelectFriend(e.target.value)}
-              value={selectedFriend || ''}
-            >
-              <option value="">Choose a friend...</option>
-              {friends.map(f => (
-                <option key={f.id} value={f.friend.id}>{displayName(f.friend)}</option>
-              ))}
-            </select>
-          </div>
-
-          {selectedFriend && friendCollection.length > 0 && (
-            <div>
-              <div className="section-title">Their Collection</div>
-              <div className="collection-grid">
-                {friendCollection.map((card, i) => (
-                  <div key={i} className="col-card">
-                    {card.img && <img src={card.img} alt={card.name} />}
-                    <div className="col-card-info">
-                      <div className="col-card-name">{card.name}</div>
-                    </div>
-                    <span className="col-card-qty">×{card.qty}</span>
+          {/* Pending requests */}
+          {pendingRequests.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <div className="section-title">Pending Requests</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {pendingRequests.map(req => (
+                  <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                    <div className="user-avatar" style={{ backgroundColor: req.requester?.avatar_color || '#c9a84c' }}>{initials(req.requester)}</div>
+                    <div style={{ flex: 1, fontWeight: 600, fontSize: '.9rem' }}>{displayName(req.requester)}</div>
+                    <button className="btn btn-primary btn-sm" onClick={() => handleAcceptRequest(req.id, req.requester?.id)}>Accept</button>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {selectedFriend && friendCollection.length === 0 && (
-            <div className="empty-state">
-              <p>No cards in this collection</p>
-            </div>
-          )}
         </div>
       )}
 
-      {tab === 'trades' && (
+      {/* ════════════════ BROWSE & TRADE ════════════════ */}
+      {tab === 'browse' && (
         <div>
-          <div className="card">
-            <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              Trade matching lets you find cards you and your friends have for trade. Manage your want list in your collection view.
-            </p>
-          </div>
-
-          {friends.length === 0 ? (
+          {!browsingFriend ? (
             <div className="card">
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                Add friends to start trading!
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.88rem' }}>
+                Click <strong>📦 Browse</strong> on a friend's card to see their collection and propose a trade.
               </div>
             </div>
           ) : (
-            <p style={{ padding: '0 0 16px 0', fontSize: '.85rem', color: 'var(--text-muted)' }}>
-              Trade matching algorithm coming soon! Check back when you have friends added.
-            </p>
+            <>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <button onClick={() => { setBrowsingFriend(null); setFriendCollection([]); setCart([]); setCartOpen(false) }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '.85rem', padding: '4px 8px' }}>
+                  ← Back
+                </button>
+                <span style={{ fontWeight: 700, fontSize: '.95rem' }}>
+                  {displayName(browsingFriend.friend)}'s Collection
+                </span>
+                <span style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginLeft: 4 }}>
+                  {friendCollection.length} cards
+                </span>
+              </div>
+
+              {/* Search */}
+              <input className="form-input" placeholder="Search cards…" value={collectionSearch}
+                onChange={e => setCollectionSearch(e.target.value)}
+                style={{ marginBottom: 16, width: '100%' }} />
+
+              {/* Cart bar — shown when cart has items */}
+              {cart.length > 0 && (
+                <div style={{ marginBottom: 16, borderRadius: 12, border: '1px solid rgba(201,168,76,.35)', background: 'rgba(201,168,76,.07)', overflow: 'hidden' }}>
+                  <div
+                    onClick={() => setCartOpen(o => !o)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--accent-gold)' }}>
+                      🛒 {cart.length} card{cart.length !== 1 ? 's' : ''} · {fmt(cartTotal)}
+                    </span>
+                    <span style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{cartOpen ? '▲ Hide cart' : '▼ View cart'}</span>
+                  </div>
+
+                  {cartOpen && (
+                    <div style={{ borderTop: '1px solid rgba(201,168,76,.2)', padding: '12px 16px' }}>
+                      {/* Cart items */}
+                      {cart.map(c => (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                          {c.img && <img src={c.img} alt={c.name} style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '.82rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                              <select value={c.condition} onChange={e => handleUpdateCartItem(c.id, { condition: e.target.value })}
+                                style={{ fontSize: '.7rem', padding: '2px 4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                                {CONDITIONS.map(cond => <option key={cond} value={cond}>{cond}</option>)}
+                              </select>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: '.7rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={c.isFoil} onChange={e => handleUpdateCartItem(c.id, { isFoil: e.target.checked })} style={{ width: 12, height: 12 }} />
+                                Foil
+                              </label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <button onClick={() => handleUpdateCartItem(c.id, { selectedQty: Math.max(1, c.selectedQty - 1) })}
+                                  style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                                <span style={{ fontSize: '.78rem', minWidth: 16, textAlign: 'center' }}>{c.selectedQty}</span>
+                                <button onClick={() => handleUpdateCartItem(c.id, { selectedQty: Math.min(c.qty, c.selectedQty + 1) })}
+                                  style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '.8rem', fontWeight: 600 }}>{c.price != null ? fmt(c.price * c.selectedQty) : '—'}</div>
+                            <button onClick={() => handleRemoveFromCart(c.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.7rem', color: '#f87171', marginTop: 2 }}>✕ Remove</button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Message + submit */}
+                      <div style={{ marginTop: 12 }}>
+                        <input className="form-input" placeholder="Add a message (optional)…" value={tradeMessage}
+                          onChange={e => setTradeMessage(e.target.value)}
+                          style={{ marginBottom: 10, fontSize: '.82rem' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 700, fontSize: '.88rem' }}>Subtotal: {fmt(cartTotal)}</span>
+                          <button
+                            onClick={handleProposeTrade}
+                            disabled={proposing}
+                            style={{ padding: '7px 18px', borderRadius: 8, background: 'var(--accent-gold)', border: 'none', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: proposing ? 'wait' : 'pointer', opacity: proposing ? 0.7 : 1 }}
+                          >
+                            {proposing ? 'Sending…' : '🤝 Propose Trade'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Collection grid */}
+              {collectionLoading ? (
+                <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading collection…</div>
+              ) : filteredCollection.length === 0 ? (
+                <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                  {collectionSearch ? 'No cards match your search.' : 'This collection is empty.'}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+                  {filteredCollection.map((card, i) => {
+                    const inCart = cart.find(c => c.id === card.id)
+                    return (
+                      <div key={i} style={{ background: 'var(--bg-card)', border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                        {card.img
+                          ? <img src={card.img} alt={card.name} style={{ width: '100%', aspectRatio: '63/88', objectFit: 'cover' }} />
+                          : <div style={{ aspectRatio: '63/88', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.7rem', color: 'var(--text-muted)' }}>No image</div>
+                        }
+                        <div style={{ padding: '8px 8px 10px' }}>
+                          <div style={{ fontSize: '.75rem', fontWeight: 600, lineHeight: 1.3, marginBottom: 4 }}>{card.name}</div>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                            {card.condition && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{card.condition}</span>}
+                            {card.isFoil   && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'rgba(201,168,76,.15)', color: 'var(--accent-gold)' }}>Foil</span>}
+                            <span style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>×{card.qty}</span>
+                          </div>
+                          {card.price != null && <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 6 }}>{fmt(card.price)}</div>}
+                          <button
+                            onClick={() => handleAddToCart(card)}
+                            disabled={inCart && inCart.selectedQty >= card.qty}
+                            style={{
+                              width: '100%', padding: '5px 0', borderRadius: 7, fontSize: '.72rem', fontWeight: 700,
+                              cursor: (inCart && inCart.selectedQty >= card.qty) ? 'default' : 'pointer',
+                              background: inCart ? 'rgba(201,168,76,.15)' : 'rgba(201,168,76,.1)',
+                              border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'rgba(201,168,76,.25)'}`,
+                              color: inCart ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                              opacity: (inCart && inCart.selectedQty >= card.qty) ? 0.5 : 1,
+                            }}
+                          >
+                            {inCart ? `✓ In cart (${inCart.selectedQty})` : '+ Add to Trade'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
+
+      {/* ════════════════ TRADE PROPOSALS ════════════════ */}
+      {tab === 'trades' && (
+        <div>
+          {tradesLoading ? (
+            <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div></div>
+          ) : (
+            <>
+              {/* Incoming */}
+              <div className="section-title" style={{ marginBottom: 10 }}>Incoming Proposals</div>
+              {incomingTrades.length === 0 ? (
+                <div className="card" style={{ marginBottom: 20 }}><div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>No incoming trade proposals.</div></div>
+              ) : (
+                <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
+                  {incomingTrades.map(trade => (
+                    <TradeCard key={trade.id} trade={trade} isIncoming perspective="recipient"
+                      onRespond={handleRespondTrade} />
+                  ))}
+                </div>
+              )}
+
+              {/* Outgoing */}
+              <div className="section-title" style={{ marginBottom: 10 }}>Sent Proposals</div>
+              {outgoingTrades.length === 0 ? (
+                <div className="card"><div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>No outgoing trade proposals.</div></div>
+              ) : (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {outgoingTrades.map(trade => (
+                    <TradeCard key={trade.id} trade={trade} isIncoming={false} perspective="sender"
+                      onRespond={handleRespondTrade} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TradeCard({ trade, perspective, onRespond }) {
+  const total = (trade.items || []).reduce((s, i) => s + (i.price || 0) * i.qty, 0)
+  const statusColor = { pending: '#facc15', accepted: '#4ade80', declined: '#f87171' }[trade.status] || 'var(--text-muted)'
+
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div>
+          <span style={{ fontSize: '.82rem', fontWeight: 700 }}>
+            {perspective === 'recipient' ? `From ${trade.senderName}` : `To ${trade.recipientName}`}
+          </span>
+          <span style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginLeft: 8 }}>{fmtDate(trade.created_at)}</span>
+        </div>
+        <span style={{ fontSize: '.72rem', fontWeight: 700, color: statusColor, textTransform: 'capitalize', padding: '2px 8px', borderRadius: 99, background: `${statusColor}18` }}>
+          {trade.status}
+        </span>
+      </div>
+
+      {/* Items */}
+      <div style={{ padding: '10px 16px' }}>
+        {(trade.items || []).map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: i < trade.items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+            {item.img && <img src={item.img} alt={item.name} style={{ width: 28, height: 39, objectFit: 'cover', borderRadius: 3, flexShrink: 0 }} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '.8rem', fontWeight: 600 }}>{item.card_name}</div>
+              <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>
+                {[item.condition, item.is_foil && 'Foil', `×${item.qty}`].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+            <div style={{ fontSize: '.78rem', fontWeight: 600 }}>{item.price ? fmt(item.price * item.qty) : '—'}</div>
+          </div>
+        ))}
+
+        {trade.message && (
+          <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: 'var(--bg-secondary)', fontSize: '.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+            "{trade.message}"
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+          <span style={{ fontSize: '.82rem', fontWeight: 700 }}>Total: {fmt(total)}</span>
+          {perspective === 'recipient' && trade.status === 'pending' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => onRespond(trade, 'accepted')}
+                style={{ padding: '5px 14px', borderRadius: 8, background: 'rgba(74,222,128,.15)', border: '1px solid rgba(74,222,128,.3)', color: '#4ade80', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer' }}>
+                ✓ Accept
+              </button>
+              <button onClick={() => onRespond(trade, 'declined')}
+                style={{ padding: '5px 14px', borderRadius: 8, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', color: '#f87171', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer' }}>
+                ✕ Decline
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
