@@ -55,6 +55,7 @@ function collectionRowToCard(row) {
     price:        row.price         ?? null,
     tcgplayerUrl: row.tcgplayer_url ?? row.tcgplayerUrl ?? null,
     scryfallId:   row.scryfall_id   ?? row.scryfallId   ?? null,
+    forTrade:     row.in_trade_binder ?? false,
   }
 }
 
@@ -126,9 +127,10 @@ export async function addCard(card, userId) {
 // ── UPDATE COLLECTION CARD ───────────────────────────
 export async function updateCollectionCard(id, patch, userId) {
   const dbPatch = {}
-  if (patch.qty        !== undefined) dbPatch.qty         = patch.qty
-  if (patch.condition  !== undefined) dbPatch.condition   = patch.condition
-  if (patch.scryfallId != null)        dbPatch.scryfall_id = patch.scryfallId
+  if (patch.qty        !== undefined) dbPatch.qty              = patch.qty
+  if (patch.condition  !== undefined) dbPatch.condition        = patch.condition
+  if (patch.scryfallId != null)        dbPatch.scryfall_id     = patch.scryfallId
+  if (patch.forTrade   !== undefined) dbPatch.in_trade_binder  = patch.forTrade
   if (hasSupabase && userId && Object.keys(dbPatch).length > 0) {
     await supabase.from('collection').update(dbPatch).eq('id', id).eq('user_id', userId)
   }

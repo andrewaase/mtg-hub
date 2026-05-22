@@ -862,8 +862,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
       if (patch.forTrade !== undefined) binders[key].forTrade = patch.forTrade
       writeBinders(binders)
     }
-    // Persist qty / condition to Supabase
-    if (patch.qty !== undefined || patch.condition !== undefined) {
+    // Persist qty / condition / trade-binder flag to Supabase
+    if (patch.qty !== undefined || patch.condition !== undefined || patch.forTrade !== undefined) {
       updateCollectionCard(id, patch, user?.id).catch(e => console.warn('[updateCard]', e))
     }
   }
