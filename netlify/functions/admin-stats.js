@@ -138,6 +138,7 @@ exports.handler = async (event) => {
         is_admin:        u.email === ADMIN_EMAIL,
         tier,
         membershipEnd:   profile.membership_end || null,
+        bannedUntil:     u.banned_until || null,
       }
     }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
