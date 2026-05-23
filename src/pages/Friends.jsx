@@ -3,7 +3,7 @@ import { hasSupabase, supabase } from '../lib/supabase'
 import {
   getFriends, getPendingRequests, sendFriendRequest, acceptFriendRequest,
   findUserByEmail, getFriendCollection, createNotification,
-  removeFriend, createTrade, getTrades, respondTrade,
+  removeFriend, createTrade, getTrades, respondTrade, reportUser,
 } from '../lib/db'
 
 function displayName(p) {
@@ -48,6 +48,11 @@ export default function Friends({ user, showToast, isActive }) {
   const [trades, setTrades] = useState([])
   const [tradesLoading, setTradesLoading] = useState(false)
   const [tradesLoaded, setTradesLoaded] = useState(false)
+
+  // Report
+  const [reportTarget, setReportTarget] = useState(null) // { id, email, name }
+  const [reportReason, setReportReason] = useState('')
+  const [reportSubmitting, setReportSubmitting] = useState(false)
 
   useEffect(() => {
     if (user && hasSupabase) loadFriendsData()
@@ -228,6 +233,18 @@ export default function Friends({ user, showToast, isActive }) {
     }
   }
 
+  // ── Report user ───────────────────────────────────────────────────────────
+  const handleSubmitReport = async () => {
+    if (!reportReason.trim() || !reportTarget) return
+    setReportSubmitting(true)
+    const token = await getToken()
+    await reportUser({ reportedUserId: reportTarget.id, reportedEmail: reportTarget.email, reason: reportReason }, token)
+    setReportSubmitting(false)
+    setReportTarget(null)
+    setReportReason('')
+    showToast('Report submitted. Thank you.')
+  }
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const filteredCollection = friendCollection.filter(c =>
     !collectionSearch || c.name?.toLowerCase().includes(collectionSearch.toLowerCase())
@@ -312,6 +329,13 @@ export default function Friends({ user, showToast, isActive }) {
                       style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#f87171', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
                     >
                       Remove
+                    </button>
+                    <button
+                      onClick={() => { setReportTarget({ id: f.friend.id, email: f.friend.email, name: displayName(f.friend) }); setReportReason('') }}
+                      title="Report this user"
+                      style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.18)', color: '#fbbf24', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
+                    >
+                      ⚑ Report
                     </button>
                   </div>
                 </div>
@@ -547,9 +571,75 @@ export default function Friends({ user, showToast, isActive }) {
         </>
       )}
 
+      {/* ── Report modal ── */}
+      {reportTarget && (
+        <>
+          <div onClick={() => setReportTarget(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            width: 'min(420px, 92vw)', background: 'var(--bg-card)',
+            border: '1px solid rgba(251,191,36,.3)', borderRadius: 16,
+            zIndex: 401, padding: '24px 24px 20px',
+            boxShadow: '0 16px 48px rgba(0,0,0,.6)',
+          }}>
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 4 }}>⚑ Report User</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+              Reporting <strong>{reportTarget.name}</strong> ({reportTarget.email})
+            </div>
+            <textarea
+              autoFocus
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              placeholder="Describe the issue — e.g. scam attempt, abusive messages, suspicious behaviour…"
+              rows={5}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '10px 12px', borderRadius: 8, resize: 'vertical',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                color: 'var(--text-primary)', fontSize: '.82rem', lineHeight: 1.5,
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setReportTarget(null)}
+                style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)', fontWeight: 600, fontSize: '.8rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason.trim() || reportSubmitting}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: 'none',
+                  background: reportReason.trim() ? 'rgba(251,191,36,.85)' : 'rgba(251,191,36,.25)',
+                  color: '#000', fontWeight: 700, fontSize: '.8rem',
+                  cursor: reportReason.trim() && !reportSubmitting ? 'pointer' : 'default',
+                  opacity: reportSubmitting ? 0.6 : 1,
+                }}
+              >
+                {reportSubmitting ? 'Submitting…' : 'Submit Report'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ════════════════ TRADE PROPOSALS ════════════════ */}
       {tab === 'trades' && (
         <div>
+          {/* Safety notice */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            padding: '10px 14px', marginBottom: 16, borderRadius: 10,
+            background: 'rgba(251,191,36,.07)', border: '1px solid rgba(251,191,36,.25)',
+          }}>
+            <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>⚠️</span>
+            <p style={{ margin: 0, fontSize: '.76rem', color: '#fcd34d', lineHeight: 1.5 }}>
+              <strong>Trade safely.</strong> Only exchange cards in person or with trusted individuals. Vaulted Singles does not mediate disputes or guarantee trades. If a user behaves suspiciously, use the <strong>Report</strong> button on their friend card.
+            </p>
+          </div>
+
           {tradesLoading ? (
             <div className="card"><div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div></div>
           ) : (
