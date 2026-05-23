@@ -175,15 +175,50 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         )}
       </div>
 
-      {/* Card image */}
-      {img && (
-        <div style={{ padding: '20px 0 12px', display: 'flex', justifyContent: 'center' }}>
-          <img src={img} alt={card.name} style={{ width: 'min(280px, 72vw)', borderRadius: '14px', boxShadow: '0 12px 60px rgba(0,0,0,.9)' }} />
-        </div>
-      )}
+      {/* Card image + legality (side-by-side on wide screens, stacked on mobile) */}
+      <div style={{ padding: '20px 20px 8px', display: 'flex', gap: 28, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {img && (
+          <img src={img} alt={card.name} style={{ width: 'min(260px, 62vw)', borderRadius: '14px', boxShadow: '0 12px 60px rgba(0,0,0,.9)', flexShrink: 0, display: 'block' }} />
+        )}
+
+        {/* Legality table */}
+        {card.legalities && (
+          <div style={{ flexShrink: 0, minWidth: 168 }}>
+            <div style={{ fontSize: '.6rem', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10 }}>Format Legality</div>
+            {[
+              ['Standard',  'standard'],
+              ['Pioneer',   'pioneer'],
+              ['Modern',    'modern'],
+              ['Legacy',    'legacy'],
+              ['Vintage',   'vintage'],
+              ['Commander', 'commander'],
+              ['Pauper',    'pauper'],
+              ['Premodern', 'premodern'],
+            ].map(([label, key]) => {
+              const status = card.legalities[key] || 'not_legal'
+              const isLegal      = status === 'legal'
+              const isBanned     = status === 'banned'
+              const isRestricted = status === 'restricted'
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '5px 0', borderBottom: '1px solid #111' }}>
+                  <span style={{ fontSize: '.76rem', color: '#888' }}>{label}</span>
+                  <span style={{
+                    fontSize: '.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap',
+                    background: isLegal ? 'rgba(74,222,128,.1)' : isBanned ? 'rgba(239,68,68,.1)' : isRestricted ? 'rgba(251,191,36,.1)' : 'rgba(255,255,255,.03)',
+                    border: `1px solid ${isLegal ? 'rgba(74,222,128,.25)' : isBanned ? 'rgba(239,68,68,.25)' : isRestricted ? 'rgba(251,191,36,.25)' : '#1e1e1e'}`,
+                    color: isLegal ? '#4ade80' : isBanned ? '#f87171' : isRestricted ? '#fbbf24' : '#333',
+                  }}>
+                    {isLegal ? 'Legal' : isBanned ? 'Banned' : isRestricted ? 'Restricted' : 'Not Legal'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Core info */}
-      <div style={{ padding: '0 16px 8px' }}>
+      <div style={{ padding: '8px 16px 8px' }}>
         <div style={{ fontSize: '.8rem', color: '#888', marginBottom: '5px' }}>{card.type_line}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '.72rem', color: rc }}>{RARITY_LABEL[card.rarity] || card.rarity}</span>
