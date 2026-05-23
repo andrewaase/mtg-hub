@@ -12,6 +12,7 @@ const TYPE_ICON = {
   trade_proposed:  '↔️',
   trade_accepted:  '🟢',
   trade_declined:  '🔴',
+  report_received: '⚠️',
 }
 
 function formatTimestamp(ts) {

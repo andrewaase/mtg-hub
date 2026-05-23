@@ -124,11 +124,12 @@ function TierBadge({ tier }) {
 
 // ── User table ─────────────────────────────────────────────────────────────
 
-function UserTable({ users, onTierChange }) {
+function UserTable({ users, onTierChange, onBan }) {
   const [search,  setSearch]  = useState('')
   const [sortKey, setSortKey] = useState('createdAt')
   const [sortDir, setSortDir] = useState('desc')
   const [changing, setChanging] = useState(null) // userId currently being updated
+  const [banning,  setBanning]  = useState(null)  // userId currently being banned/unbanned
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -203,6 +204,7 @@ function UserTable({ users, onTierChange }) {
               <SortHeader label="Last Seen"    k="lastSignIn"  />
               <SortHeader label="Cards"        k="totalCards"  />
               <SortHeader label="Matches"      k="matchCount"  />
+              <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -280,6 +282,33 @@ function UserTable({ users, onTierChange }) {
                     ? <span style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>{u.matchCount}</span>
                     : <span style={{ color: '#334155' }}>—</span>
                   }
+                </td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                  {!u.is_admin && (
+                    (() => {
+                      const isBanned = u.bannedUntil && new Date(u.bannedUntil) > new Date()
+                      return (
+                        <button
+                          disabled={banning === u.id}
+                          onClick={async () => {
+                            if (!confirm(isBanned ? `Unban ${u.email}?` : `Ban ${u.email}? They will be unable to sign in.`)) return
+                            setBanning(u.id)
+                            try { await onBan(u.id, !isBanned) } finally { setBanning(null) }
+                          }}
+                          style={{
+                            padding: '3px 10px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 700,
+                            cursor: banning === u.id ? 'wait' : 'pointer',
+                            opacity: banning === u.id ? 0.5 : 1,
+                            background: isBanned ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.1)',
+                            border:     isBanned ? '1px solid rgba(74,222,128,.3)' : '1px solid rgba(239,68,68,.25)',
+                            color:      isBanned ? '#4ade80' : '#f87171',
+                          }}
+                        >
+                          {isBanned ? 'Unban' : 'Ban'}
+                        </button>
+                      )
+                    })()
+                  )}
                 </td>
               </tr>
             ))}
@@ -1521,12 +1550,81 @@ function SettingsTab() {
 
 // ── Main component ──────────────────────────────────────────────────────────
 
+// ── Reports tab ─────────────────────────────────────────────────────────────
+
+function ReportsTab() {
+  const [reports,  setReports]  = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [loaded,   setLoaded]   = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/.netlify/functions/get-reports', {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        const json = await res.json()
+        setReports(json.reports || [])
+      } catch { /* non-critical */ }
+      setLoading(false)
+      setLoaded(true)
+    }
+    load()
+  }, [])
+
+  function fmtTs(ts) {
+    if (!ts) return '—'
+    const d = new Date(ts)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+
+  if (loading && !loaded) return (
+    <div style={{ padding: 32, textAlign: 'center', color: '#475569' }}>Loading reports…</div>
+  )
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.08)', fontWeight: 700, fontSize: '.88rem', color: '#e2e8f0' }}>
+        ⚠️ User Reports
+        <span style={{ marginLeft: 8, fontSize: '.72rem', color: '#475569', fontWeight: 400 }}>{reports.length} total</span>
+      </div>
+      {reports.length === 0 ? (
+        <div style={{ padding: '32px 16px', textAlign: 'center', color: '#334155', fontSize: '.85rem' }}>No reports submitted yet.</div>
+      ) : (
+        <div>
+          {reports.map(r => (
+            <div key={r.id} style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '.78rem' }}>
+                  <span style={{ color: '#f87171', fontWeight: 700 }}>Reported: </span>
+                  <span style={{ color: '#e2e8f0' }}>{r.reported_email || r.reported_user_id || '—'}</span>
+                  <span style={{ color: '#475569', margin: '0 8px' }}>·</span>
+                  <span style={{ color: '#94a3b8', fontWeight: 700 }}>By: </span>
+                  <span style={{ color: '#e2e8f0' }}>{r.reporter_email || r.reporter_id || '—'}</span>
+                </div>
+                <span style={{ fontSize: '.68rem', color: '#475569', whiteSpace: 'nowrap' }}>{fmtTs(r.created_at)}</span>
+              </div>
+              <div style={{ fontSize: '.8rem', color: '#94a3b8', lineHeight: 1.5, padding: '8px 10px', borderRadius: 6, background: 'rgba(0,0,0,.25)', whiteSpace: 'pre-wrap' }}>
+                {r.reason}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'overview',  label: '📊 Overview'  },
   { id: 'listings',  label: '🏪 Listings'  },
   { id: 'orders',    label: '📦 Orders'    },
   { id: 'meta',      label: '📈 Meta'      },
   { id: 'settings',  label: '⚙️ Settings'  },
+  { id: 'reports',   label: '⚠️ Reports'   },
 ]
 
 // ── Meta Tracker admin tab ──────────────────────────────────────────────────
@@ -2357,6 +2455,17 @@ export default function AdminPanel({ user, isAdmin }) {
                 await setUserMembership(userId, tier, tier === 'pro' ? 1 : 0, session.access_token)
                 await fetchStats()
               }}
+              onBan={async (userId, banned) => {
+                const { data: { session } } = await supabase.auth.getSession()
+                const res = await fetch('/.netlify/functions/ban-user', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                  body: JSON.stringify({ userId, banned }),
+                })
+                const json = await res.json()
+                if (json.ok) await fetchStats()
+                else alert('Ban failed: ' + (json.error || 'Unknown error'))
+              }}
             />
           )}
         </>
@@ -2373,6 +2482,9 @@ export default function AdminPanel({ user, isAdmin }) {
 
       {/* ── Settings tab ── */}
       {tab === 'settings' && <SettingsTab />}
+
+      {/* ── Reports tab ── */}
+      {tab === 'reports' && <ReportsTab />}
 
       <style>{`
         @keyframes spin  { to { transform: rotate(360deg); } }

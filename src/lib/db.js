@@ -452,6 +452,24 @@ export async function getTrades(accessToken) {
   } catch { return [] }
 }
 
+export async function reportUser({ reportedUserId, reportedEmail, reason }, accessToken) {
+  const res = await fetch('/.netlify/functions/report-user', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body:    JSON.stringify({ reportedUserId, reportedEmail, reason }),
+  })
+  return res.json()
+}
+
+export async function banUser(userId, banned, accessToken) {
+  const res = await fetch('/.netlify/functions/ban-user', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body:    JSON.stringify({ userId, banned }),
+  })
+  return res.json()
+}
+
 export async function respondTrade(tradeId, action, accessToken, opts = {}) {
   const res = await fetch('/.netlify/functions/respond-trade', {
     method:  'POST',
