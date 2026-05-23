@@ -51,7 +51,17 @@ async function fetchAllCardPrices() {
           card.image_uris?.small ||
           card.card_faces?.[0]?.image_uris?.small ||
           null
-        priceMap[card.name] = { price, img }
+        // Store legalities so format filtering works in the UI
+        const leg = card.legalities || {}
+        const legalities = {
+          standard:  leg.standard  || 'not_legal',
+          pioneer:   leg.pioneer   || 'not_legal',
+          modern:    leg.modern    || 'not_legal',
+          legacy:    leg.legacy    || 'not_legal',
+          pauper:    leg.pauper    || 'not_legal',
+          premodern: leg.premodern || 'not_legal',
+        }
+        priceMap[card.name] = { price, img, legalities }
       }
 
       pageCount++
@@ -199,7 +209,7 @@ exports.handler = async (event) => {
     // Noise filter: require at least $0.10 OR 5% move
     if (Math.abs(dollarChange) < 0.10 && Math.abs(pctChange) < 5) continue
 
-    deltas.push({ name, img, oldPrice, newPrice, dollarChange, pctChange })
+    deltas.push({ name, img, oldPrice, newPrice, dollarChange, pctChange, legalities: todayPrices[name]?.legalities || null })
   }
 
   const gainers = deltas
