@@ -378,6 +378,8 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   const [marketMovers, setMarketMovers] = useState({ gainers: [], losers: [], daysApart: 0, ready: false })
   const [moversLoading, setMoversLoading] = useState(true)
   const [moverSort,    setMoverSort]    = useState('dollar')   // 'dollar' | 'pct'
+  const [moverFormat,  setMoverFormat]  = useState(null)       // null | 'standard' | 'pioneer' | ...
+  const [moverCard,    setMoverCard]    = useState(null)       // card name to preview
 
   // Read pre-computed movers from Supabase on mount
   useEffect(() => {
@@ -543,36 +545,48 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
       {/* ── Market Movers ── */}
       {(() => {
-        const { gainers: allGainers, losers: allLosers, ready, daysApart, computedDate } = marketMovers
+        const { gainers: allGainers, losers: allLosers, ready, daysApart } = marketMovers
 
-        // Sort gainers: highest first ($ or %)
-        const sortedGainers = [...allGainers]
+        const FORMATS = [
+          { id: 'standard',  label: 'Standard'  },
+          { id: 'pioneer',   label: 'Pioneer'   },
+          { id: 'modern',    label: 'Modern'    },
+          { id: 'legacy',    label: 'Legacy'    },
+          { id: 'pauper',    label: 'Pauper'    },
+          { id: 'premodern', label: 'Premodern' },
+        ]
+
+        const fmtFilter = (list) => {
+          if (!moverFormat) return list
+          return list.filter(item =>
+            !item.legalities || item.legalities[moverFormat] === 'legal'
+          )
+        }
+
+        const sortedGainers = fmtFilter([...allGainers])
           .sort(moverSort === 'pct'
             ? (a, b) => b.pctChange    - a.pctChange
             : (a, b) => b.dollarChange - a.dollarChange)
           .slice(0, 5)
 
-        // Sort losers: most negative first ($ or %)
-        const sortedLosers = [...allLosers]
+        const sortedLosers = fmtFilter([...allLosers])
           .sort(moverSort === 'pct'
             ? (a, b) => a.pctChange    - b.pctChange
             : (a, b) => a.dollarChange - b.dollarChange)
           .slice(0, 5)
 
-        const SortBtn = ({ id, label }) => (
-          <button onClick={() => setMoverSort(id)} style={{
-            padding: '3px 10px', borderRadius: 99, fontSize: '.64rem', fontWeight: 700,
-            background:  moverSort === id ? 'var(--accent-gold-glow)' : 'transparent',
-            border:      `1px solid ${moverSort === id ? 'var(--accent-gold)' : 'var(--border)'}`,
-            color:       moverSort === id ? 'var(--accent-gold)' : 'var(--text-muted)',
-            cursor: 'pointer', transition: 'all .15s',
-          }}>{label}</button>
-        )
+        const chipStyle = (active) => ({
+          padding: '3px 10px', borderRadius: 99, fontSize: '.64rem', fontWeight: 700,
+          background:  active ? 'var(--accent-gold-glow)' : 'transparent',
+          border:      `1px solid ${active ? 'var(--accent-gold)' : 'var(--border)'}`,
+          color:       active ? 'var(--accent-gold)' : 'var(--text-muted)',
+          cursor: 'pointer', transition: 'all .15s',
+        })
 
         return (
           <div style={{ margin: '12px 16px 0' }}>
             {/* Section header + sort toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                 <div className="section-title" style={{ padding: 0 }}>Market Movers</div>
                 {ready && daysApart > 0 && (
@@ -581,11 +595,23 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
               </div>
               {ready && (
                 <div style={{ display: 'flex', gap: 5 }}>
-                  <SortBtn id="dollar" label="$ Amount" />
-                  <SortBtn id="pct"    label="% Change" />
+                  <button onClick={() => setMoverSort('dollar')} style={chipStyle(moverSort === 'dollar')}>$ Amount</button>
+                  <button onClick={() => setMoverSort('pct')}    style={chipStyle(moverSort === 'pct')}>% Change</button>
                 </div>
               )}
             </div>
+
+            {/* Format filter row */}
+            {ready && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                <button onClick={() => setMoverFormat(null)} style={chipStyle(!moverFormat)}>All</button>
+                {FORMATS.map(f => (
+                  <button key={f.id} onClick={() => setMoverFormat(moverFormat === f.id ? null : f.id)} style={chipStyle(moverFormat === f.id)}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Loading */}
             {moversLoading ? (
@@ -593,7 +619,6 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
                 <div style={{ fontSize: '.78rem', color: 'var(--text-muted)' }}>Loading market data…</div>
               </div>
 
-            /* No data yet (scheduler hasn't run) */
             ) : !ready ? (
               <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>📊</div>
@@ -611,16 +636,16 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
                 <div className="card" style={{ padding: '12px 14px' }}>
                   <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-green)', marginBottom: '10px' }}>▲ Gainers</div>
                   {sortedGainers.length === 0
-                    ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable gainers today</div>
-                    : sortedGainers.map(g => <MoverRow key={g.name} item={g} type="gain" sort={moverSort} />)
+                    ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable gainers{moverFormat ? ` in ${moverFormat}` : ''}</div>
+                    : sortedGainers.map(g => <MoverRow key={g.name} item={g} type="gain" sort={moverSort} onClick={() => setMoverCard(g.name)} />)
                   }
                 </div>
                 {/* Losers */}
                 <div className="card" style={{ padding: '12px 14px' }}>
                   <div style={{ fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)', marginBottom: '10px' }}>▼ Losers</div>
                   {sortedLosers.length === 0
-                    ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable losers today</div>
-                    : sortedLosers.map(l => <MoverRow key={l.name} item={l} type="loss" sort={moverSort} />)
+                    ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable losers{moverFormat ? ` in ${moverFormat}` : ''}</div>
+                    : sortedLosers.map(l => <MoverRow key={l.name} item={l} type="loss" sort={moverSort} onClick={() => setMoverCard(l.name)} />)
                   }
                 </div>
               </div>
@@ -628,6 +653,9 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
           </div>
         )
       })()}
+
+      {/* ── Mover card preview modal ── */}
+      {moverCard && <MoverCardModal name={moverCard} onClose={() => setMoverCard(null)} />}
 
       {/* ── Tournament Demand ── */}
       <TournamentWidget collection={collection} setPage={setPage} />
@@ -695,7 +723,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   )
 }
 
-function MoverRow({ item, type, sort = 'dollar' }) {
+function MoverRow({ item, type, sort = 'dollar', onClick }) {
   const isGain   = type === 'gain'
   const color    = isGain ? 'var(--accent-green)' : 'var(--accent-red)'
   const primary  = sort === 'pct'
@@ -705,7 +733,17 @@ function MoverRow({ item, type, sort = 'dollar' }) {
     ? `${item.dollarChange > 0 ? '+' : '-'}$${Math.abs(item.dollarChange).toFixed(2)}`
     : `${isGain ? '+' : ''}${item.pctChange}%`
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }} className="mover-row-last-no-border">
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0',
+        borderBottom: '1px solid var(--border-subtle)',
+        cursor: 'pointer', borderRadius: 6, transition: 'background .12s',
+      }}
+      className="mover-row-last-no-border"
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
       {item.img
         ? <img src={item.img} alt={item.name} style={{ width: '28px', borderRadius: '3px', flexShrink: 0 }} />
         : <div style={{ width: '28px', height: '40px', background: 'var(--bg-hover)', borderRadius: '3px', flexShrink: 0 }} />
@@ -719,6 +757,139 @@ function MoverRow({ item, type, sort = 'dollar' }) {
         <div style={{ fontSize: '.62rem', color, opacity: .7, marginTop: '1px' }}>{secondary}</div>
       </div>
     </div>
+  )
+}
+
+function MoverCardModal({ name, onClose }) {
+  const [card,    setCard]    = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setCard(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [name])
+
+  const face     = card?.card_faces?.[0] || card
+  const img      = card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal
+  const oracle   = face?.oracle_text || ''
+  const typeLine = face?.type_line   || card?.type_line || ''
+  const manaCost = face?.mana_cost   || card?.mana_cost || ''
+  const flavor   = face?.flavor_text || ''
+  const usd      = card?.prices?.usd
+  const usdFoil  = card?.prices?.usd_foil
+  const setName  = card?.set_name
+  const tcgUrl   = card?.purchase_uris?.tcgplayer
+
+  const FORMAT_LABELS = {
+    standard: 'Standard', pioneer: 'Pioneer', modern: 'Modern',
+    legacy: 'Legacy', pauper: 'Pauper', premodern: 'Premodern',
+  }
+  const legalFormats = card?.legalities
+    ? Object.entries(FORMAT_LABELS)
+        .filter(([k]) => card.legalities[k] === 'legal')
+        .map(([, v]) => v)
+    : []
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 500 }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 'min(560px, 96vw)', maxHeight: '92vh', overflowY: 'auto',
+        background: 'var(--bg-primary)', border: '1px solid var(--border)',
+        borderRadius: 18, zIndex: 501, padding: 20,
+        boxShadow: '0 24px 60px rgba(0,0,0,.7)',
+      }}>
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 14, right: 14,
+          background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%',
+          width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
+
+        {loading ? (
+          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.82rem' }}>
+            Loading…
+          </div>
+        ) : !card ? (
+          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '.82rem' }}>
+            Card not found
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            {/* Image */}
+            <div style={{ flexShrink: 0 }}>
+              {img
+                ? <img src={img} alt={name} style={{ width: 'min(200px,40vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
+                : <div style={{ width: 'min(200px,40vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+              }
+            </div>
+
+            {/* Details */}
+            <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', lineHeight: 1.25, paddingRight: 32 }}>{name}</div>
+                {typeLine && <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>{typeLine}</div>}
+                {manaCost && <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>{manaCost}</div>}
+                {setName  && <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginTop: 2 }}>{setName}</div>}
+              </div>
+
+              {oracle && (
+                <div style={{ fontSize: '.75rem', color: 'var(--text-secondary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', padding: '8px 10px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  {oracle}
+                </div>
+              )}
+              {flavor && (
+                <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: 1.5 }}>"{flavor}"</div>
+              )}
+
+              {/* Prices */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                {usd && (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(201,168,76,.1)', border: '1px solid rgba(201,168,76,.25)' }}>
+                    <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>MARKET</div>
+                    <div style={{ fontSize: '.95rem', fontWeight: 800, color: 'var(--accent-gold)' }}>${usd}</div>
+                  </div>
+                )}
+                {usdFoil && (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.15)' }}>
+                    <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>FOIL</div>
+                    <div style={{ fontSize: '.95rem', fontWeight: 800, color: 'var(--accent-gold)', opacity: .8 }}>${usdFoil}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Legal formats */}
+              {legalFormats.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 5 }}>Legal in</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {legalFormats.map(f => (
+                      <span key={f} style={{ fontSize: '.62rem', padding: '2px 7px', borderRadius: 99, background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.25)', color: '#4ade80', fontWeight: 600 }}>
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {tcgUrl && (
+                <a href={tcgUrl} target="_blank" rel="noreferrer" style={{
+                  display: 'inline-block', marginTop: 4,
+                  padding: '7px 14px', borderRadius: 8, fontSize: '.75rem', fontWeight: 700,
+                  background: 'var(--accent-gold)', color: '#000', textDecoration: 'none',
+                  alignSelf: 'flex-start',
+                }}>
+                  Buy on TCGPlayer →
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
