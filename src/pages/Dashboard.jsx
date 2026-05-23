@@ -655,7 +655,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
       })()}
 
       {/* ── Mover card preview modal ── */}
-      {moverCard && <MoverCardModal name={moverCard} onClose={() => setMoverCard(null)} />}
+      {moverCard && <MoverCardModal name={moverCard} onClose={() => setMoverCard(null)} setPage={setPage} />}
 
       {/* ── Tournament Demand ── */}
       <TournamentWidget collection={collection} setPage={setPage} />
@@ -760,7 +760,7 @@ function MoverRow({ item, type, sort = 'dollar', onClick }) {
   )
 }
 
-function MoverCardModal({ name, onClose }) {
+function MoverCardModal({ name, onClose, setPage }) {
   const [card,    setCard]    = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -777,10 +777,9 @@ function MoverCardModal({ name, onClose }) {
   const typeLine = face?.type_line   || card?.type_line || ''
   const manaCost = face?.mana_cost   || card?.mana_cost || ''
   const flavor   = face?.flavor_text || ''
-  const usd      = card?.prices?.usd
-  const usdFoil  = card?.prices?.usd_foil
-  const setName  = card?.set_name
-  const tcgUrl   = card?.purchase_uris?.tcgplayer
+  const usd     = card?.prices?.usd
+  const usdFoil = card?.prices?.usd_foil
+  const setName = card?.set_name
 
   const FORMAT_LABELS = {
     standard: 'Standard', pioneer: 'Pioneer', modern: 'Modern',
@@ -847,10 +846,15 @@ function MoverCardModal({ name, onClose }) {
 
               {/* Prices */}
               <div style={{ display: 'flex', gap: 10 }}>
-                {usd && (
+                {usd ? (
                   <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(201,168,76,.1)', border: '1px solid rgba(201,168,76,.25)' }}>
                     <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>MARKET</div>
                     <div style={{ fontSize: '.95rem', fontWeight: 800, color: 'var(--accent-gold)' }}>${usd}</div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>MARKET</div>
+                    <div style={{ fontSize: '.95rem', fontWeight: 800, color: 'var(--text-muted)' }}>—</div>
                   </div>
                 )}
                 {usdFoil && (
@@ -875,16 +879,16 @@ function MoverCardModal({ name, onClose }) {
                 </div>
               )}
 
-              {tcgUrl && (
-                <a href={tcgUrl} target="_blank" rel="noreferrer" style={{
-                  display: 'inline-block', marginTop: 4,
-                  padding: '7px 14px', borderRadius: 8, fontSize: '.75rem', fontWeight: 700,
-                  background: 'var(--accent-gold)', color: '#000', textDecoration: 'none',
-                  alignSelf: 'flex-start',
-                }}>
-                  Buy on TCGPlayer →
-                </a>
-              )}
+              <button
+                onClick={() => { window.__lookupCardName = name; setPage?.('cards'); onClose() }}
+                style={{
+                  marginTop: 4, padding: '9px 16px', borderRadius: 9, border: 'none',
+                  background: 'var(--accent-gold)', color: '#000',
+                  fontWeight: 700, fontSize: '.8rem', cursor: 'pointer', alignSelf: 'flex-start',
+                }}
+              >
+                View in Card Lookup →
+              </button>
             </div>
           </div>
         )}
