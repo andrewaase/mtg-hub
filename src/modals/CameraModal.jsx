@@ -622,7 +622,15 @@ export default function CameraModal({
         img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
         scryfall_id: snap.id || null,
       })
-      setAddedCards(prev => [...prev, snap.name].slice(-5))
+      setAddedCards(prev => [
+        ...prev,
+        {
+          name:         snap.name,
+          img:          snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null,
+          collectionId: null, // store-only listing, no collection row to undo against
+          qtyBefore:    0,
+        },
+      ].slice(-5))
       showToast(merged ? `🏪 +1 stock: ${snap.name}` : `🏪 Listed ${snap.name}`)
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
       doRescan()
