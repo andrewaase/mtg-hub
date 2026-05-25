@@ -25,11 +25,13 @@ import Wishlist from './pages/Wishlist'
 import Store from './pages/Store'
 import About from './pages/About'
 import Membership from './pages/Membership'
+import Lab from './pages/Lab'
 import OnboardingTutorial from './components/OnboardingTutorial'
 import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
 
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin']
+// 'lab' is intentionally hidden from Sidebar/MobileNav — reachable only at /#lab
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab']
 
 const PAGE_TITLES = {
   dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
@@ -46,6 +48,7 @@ const PAGE_TITLES = {
   membership: 'VS Pro | Vaulted Singles',
   about:      'About | Vaulted Singles',
   admin:      'Control Center | Vaulted Singles',
+  lab:        'Hero Lab (sandbox) | Vaulted Singles',
 }
 
 const PAGE_DESCRIPTIONS = {
@@ -416,6 +419,7 @@ export default function App() {
               {mountedPages.has('membership') && <div style={{ display: page === 'membership' ? undefined : 'none' }}><Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} /></div>}
               {mountedPages.has('about')      && <div style={{ display: page === 'about'      ? undefined : 'none' }}><About setPage={setPage} /></div>}
               {mountedPages.has('admin')      && <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>}
+              {mountedPages.has('lab')        && <div style={{ display: page === 'lab'        ? undefined : 'none' }}><Lab setPage={setPage} /></div>}
             </>
           )}
         </div>
