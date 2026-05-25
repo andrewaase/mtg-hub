@@ -380,6 +380,11 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   const [moverSort,    setMoverSort]    = useState('dollar')   // 'dollar' | 'pct'
   const [moverFormat,  setMoverFormat]  = useState(null)       // null | 'standard' | 'pioneer' | ...
   const [moverCard,    setMoverCard]    = useState(null)       // card name to preview
+  const [gainersShown, setGainersShown] = useState(5)
+  const [losersShown,  setLosersShown]  = useState(5)
+
+  // Reset visible counts whenever sort or format filter changes
+  useEffect(() => { setGainersShown(5); setLosersShown(5) }, [moverSort, moverFormat])
 
   // Read pre-computed movers from Supabase on mount
   useEffect(() => {
@@ -563,17 +568,29 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
           )
         }
 
-        const sortedGainers = fmtFilter([...allGainers])
+        const allSortedGainers = fmtFilter([...allGainers])
           .sort(moverSort === 'pct'
             ? (a, b) => b.pctChange    - a.pctChange
             : (a, b) => b.dollarChange - a.dollarChange)
-          .slice(0, 5)
 
-        const sortedLosers = fmtFilter([...allLosers])
+        const allSortedLosers = fmtFilter([...allLosers])
           .sort(moverSort === 'pct'
             ? (a, b) => a.pctChange    - b.pctChange
             : (a, b) => a.dollarChange - b.dollarChange)
-          .slice(0, 5)
+
+        const sortedGainers      = allSortedGainers.slice(0, gainersShown)
+        const sortedLosers       = allSortedLosers.slice(0, losersShown)
+        const moreGainersCount   = Math.max(0, allSortedGainers.length - gainersShown)
+        const moreLosersCount    = Math.max(0, allSortedLosers.length  - losersShown)
+
+        const showMoreBtnStyle = (color) => ({
+          marginTop: 10, width: '100%',
+          padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
+          border: `1px solid ${color}40`,
+          background: `${color}14`,
+          color, fontSize: '.7rem', fontWeight: 700,
+          transition: 'background .15s',
+        })
 
         const chipStyle = (active) => ({
           padding: '3px 10px', borderRadius: 99, fontSize: '.64rem', fontWeight: 700,
@@ -639,6 +656,14 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
                     ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable gainers{moverFormat ? ` in ${moverFormat}` : ''}</div>
                     : sortedGainers.map(g => <MoverRow key={g.name} item={g} type="gain" sort={moverSort} onClick={() => setMoverCard(g.name)} />)
                   }
+                  {moreGainersCount > 0 && (
+                    <button
+                      onClick={() => setGainersShown(n => n + 5)}
+                      style={showMoreBtnStyle('#4ade80')}
+                    >
+                      Show {Math.min(5, moreGainersCount)} more ({moreGainersCount} remaining)
+                    </button>
+                  )}
                 </div>
                 {/* Losers */}
                 <div className="card" style={{ padding: '12px 14px' }}>
@@ -647,6 +672,14 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
                     ? <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>No notable losers{moverFormat ? ` in ${moverFormat}` : ''}</div>
                     : sortedLosers.map(l => <MoverRow key={l.name} item={l} type="loss" sort={moverSort} onClick={() => setMoverCard(l.name)} />)
                   }
+                  {moreLosersCount > 0 && (
+                    <button
+                      onClick={() => setLosersShown(n => n + 5)}
+                      style={showMoreBtnStyle('#f87171')}
+                    >
+                      Show {Math.min(5, moreLosersCount)} more ({moreLosersCount} remaining)
+                    </button>
+                  )}
                 </div>
               </div>
             )}
