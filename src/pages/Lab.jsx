@@ -15,7 +15,7 @@ import { useState } from 'react'
 
 // Reference the file from /public so users can swap it without rebuilding.
 // If the file isn't there yet, the gradient fallback still looks fine.
-const HERO_IMG = '/hero-vault.jpg'
+const HERO_IMG = '/hero-vault.png'
 
 const OVERLAY_STYLES = {
   // Soft dark wash on the left, fading to clear on the right. Tuned for the
