@@ -5,6 +5,20 @@ import UpgradeModal from '../components/UpgradeModal'
 
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
+// Strip crop fractions — what slice of the card region we actually send to Claude.
+// Card titles live in the top ~14% and set/collector code in the bottom ~7%.
+// We add a margin to each for tilt/framing tolerance.
+const TITLE_STRIP_FRAC  = 0.20   // top 20% of guide
+const BOTTOM_STRIP_FRAC = 0.12   // bottom 12% of guide
+const STRIP_TARGET_W    = 600    // px width sent to API
+const JPEG_QUALITY      = 0.72   // OCR-grade quality (was 0.85)
+const SHARPNESS_MIN     = 90     // gradient-variance threshold; below = too blurry to scan
+
+// Module-level cache of recent Scryfall results so repeat scans of the same card
+// don't re-hit the network. Cleared on hard refresh; survives modal open/close.
+const LOOKUP_CACHE     = new Map()
+const LOOKUP_CACHE_MAX = 50
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Image helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,16 +38,66 @@ function frameDiff(c1, c2) {
   return total / (d1.length / 16)
 }
 
-function captureCardImage(video) {
+// Capture title-bar + bottom-strip composition. Returns the canvas so callers can
+// run a sharpness check before encoding to JPEG.
+function captureCardCanvas(video) {
   const vw = video.videoWidth, vh = video.videoHeight
-  const sx = Math.floor(vw * GUIDE.x), sy = Math.floor(vh * GUIDE.y)
-  const sw = Math.floor(vw * GUIDE.w), sh = Math.floor(vh * GUIDE.h)
-  const scale = Math.min(1, 800 / sw)
+  const sx = Math.floor(vw * GUIDE.x)
+  const sw = Math.floor(vw * GUIDE.w)
+
+  // Source rectangles in video coords
+  const titleSrcY = Math.floor(vh * GUIDE.y)
+  const titleSrcH = Math.floor(vh * GUIDE.h * TITLE_STRIP_FRAC)
+  const bottomSrcY = Math.floor(vh * (GUIDE.y + GUIDE.h * (1 - BOTTOM_STRIP_FRAC)))
+  const bottomSrcH = Math.floor(vh * GUIDE.h * BOTTOM_STRIP_FRAC)
+
+  // Destination dims (scale so width ≤ STRIP_TARGET_W)
+  const scale = Math.min(1, STRIP_TARGET_W / sw)
+  const outW       = Math.floor(sw * scale)
+  const outTitleH  = Math.floor(titleSrcH * scale)
+  const outBottomH = Math.floor(bottomSrcH * scale)
+  const gap        = 8
+
   const c = document.createElement('canvas')
-  c.width  = Math.floor(sw * scale)
-  c.height = Math.floor(sh * scale)
-  c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, c.width, c.height)
-  return c.toDataURL('image/jpeg', 0.85).split(',')[1]
+  c.width  = outW
+  c.height = outTitleH + gap + outBottomH
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, c.width, c.height)
+  ctx.drawImage(video, sx, titleSrcY,  sw, titleSrcH,  0, 0,                   outW, outTitleH)
+  ctx.drawImage(video, sx, bottomSrcY, sw, bottomSrcH, 0, outTitleH + gap,     outW, outBottomH)
+  return c
+}
+
+// Gradient-variance sharpness metric (cheap proxy for Laplacian variance).
+// Higher = sharper. Samples every 3rd pixel for speed.
+function imageVariance(canvas) {
+  const w = canvas.width, h = canvas.height
+  const data = canvas.getContext('2d').getImageData(0, 0, w, h).data
+  let sum = 0, sumSq = 0, count = 0
+  const rowBytes = w * 4
+  for (let y = 1; y < h - 1; y += 3) {
+    for (let x = 1; x < w - 1; x += 3) {
+      const i  = (y * w + x) * 4
+      const c  = (data[i]                + data[i + 1]                + data[i + 2])              / 3
+      const r  = (data[i + 12]           + data[i + 13]               + data[i + 14])             / 3
+      const d  = (data[i + rowBytes * 3] + data[i + rowBytes * 3 + 1] + data[i + rowBytes * 3 + 2]) / 3
+      const g  = Math.abs(c - r) + Math.abs(c - d)
+      sum   += g
+      sumSq += g * g
+      count++
+    }
+  }
+  const mean = sum / count
+  return sumSq / count - mean * mean
+}
+
+function canvasToBase64(canvas) {
+  return canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1]
+}
+
+function cacheKeyFor(name, setCode, collectorNumber) {
+  return `${(setCode || '').toLowerCase()}|${collectorNumber || ''}|${(name || '').toLowerCase()}`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +105,23 @@ function captureCardImage(video) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function lookupCard(name, setCode = null, collectorNumber = null) {
+  // Cache hit — skip every network call
+  const key = cacheKeyFor(name, setCode, collectorNumber)
+  if (LOOKUP_CACHE.has(key)) {
+    return { card: LOOKUP_CACHE.get(key), quality: 'cached' }
+  }
+
+  // Helper: cache a successful result and return it
+  function cacheAndReturn(card, quality) {
+    if (card) {
+      LOOKUP_CACHE.set(key, card)
+      if (LOOKUP_CACHE.size > LOOKUP_CACHE_MAX) {
+        LOOKUP_CACHE.delete(LOOKUP_CACHE.keys().next().value)
+      }
+    }
+    return { card, quality }
+  }
+
   // Helper: try fetching a single Scryfall card URL
   async function tryScryfallCard(url) {
     try {
@@ -58,7 +139,7 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
     const card = await tryScryfallCard(
       `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(collectorNumber)}`
     )
-    if (card) return { card, quality: 'exact' }
+    if (card) return cacheAndReturn(card, 'exact')
 
     // Tier 0b — same but strip leading zeros (foil cards often print "0300", Scryfall stores "300")
     const stripped = collectorNumber.replace(/^0+(\d)/, '$1')
@@ -66,7 +147,7 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
       const card2 = await tryScryfallCard(
         `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(stripped)}`
       )
-      if (card2) return { card: card2, quality: 'exact' }
+      if (card2) return cacheAndReturn(card2, 'exact')
     }
   }
 
@@ -90,9 +171,9 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
               const bestDiff = Math.abs(parseInt(best.collector_number, 10) - target)
               return diff < bestDiff ? c : best
             })
-            return { card: closest, quality: 'exact' }
+            return cacheAndReturn(closest, 'exact')
           }
-          return { card: json.data[0], quality: 'exact' }
+          return cacheAndReturn(json.data[0], 'exact')
         }
       }
     } catch { /* continue */ }
@@ -102,13 +183,13 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
   const byName = await tryScryfallCard(
     `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`
   )
-  if (byName) return { card: byName, quality: 'exact' }
+  if (byName) return cacheAndReturn(byName, 'exact')
 
   // Tier 3 — fuzzy name
   const byFuzzy = await tryScryfallCard(
     `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`
   )
-  if (byFuzzy) return { card: byFuzzy, quality: 'fuzzy' }
+  if (byFuzzy) return cacheAndReturn(byFuzzy, 'fuzzy')
 
   // Tier 4 — autocomplete (handles garbled OCR)
   try {
@@ -120,7 +201,7 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
         const card = await tryScryfallCard(
           `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(top)}`
         )
-        if (card) return { card, quality: 'fuzzy' }
+        if (card) return cacheAndReturn(card, 'fuzzy')
       }
     }
   } catch { /* continue */ }
@@ -158,11 +239,13 @@ function Chip({ children, active, onClick, disabled }) {
 export default function CameraModal({
   onClose, showToast, user, isAdmin, collection, setCollection, openAddCard, setPage, membership
 }) {
-  const scanningRef   = useRef(false)
-  const frozenRef     = useRef(false)
-  const prevThumbRef  = useRef(null)
-  const stableRef     = useRef(0)
-  const STABLE_NEEDED = 2
+  const scanningRef    = useRef(false)
+  const frozenRef      = useRef(false)
+  const prevThumbRef   = useRef(null)
+  const stableRef      = useRef(0)
+  const unknownCountRef = useRef(0)  // consecutive "unknown" responses
+  const MAX_UNKNOWN     = 2
+  const STABLE_NEEDED   = 2
   const [showUpgrade, setShowUpgrade] = useState(false)
 
   const videoRef  = useRef(null)
@@ -267,7 +350,20 @@ export default function CameraModal({
     setScanError(null)
 
     try {
-      const image = captureCardImage(video)
+      // Capture title+bottom strip composition, then verify it's sharp enough.
+      // Skipping a blurry frame here saves a Claude API call.
+      const canvas = captureCardCanvas(video)
+      const sharpness = imageVariance(canvas)
+      if (sharpness < SHARPNESS_MIN) {
+        // Reset stability so next still+sharp frame triggers a fresh scan.
+        stableRef.current = 0
+        prevThumbRef.current = null
+        scanningRef.current = false
+        setScanStatus('ready')
+        return
+      }
+
+      const image = canvasToBase64(canvas)
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/.netlify/functions/scan-card', {
         method: 'POST',
@@ -304,7 +400,10 @@ export default function CameraModal({
       const { name, setCode, collectorNumber } = await res.json()
 
       const cleanName = (name || '').trim().replace(/["""]/g, '"').replace(/[''']/g, "'")
-      if (cleanName && cleanName.toLowerCase() !== 'unknown' && cleanName.length >= 2) {
+      const isUsable = cleanName && cleanName.toLowerCase() !== 'unknown' && cleanName.length >= 2
+
+      if (isUsable) {
+        unknownCountRef.current = 0
         setNameRead(cleanName)
         setLookingUp(true)
         setLookupFailed(false)
@@ -324,6 +423,19 @@ export default function CameraModal({
             .catch(() => {})
         } else {
           setLookupFailed(true)
+        }
+      } else {
+        // Claude couldn't read a name — count it. After MAX_UNKNOWN consecutive
+        // failures, freeze so we stop burning API calls and prompt the user.
+        unknownCountRef.current++
+        if (unknownCountRef.current >= MAX_UNKNOWN) {
+          frozenRef.current = true
+          setNameRead('')
+          setLookupFailed(true)
+        } else {
+          // Reset stability so a fresh stable+sharp frame retries automatically.
+          stableRef.current = 0
+          prevThumbRef.current = null
         }
       }
     } catch (e) {
@@ -428,6 +540,7 @@ export default function CameraModal({
     frozenRef.current = false
     stableRef.current = 0
     prevThumbRef.current = null
+    unknownCountRef.current = 0
     setFoundCard(null)
     setNameRead('')
     setLookingUp(false)
@@ -615,14 +728,22 @@ export default function CameraModal({
         </div>
       )}
 
-      {lookupFailed && !foundCard && !lookingUp && nameRead && (
-        <div style={{
-          position: 'absolute', bottom: '200px', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.7)', borderRadius: '20px',
-          padding: '6px 16px', backdropFilter: 'blur(8px)', textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '.72rem', color: '#f87171' }}>Could not find "{nameRead}"</div>
-          <div style={{ fontSize: '.62rem', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>Hold card steadier and try again</div>
+      {lookupFailed && !foundCard && !lookingUp && (
+        <div
+          onClick={doRescan}
+          style={{
+            position: 'absolute', bottom: '200px', left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.7)', borderRadius: '20px',
+            padding: '6px 16px', backdropFilter: 'blur(8px)', textAlign: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ fontSize: '.72rem', color: '#f87171' }}>
+            {nameRead ? `Could not find "${nameRead}"` : "Couldn't read card"}
+          </div>
+          <div style={{ fontSize: '.62rem', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+            Tap here to try again
+          </div>
         </div>
       )}
 

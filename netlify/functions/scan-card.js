@@ -132,13 +132,13 @@ exports.handler = async (event) => {
               },
               {
                 type: 'text',
-                text: `This is a Magic: The Gathering card. Read the card carefully and reply with ONLY a JSON object in this exact format (no markdown, no extra text):
-{"name":"<exact card name>","setCode":"<2-4 letter set code from bottom of card, lowercase>","collectorNumber":"<collector number from bottom of card>"}
+                text: `This image shows two strips of a Magic: The Gathering card — the title bar (top) and the bottom info strip, separated by a small black gap. Read both strips carefully and reply with ONLY a JSON object in this exact format (no markdown, no extra text):
+{"name":"<exact card name from top strip>","setCode":"<2-4 letter set code from bottom strip, lowercase>","collectorNumber":"<collector number from bottom strip>"}
 
-The set code is the 2-4 letter abbreviation printed at the bottom of the card (e.g. "one", "bro", "mh3", "ltr", "tmt").
+The set code is the 2-4 letter abbreviation printed at the bottom (e.g. "one", "bro", "mh3", "ltr", "tmt").
 The collector number is the number printed at the bottom (e.g. "112", "261a").
 If you cannot read a field, use null.
-If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"collectorNumber":null}`,
+If this is clearly not a Magic card, reply with: {"name":"unknown","setCode":null,"collectorNumber":null}`,
               },
             ],
           },
@@ -162,13 +162,19 @@ If this is not a Magic card, reply with: {"name":"unknown","setCode":null,"colle
       .replace(/\s*```\s*$/, '')
       .trim()
 
-    // Log this scan in scan_logs (fire-and-forget — don't block the response)
+    // Log this scan in scan_logs. We await so the row is durable before the
+    // lambda freezes — fire-and-forget in serverless can drop the request and
+    // silently undercount the daily limit. ~30ms cost; worth the accuracy.
     const today = new Date().toISOString().slice(0, 10)
-    fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
-      method:  'POST',
-      headers: { ...adminHeaders, Prefer: 'return=minimal' },
-      body:    JSON.stringify({ user_id: userId, scan_date: today }),
-    }).catch(e => console.error('[scan-card] scan_log insert failed:', e.message))
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
+        method:  'POST',
+        headers: { ...adminHeaders, Prefer: 'return=minimal' },
+        body:    JSON.stringify({ user_id: userId, scan_date: today }),
+      })
+    } catch (e) {
+      console.error('[scan-card] scan_log insert failed:', e.message)
+    }
 
     // Helper to return a parsed result
     function makeResult(parsed) {
