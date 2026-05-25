@@ -880,7 +880,12 @@ function MoverCardModal({ name, onClose, setPage }) {
               )}
 
               <button
-                onClick={() => { window.__lookupCardName = name; setPage?.('cards'); onClose() }}
+                onClick={() => {
+                  window.__lookupCardName = name
+                  window.dispatchEvent(new CustomEvent('vaulted:lookup-card', { detail: { name } }))
+                  setPage?.('cards')
+                  onClose()
+                }}
                 style={{
                   marginTop: 4, padding: '9px 16px', borderRadius: 9, border: 'none',
                   background: 'var(--accent-gold)', color: '#000',

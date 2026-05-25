@@ -633,6 +633,19 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
   const setView = useCallback((v) => { setViewRaw(v); ssSaveView(v) }, [])
   const setCardDetail = useCallback((c) => { setCardDetailRaw(c); ssSaveCard(c) }, [])
 
+  // Keep a ref to openCardDetail so the event listener always calls the latest version
+  const openCardDetailRef = useRef(null)
+  useEffect(() => { openCardDetailRef.current = openCardDetail })
+
+  // Persistent listener for "View in Card Lookup" from Market Movers modal.
+  // CardLookup stays mounted (display:none when hidden), so a mount-only effect
+  // won't re-fire — a custom event bridges the gap.
+  useEffect(() => {
+    const handler = (e) => openCardDetailRef.current?.(e.detail.name)
+    window.addEventListener('vaulted:lookup-card', handler)
+    return () => window.removeEventListener('vaulted:lookup-card', handler)
+  }, []) // eslint-disable-line
+
   // Incoming card from Dashboard (random card or format staple tap)
   useEffect(() => {
     if (window.__randomCard) {
