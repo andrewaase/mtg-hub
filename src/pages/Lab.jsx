@@ -18,9 +18,12 @@ import { useState } from 'react'
 const HERO_IMG = '/hero-vault.jpg'
 
 const OVERLAY_STYLES = {
-  // Strong dark wash on the left, fading to clear on the right — for images
-  // where the visual subject lives on the right side (like the vault shot).
-  leftToClear: 'linear-gradient(to right, rgba(8,8,10,0.95) 0%, rgba(8,8,10,0.82) 35%, rgba(8,8,10,0.45) 60%, rgba(8,8,10,0) 90%)',
+  // Soft dark wash on the left, fading to clear on the right. Tuned for the
+  // vault image where the wall is already textured/dark — we only need a slight
+  // tint to make white text legible while preserving the bricks.
+  leftToClear: 'linear-gradient(to right, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.42) 30%, rgba(8,8,10,0.15) 55%, rgba(8,8,10,0) 80%)',
+  // Stronger version of left-to-clear for brighter images.
+  leftHeavy:   'linear-gradient(to right, rgba(8,8,10,0.92) 0%, rgba(8,8,10,0.78) 30%, rgba(8,8,10,0.35) 60%, rgba(8,8,10,0) 90%)',
   // Vignette — dims all four edges, art reads in the center.
   vignette:    'radial-gradient(ellipse at center, rgba(8,8,10,0) 35%, rgba(8,8,10,0.6) 70%, rgba(8,8,10,0.92) 100%)',
   // Top-down — dark at top for headline, fades to bright at bottom.
@@ -30,7 +33,8 @@ const OVERLAY_STYLES = {
 }
 
 const OVERLAY_LABELS = {
-  leftToClear: 'Left → Clear',
+  leftToClear: 'Left → Clear (soft)',
+  leftHeavy:   'Left → Clear (heavy)',
   vignette:    'Vignette',
   topDown:     'Top-Down',
   none:        'None',
