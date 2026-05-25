@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
-import { addCard, upsertStoreListing } from '../lib/db'
+import { addCard, upsertStoreListing, updateCollectionCard, removeCard } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import UpgradeModal from '../components/UpgradeModal'
+
+const RAPID_DELAY_MS = 1000  // pause before auto-adding in Rapid Mode
 
 const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
 
@@ -258,14 +260,28 @@ export default function CameraModal({
 
   const [nameRead,      setNameRead]      = useState('')
   const [foundCard,     setFoundCard]     = useState(null)
-  const [addedCards,    setAddedCards]    = useState([])
+  const [addedCards,    setAddedCards]    = useState([])   // [{ name, img, collectionId, qtyBefore }]
   const [adding,        setAdding]        = useState(false)
   const [lookingUp,     setLookingUp]     = useState(false)
   const [lookupFailed,  setLookupFailed]  = useState(false)
-  const [scanError,     setScanError]     = useState(null)   // visible function error
+  const [scanError,     setScanError]     = useState(null) // visible function error
   const [priceMode,      setPriceMode]      = useState('normal')
   const [printings,      setPrintings]      = useState([])
   const [showPrintings,  setShowPrintings]  = useState(false)
+  const [editingName,    setEditingName]    = useState(false)
+  const [editValue,      setEditValue]      = useState('')
+  const [dfcFlipped,     setDfcFlipped]     = useState(false)
+
+  // Rapid Mode — auto-adds the identified card after a short delay so users
+  // can bulk-catalog without tapping. Persisted across sessions.
+  const [rapidMode, setRapidMode] = useState(() => {
+    try { return localStorage.getItem('scanner.rapidMode') === '1' } catch { return false }
+  })
+  const [rapidCountdown, setRapidCountdown] = useState(0)
+  const rapidTimerRef = useRef(null)
+  useEffect(() => {
+    try { localStorage.setItem('scanner.rapidMode', rapidMode ? '1' : '0') } catch {}
+  }, [rapidMode])
 
   // Store mode (admin only)
   const [storeMode,        setStoreMode]        = useState(false)
@@ -416,10 +432,23 @@ export default function CameraModal({
           setPriceMode('normal')
           setScanError(null)
           if (navigator.vibrate) navigator.vibrate(40)
-          // Fetch all printings in background
+          // Fetch all printings in background.
+          // Sort: same-set prints first (so STA / Secret Lair / etc. variants
+          // surface immediately), then everything else by release date.
+          // Auto-open the printings panel when the *same set* has multiple
+          // variants — this is the Strixhaven-Mystical-Archive case where the
+          // scanner picks one print but the user actually scanned a Japanese
+          // alt-art / etched / showcase version.
           fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`)
             .then(r => r.ok ? r.json() : null)
-            .then(data => setPrintings(data?.data?.slice(0, 20) || []))
+            .then(data => {
+              const all       = data?.data || []
+              const sameSet   = all.filter(p => p.set === card.set)
+              const otherSets = all.filter(p => p.set !== card.set)
+              const sorted    = [...sameSet, ...otherSets].slice(0, 30)
+              setPrintings(sorted)
+              if (sameSet.length > 1 && !rapidMode) setShowPrintings(true)
+            })
             .catch(() => {})
         } else {
           setLookupFailed(true)
@@ -456,13 +485,14 @@ export default function CameraModal({
       const priceUsdFoil = snap.prices?.usd_foil ? parseFloat(snap.prices.usd_foil) : null
       const isFoil       = priceMode === 'foil' && priceUsdFoil != null
       const cardPrice    = isFoil ? priceUsdFoil : (priceUsd ?? priceUsdFoil)
+      const thumbImg     = snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null
 
       const card = {
         name:         snap.name,
         qty:          1,
         condition:    'NM',
         setName:      snap.set_name,
-        img:          snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null,
+        img:          thumbImg,
         colors:       snap.color_identity || [],
         price:        cardPrice,
         isFoil,
@@ -470,6 +500,13 @@ export default function CameraModal({
         tcgplayerUrl: snap.purchase_uris?.tcgplayer || null,
         scryfallId:   snap.id || null,
       }
+
+      // Capture pre-add qty so undo can restore it (rather than always removing)
+      const existingInCollection = (collection || []).find(
+        c => c.name.toLowerCase() === card.name.toLowerCase()
+      )
+      const qtyBefore = existingInCollection?.qty || 0
+
       const saved = await addCard(card, user?.id)
       setCollection(prev => {
         const i = prev.findIndex(c => c.name.toLowerCase() === card.name.toLowerCase())
@@ -495,7 +532,15 @@ export default function CameraModal({
         showToast(`✓ Added ${snap.name}`)
       }
 
-      setAddedCards(prev => [...prev, snap.name].slice(-5))
+      setAddedCards(prev => [
+        ...prev,
+        {
+          name:         snap.name,
+          img:          thumbImg,
+          collectionId: saved?.id || existingInCollection?.id || null,
+          qtyBefore,
+        },
+      ].slice(-5))
       if (navigator.vibrate) navigator.vibrate([40, 20, 80])
       doRescan()
     } catch (err) {
@@ -503,6 +548,58 @@ export default function CameraModal({
       showToast(`Could not save — ${err.message || 'try again'}`)
     }
     setAdding(false)
+  }
+
+  // ── Undo a recent add ────────────────────────────────────────────────────
+  async function handleUndo(entry, index) {
+    if (!entry?.collectionId) {
+      setAddedCards(prev => prev.filter((_, i) => i !== index))
+      return
+    }
+    try {
+      if (entry.qtyBefore === 0) {
+        await removeCard(entry.collectionId, user?.id)
+        setCollection(prev => prev.filter(c => c.id !== entry.collectionId))
+      } else {
+        await updateCollectionCard(entry.collectionId, { qty: entry.qtyBefore }, user?.id)
+        setCollection(prev => prev.map(c =>
+          c.id === entry.collectionId ? { ...c, qty: entry.qtyBefore } : c
+        ))
+      }
+      setAddedCards(prev => prev.filter((_, i) => i !== index))
+      showToast(`↩ Removed ${entry.name}`)
+    } catch (err) {
+      console.error('[Scanner] undo failed:', err)
+      showToast('Could not undo')
+    }
+  }
+
+  // ── Manual name correction (re-lookup with a corrected name) ─────────────
+  async function handleManualCorrect() {
+    setEditingName(false)
+    const newName = (editValue || '').trim()
+    if (!newName || !foundCard || newName.toLowerCase() === foundCard.name.toLowerCase()) return
+    setLookingUp(true)
+    const { card } = await lookupCard(newName)
+    setLookingUp(false)
+    if (card) {
+      setFoundCard(card)
+      setNameRead(newName)
+      setDfcFlipped(false)
+      setPriceMode('normal')
+      // Refresh printings panel for the new card
+      fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const all     = data?.data || []
+          const sameSet = all.filter(p => p.set === card.set)
+          const others  = all.filter(p => p.set !== card.set)
+          setPrintings([...sameSet, ...others].slice(0, 30))
+        })
+        .catch(() => {})
+    } else {
+      showToast(`Couldn't find "${newName}"`)
+    }
   }
 
   // ── Add to store inventory (admin only) ──────────────────────────────────
@@ -549,20 +646,60 @@ export default function CameraModal({
     setShowPrintings(false)
     setListingCondition('NM')
     setListingPrice('')
+    setEditingName(false)
+    setDfcFlipped(false)
+    setRapidCountdown(0)
+    if (rapidTimerRef.current) { clearInterval(rapidTimerRef.current); rapidTimerRef.current = null }
+  }
+
+  // ── Rapid Mode auto-add ──────────────────────────────────────────────────
+  // When enabled, auto-adds the identified card after RAPID_DELAY_MS so the
+  // user can bulk-catalog without tapping. Cancels if foundCard changes or
+  // mode toggles off.
+  useEffect(() => {
+    if (!foundCard || !rapidMode || storeMode) { setRapidCountdown(0); return }
+    const startedAt = Date.now()
+    setRapidCountdown(RAPID_DELAY_MS)
+    rapidTimerRef.current = setInterval(() => {
+      const remaining = RAPID_DELAY_MS - (Date.now() - startedAt)
+      if (remaining <= 0) {
+        clearInterval(rapidTimerRef.current)
+        rapidTimerRef.current = null
+        setRapidCountdown(0)
+        handleAdd()
+      } else {
+        setRapidCountdown(remaining)
+      }
+    }, 60)
+    return () => {
+      if (rapidTimerRef.current) { clearInterval(rapidTimerRef.current); rapidTimerRef.current = null }
+      setRapidCountdown(0)
+    }
+  }, [foundCard, rapidMode, storeMode]) // eslint-disable-line
+
+  function cancelRapid() {
+    if (rapidTimerRef.current) { clearInterval(rapidTimerRef.current); rapidTimerRef.current = null }
+    setRapidCountdown(0)
   }
 
   function handleClose() { stopTracks(); onClose() }
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const artImg       = foundCard?.image_uris?.normal || foundCard?.card_faces?.[0]?.image_uris?.normal
-  const smallImg     = foundCard?.image_uris?.small  || foundCard?.card_faces?.[0]?.image_uris?.small
+  const DFC_LAYOUTS  = ['transform', 'modal_dfc', 'reversible_card', 'double_faced_token']
+  const isDFC        = !!foundCard && DFC_LAYOUTS.includes(foundCard.layout) && (foundCard.card_faces?.length || 0) >= 2
+  const faceIdx      = isDFC && dfcFlipped ? 1 : 0
+  const activeFace   = isDFC ? foundCard.card_faces[faceIdx] : foundCard
+  const artImg       = activeFace?.image_uris?.normal || foundCard?.image_uris?.normal || foundCard?.card_faces?.[0]?.image_uris?.normal
+  const smallImg     = activeFace?.image_uris?.small  || foundCard?.image_uris?.small  || foundCard?.card_faces?.[0]?.image_uris?.small
+  const displayName  = isDFC ? activeFace?.name : foundCard?.name
   const priceUsd     = foundCard?.prices?.usd      ? parseFloat(foundCard.prices.usd)      : null
   const priceUsdFoil = foundCard?.prices?.usd_foil ? parseFloat(foundCard.prices.usd_foil) : null
   const displayPrice = priceMode === 'foil' && priceUsdFoil != null ? priceUsdFoil : priceUsd
   const alreadyOwned = foundCard
     ? (collection || []).find(c => c.name.toLowerCase() === foundCard.name.toLowerCase())
     : null
-  const extraPrints  = printings.length > 1 ? printings.length - 1 : 0
+  const sameSetVariants = foundCard ? printings.filter(p => p.set === foundCard.set).length : 0
+  const extraPrints     = printings.length > 1 ? printings.length - 1 : 0
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -598,6 +735,18 @@ export default function CameraModal({
         }}>✕</button>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            onClick={() => setRapidMode(r => !r)}
+            title={rapidMode ? 'Rapid Mode ON — auto-adds after each scan' : 'Enable Rapid Mode for bulk-cataloging'}
+            style={{
+              background: rapidMode ? 'rgba(74,222,128,0.9)' : 'rgba(0,0,0,0.5)',
+              border: `1.5px solid ${rapidMode ? '#4ade80' : 'rgba(255,255,255,0.15)'}`,
+              borderRadius: '50%', width: '38px', height: '38px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', fontSize: '1rem', backdropFilter: 'blur(8px)',
+              color: rapidMode ? '#000' : '#fff',
+            }}
+          >⚡</button>
           {torchSupported && (
             <button onClick={toggleTorch} style={{
               background: torchOn ? 'rgba(255,220,50,0.85)' : 'rgba(0,0,0,0.5)',
@@ -675,7 +824,7 @@ export default function CameraModal({
         >
           <img
             src={artImg}
-            alt={foundCard.name}
+            alt={displayName}
             style={{
               width: '100%', height: '100%', objectFit: 'contain',
               borderRadius: '10px',
@@ -684,6 +833,25 @@ export default function CameraModal({
               animation: 'scanCardIn .25s ease-out',
             }}
           />
+        </div>
+      )}
+
+      {/* ── Rapid Mode countdown bar (visible during auto-add) ── */}
+      {rapidCountdown > 0 && foundCard && (
+        <div
+          onClick={cancelRapid}
+          style={{
+            position: 'absolute', top: 'calc(8% + 52% + 36px)',
+            left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(74,222,128,0.95)', color: '#000',
+            borderRadius: '20px', padding: '6px 14px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            fontSize: '.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+          }}
+        >
+          <span>⚡ Auto-adding in {(rapidCountdown / 1000).toFixed(1)}s</span>
+          <span style={{ opacity: .65, fontSize: '.65rem' }}>· tap to cancel</span>
         </div>
       )}
 
@@ -747,17 +915,58 @@ export default function CameraModal({
         </div>
       )}
 
-      {/* ── Added cards log (floats above sheet) ── */}
+      {/* ── Recent scans strip (thumbnails with per-card undo) ── */}
       {addedCards.length > 0 && (
         <div style={{
           position: 'absolute', bottom: foundCard ? '230px' : '130px',
           left: '16px', right: '16px',
-          padding: '7px 12px', background: 'rgba(74,222,128,0.15)', borderRadius: '10px',
+          padding: '8px 10px', background: 'rgba(74,222,128,0.12)', borderRadius: '12px',
           border: '1px solid rgba(74,222,128,0.25)', backdropFilter: 'blur(8px)',
-          fontSize: '.75rem',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          overflowX: 'auto',
         }}>
-          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Added: </span>
-          <span style={{ color: '#4ade80', fontWeight: 600 }}>{addedCards.join(' · ')}</span>
+          <div style={{
+            fontSize: '.55rem', fontWeight: 800, textTransform: 'uppercase',
+            letterSpacing: '.5px', color: '#4ade80', flexShrink: 0, paddingRight: '4px',
+          }}>
+            +{addedCards.length}
+          </div>
+          {addedCards.map((c, i) => (
+            <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
+              {c.img ? (
+                <img
+                  src={c.img}
+                  alt={c.name}
+                  title={c.name}
+                  style={{
+                    width: '32px', height: '44px', objectFit: 'cover',
+                    borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              ) : (
+                <div title={c.name} style={{
+                  width: '32px', height: '44px', borderRadius: '4px',
+                  background: 'rgba(255,255,255,0.1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '.55rem', color: 'rgba(255,255,255,0.7)',
+                  padding: '2px', overflow: 'hidden',
+                }}>{c.name.slice(0, 3)}</div>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleUndo(c, i) }}
+                title={`Undo ${c.name}`}
+                style={{
+                  position: 'absolute', top: '-5px', right: '-5px',
+                  width: '16px', height: '16px', borderRadius: '50%',
+                  background: 'rgba(239,68,68,0.95)', color: '#fff',
+                  border: '1.5px solid rgba(0,0,0,0.5)', cursor: 'pointer',
+                  fontSize: '.6rem', fontWeight: 700, lineHeight: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 0,
+                }}
+              >×</button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -784,16 +993,50 @@ export default function CameraModal({
               marginBottom: '10px',
             }}>
               {smallImg && (
-                <img src={smallImg} alt={foundCard.name}
+                <img src={smallImg} alt={displayName}
                   style={{ width: '44px', borderRadius: '6px', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }} />
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '.9rem', color: '#fff', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {foundCard.name}
-                </div>
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onBlur={handleManualCorrect}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleManualCorrect()
+                      if (e.key === 'Escape') setEditingName(false)
+                    }}
+                    style={{
+                      width: '100%', background: 'rgba(255,255,255,0.1)',
+                      border: '1.5px solid var(--accent-teal)',
+                      borderRadius: '6px', padding: '5px 8px',
+                      color: '#fff', fontSize: '.9rem', fontWeight: 700,
+                      outline: 'none',
+                    }}
+                  />
+                ) : (
+                  <div
+                    onClick={() => { setEditValue(displayName || ''); setEditingName(true) }}
+                    title="Tap to correct name"
+                    style={{
+                      fontWeight: 700, fontSize: '.9rem', color: '#fff', lineHeight: 1.2,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {displayName}
+                    <span style={{ opacity: 0.4, marginLeft: 6, fontSize: '.7rem' }}>✎</span>
+                  </div>
+                )}
                 <div style={{ fontSize: '.7rem', color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
                   {foundCard.set_name}
                   {alreadyOwned && <span style={{ color: '#93c5fd', marginLeft: '6px' }}>Own ×{alreadyOwned.qty}</span>}
+                  {sameSetVariants > 1 && (
+                    <span style={{ color: '#fbbf24', marginLeft: '6px', fontWeight: 700 }}>
+                      ✦ {sameSetVariants} variants
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -813,7 +1056,7 @@ export default function CameraModal({
               >›</button>
             </div>
 
-            {/* Chips row: Normal | Foil | #Collector | +X prints */}
+            {/* Chips row: Normal | Foil | Flip (DFC) | #Collector | +X prints */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
               <Chip active={priceMode === 'normal'} onClick={() => setPriceMode('normal')}>Normal</Chip>
               <Chip
@@ -821,6 +1064,11 @@ export default function CameraModal({
                 onClick={() => setPriceMode('foil')}
                 disabled={priceUsdFoil == null}
               >✦ Foil</Chip>
+              {isDFC && (
+                <Chip active={dfcFlipped} onClick={() => setDfcFlipped(f => !f)}>
+                  ↻ {dfcFlipped ? 'Front' : 'Flip'}
+                </Chip>
+              )}
               {foundCard.collector_number && (
                 <Chip>#{foundCard.collector_number}</Chip>
               )}
