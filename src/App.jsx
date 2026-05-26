@@ -26,6 +26,7 @@ import Store from './pages/Store'
 import About from './pages/About'
 import Membership from './pages/Membership'
 import Lab from './pages/Lab'
+import HeroLanding from './pages/HeroLanding'
 import OnboardingTutorial from './components/OnboardingTutorial'
 import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
@@ -90,6 +91,10 @@ export default function App() {
   const membership = useMembership(user)
   // Onboarding tutorial — shown once after first sign-up
   const [showOnboarding, setShowOnboarding] = useState(false)
+  // Hero landing — full-screen splash shown once per browser session
+  const [showHeroLanding, setShowHeroLanding] = useState(
+    () => !sessionStorage.getItem('vaulted:hero-seen')
+  )
 
   // Lazy-mount pages: track which pages have been visited so they stay mounted
   // (hidden with display:none) without crashing pages that haven't been opened yet
@@ -134,6 +139,13 @@ export default function App() {
       document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', title)
     }
   }, [])
+
+  // Dismiss hero landing and navigate to the chosen page
+  const handleHeroNavigate = useCallback((dest) => {
+    sessionStorage.setItem('vaulted:hero-seen', '1')
+    setShowHeroLanding(false)
+    if (dest) setPage(dest)
+  }, [setPage])
 
   // Lock body scroll when sidebar is open on mobile
   useEffect(() => {
@@ -426,6 +438,18 @@ export default function App() {
       </div>
       <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
+      {showHeroLanding && (
+        <HeroLanding
+          user={user}
+          onNavigate={handleHeroNavigate}
+          onAuthClick={() => {
+            sessionStorage.setItem('vaulted:hero-seen', '1')
+            setShowHeroLanding(false)
+            setAuthPrompt(null)
+            setShowAuth(true)
+          }}
+        />
+      )}
       {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
