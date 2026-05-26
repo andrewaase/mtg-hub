@@ -91,10 +91,12 @@ export default function App() {
   const membership = useMembership(user)
   // Onboarding tutorial — shown once after first sign-up
   const [showOnboarding, setShowOnboarding] = useState(false)
-  // Hero landing — full-screen splash shown once per browser session
+  // Hero landing — splash shown once per browser session in the content area
   const [showHeroLanding, setShowHeroLanding] = useState(
     () => !sessionStorage.getItem('vaulted:hero-seen')
   )
+  // Ref so setPage (used by Sidebar) can dismiss the hero without stale closures
+  const heroLandingActiveRef = useRef(!sessionStorage.getItem('vaulted:hero-seen'))
 
   // Lazy-mount pages: track which pages have been visited so they stay mounted
   // (hidden with display:none) without crashing pages that haven't been opened yet
@@ -123,6 +125,12 @@ export default function App() {
   const setPage = useCallback((newPage) => {
     // Silently block navigation while the deck import/edit modal is open
     if (deckModalOpenRef.current) return
+    // Dismiss the hero landing whenever the user navigates anywhere
+    if (heroLandingActiveRef.current) {
+      sessionStorage.setItem('vaulted:hero-seen', '1')
+      setShowHeroLanding(false)
+      heroLandingActiveRef.current = false
+    }
     setPageState(newPage)
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
     document.title = PAGE_TITLES[newPage] || 'Vaulted Singles'
@@ -140,8 +148,9 @@ export default function App() {
     }
   }, [])
 
-  // Dismiss hero landing and navigate to the chosen page
+  // Dismiss hero landing and navigate to the chosen page (buttons + ✕)
   const handleHeroNavigate = useCallback((dest) => {
+    heroLandingActiveRef.current = false
     sessionStorage.setItem('vaulted:hero-seen', '1')
     setShowHeroLanding(false)
     if (dest) setPage(dest)
@@ -412,6 +421,18 @@ export default function App() {
             page === 'collection' ? <CollectionSkeleton /> :
             page === 'decks'      ? <DecksSkeleton />      :
             <PageSkeleton />
+          ) : showHeroLanding ? (
+            <HeroLanding
+              user={user}
+              onNavigate={handleHeroNavigate}
+              onAuthClick={() => {
+                heroLandingActiveRef.current = false
+                sessionStorage.setItem('vaulted:hero-seen', '1')
+                setShowHeroLanding(false)
+                setAuthPrompt(null)
+                setShowAuth(true)
+              }}
+            />
           ) : (
             /* Pages are lazily mounted on first visit, then kept mounted (hidden with
                display:none) so scroll position, search state, and open card details
@@ -438,18 +459,6 @@ export default function App() {
       </div>
       <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
-      {showHeroLanding && (
-        <HeroLanding
-          user={user}
-          onNavigate={handleHeroNavigate}
-          onAuthClick={() => {
-            sessionStorage.setItem('vaulted:hero-seen', '1')
-            setShowHeroLanding(false)
-            setAuthPrompt(null)
-            setShowAuth(true)
-          }}
-        />
-      )}
       {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
