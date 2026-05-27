@@ -6,7 +6,7 @@ export function formatDate(dateStr) {
 
 export function colorPips(colorStr) {
   if (!colorStr) return ''
-  const map = { W: '⚪', U: '🔵', B: '⚫', R: '🔴', G: '🟢' }
+  const map = { W: '', U: '', B: '', R: '', G: '' }
   return colorStr.split('').map(c => map[c] || '').join('')
 }
 

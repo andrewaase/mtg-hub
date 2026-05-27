@@ -28,7 +28,7 @@ export async function getCKPriceMap() {
       const sellPrice = parseFloat(item.price_retail) || 0
       const isFoil    = item.is_foil === 'true' || item.is_foil === true
 
-      // ── Name-based map (best price across all printings) ──────────────────
+      //  Name-based map (best price across all printings) 
       const nameKey = (item.name || '').toLowerCase().trim()
       if (!nameMap[nameKey]) nameMap[nameKey] = {}
       if (isFoil) {
@@ -39,7 +39,7 @@ export async function getCKPriceMap() {
         nameMap[nameKey].sellNormal = Math.max(nameMap[nameKey].sellNormal || 0, sellPrice)
       }
 
-      // ── Scryfall-ID map (exact printing price) ────────────────────────────
+      //  Scryfall-ID map (exact printing price) 
       // Multiple CK entries can share a scryfall_id (e.g. foil vs non-foil of
       // the same printing), so use Math.max here too for safety.
       if (item.scryfall_id) {

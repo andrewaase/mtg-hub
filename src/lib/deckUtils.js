@@ -3,7 +3,7 @@
 
 const COMMANDER_FORMATS = ['Commander', 'Brawl', 'Historic Brawl', 'Oathbreaker']
 
-// ── Parser ─────────────────────────────────────────────────────────────────
+//  Parser 
 // Handles these common formats:
 //   "4 Lightning Bolt"
 //   "4 Lightning Bolt (M11) 149"         ← Arena / Moxfield with set+collector
@@ -65,7 +65,7 @@ export function parseDeckText(text, format = 'Standard') {
   return { mainboard, sideboard, commander }
 }
 
-// ── Arena Formatter ────────────────────────────────────────────────────────
+//  Arena Formatter 
 // Produces a string ready to paste into MTG Arena's deck import.
 
 export function toArenaFormat(deck) {
@@ -94,7 +94,7 @@ export function toArenaFormat(deck) {
   return lines.join('\n')
 }
 
-// ── Card counts ────────────────────────────────────────────────────────────
+//  Card counts 
 
 export function countCards(deck) {
   const main = (deck.mainboard || []).reduce((s, c) => s + c.qty, 0)
@@ -107,7 +107,7 @@ export function isCommanderFormat(format) {
   return COMMANDER_FORMATS.includes(format)
 }
 
-// ── Deck text serialiser (for editing) ────────────────────────────────────
+//  Deck text serialiser (for editing) 
 // Converts a stored deck back to pasteable text.
 
 export function deckToText(deck) {
@@ -134,13 +134,13 @@ export function deckToText(deck) {
   return lines.join('\n')
 }
 
-// ── Meta decklist parser (MTGGoldfish / Arena / MTGO / Archidekt) ─────────
+//  Meta decklist parser (MTGGoldfish / Arena / MTGO / Archidekt) 
 // Alias of parseDeckText with a name that makes call-sites self-documenting.
 export function parseArenaDecklist(text) {
   return parseDeckText(text)
 }
 
-// ── Format badge colours ───────────────────────────────────────────────────
+//  Format badge colours 
 
 export const FORMAT_COLORS = {
   Standard:       { bg: 'rgba(74,144,217,.15)',  color: 'var(--accent-blue)' },

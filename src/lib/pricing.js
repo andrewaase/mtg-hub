@@ -35,7 +35,7 @@ function setCachedPrice(cardName, price) {
   saveCache(cache)
 }
 
-// ── Bulk refresh ──────────────────────────────────────────────────────────────
+//  Bulk refresh 
 // Re-fetches Scryfall prices for every card in the collection.
 // Uses set+collector for exact printings (preserves foil/alt-art prices).
 // onProgress(done, total) called after each card.
@@ -80,7 +80,7 @@ export async function bulkRefreshPrices(collection, { onProgress } = {}) {
   return updates
 }
 
-// ── Smart pricing ─────────────────────────────────────────────────────────────
+//  Smart pricing 
 // Returns suggested sale price at a given margin below market.
 // Default: 5% below market (competitive but not the cheapest listing).
 export function suggestPrice(marketPrice, margin = 0.95) {
@@ -88,7 +88,7 @@ export function suggestPrice(marketPrice, margin = 0.95) {
   return Math.max(0.01, Math.round(marketPrice * margin * 100) / 100)
 }
 
-// ── Deck market value ─────────────────────────────────────────────────────────
+//  Deck market value 
 // Instant calculation using collection prices + localStorage cache.
 // Returns { ownedValue, cachedValue, cardValues, unknownCards }.
 export function getDeckValueSync(deck, collection) {

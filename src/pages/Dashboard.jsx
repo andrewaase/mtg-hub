@@ -18,7 +18,7 @@ function fmtShort(n) {
   return `$${n.toFixed(2)}`
 }
 
-// ── Circular donut chart ──────────────────────────────────────────────────────
+//  Circular donut chart 
 function DonutChart({ total, delta, deltaPercent, cardCount }) {
   const uid  = useId()
   const r    = 68
@@ -67,7 +67,7 @@ function DonutChart({ total, delta, deltaPercent, cardCount }) {
   )
 }
 
-// ── News widget ───────────────────────────────────────────────────────────────
+//  News widget 
 function NewsWidget({ setPage }) {
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -152,7 +152,7 @@ function NewsWidget({ setPage }) {
   )
 }
 
-// ── Tournament Widget ─────────────────────────────────────────────────────────
+//  Tournament Widget 
 function TournamentWidget({ collection, setPage }) {
   const [format,     setFormat]     = useState('standard')
   const [cards,      setCards]      = useState([])
@@ -294,7 +294,7 @@ function TournamentWidget({ collection, setPage }) {
                     }}
                     title="Buy on TCGPlayer"
                   >
-                    TCG
+                    
                   </a>
                   <a
                     href={getManaPoolLink({ name: card.name })}
@@ -309,7 +309,7 @@ function TournamentWidget({ collection, setPage }) {
                     }}
                     title="Buy on ManaPool"
                   >
-                    MP
+                    
                   </a>
                   <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>›</span>
                 </div>
@@ -340,7 +340,7 @@ function TournamentWidget({ collection, setPage }) {
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+//  Main component 
 export default function Dashboard({ matches, collection, wishlist, openLogMatch, setPage, onStartTutorial }) {
   const winRate = calculateWinRate(matches)
   const streak  = calculateStreak(matches)
@@ -374,7 +374,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   const chartColor = delta30d == null || delta30d.chg >= 0 ? '#f59e0b' : '#f87171'
   const hasTrend   = snapshots.length >= 2
 
-  // ── Market movers state ──────────────────────────────────────────────────
+  //  Market movers state 
   const [marketMovers, setMarketMovers] = useState({ gainers: [], losers: [], daysApart: 0, ready: false })
   const [moversLoading, setMoversLoading] = useState(true)
   const [moverSort,    setMoverSort]    = useState('dollar')   // 'dollar' | 'pct'
@@ -407,7 +407,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   return (
     <div>
 
-      {/* ── Hero welcome strip (empty collection) ── */}
+      {/*  Hero welcome strip (empty collection)  */}
       {collection.length === 0 && matches.length === 0 && (
         <div style={{
           margin: '12px 16px 0',
@@ -435,7 +435,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         </div>
       )}
 
-      {/* ── Wishlist alert badge ── */}
+      {/*  Wishlist alert badge  */}
       {(() => {
         const wl = wishlist || []
         const hits = wl.filter(i => i.targetPrice != null && i.currentPrice != null && i.currentPrice <= i.targetPrice)
@@ -454,7 +454,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
             onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(62,207,178,.6)'}
             onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(62,207,178,.35)'}
           >
-            <span style={{ flexShrink: 0 }}></span>
+            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}></span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--accent-teal)' }}>
                 {hits.length} wishlist card{hits.length > 1 ? 's' : ''} at or below target price!
@@ -468,7 +468,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         )
       })()}
 
-      {/* ── Portfolio Value (compact horizontal layout) ── */}
+      {/*  Portfolio Value (compact horizontal layout)  */}
       <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px 0', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '0 0 14px' }}>
           {/* Main value */}
@@ -513,7 +513,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         )}
       </div>
 
-      {/* ── 30-day Chart ── */}
+      {/*  30-day Chart  */}
       {hasTrend ? (
         <div className="card" style={{ margin: '12px 16px 0', padding: '16px 16px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
@@ -542,12 +542,13 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
       ) : collection.length > 0 && (
         <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px' }}>
           <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span></span>
             <span>Portfolio chart appears after your first daily snapshot.</span>
           </div>
         </div>
       )}
 
-      {/* ── Market Movers ── */}
+      {/*  Market Movers  */}
       {(() => {
         const { gainers: allGainers, losers: allLosers, ready, daysApart } = marketMovers
 
@@ -637,7 +638,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
             ) : !ready ? (
               <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-                <div style={{ marginBottom: 6 }}></div>
+                <div style={{ fontSize: '1.4rem', marginBottom: 6 }}></div>
                 <div style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
                   Building market history
                 </div>
@@ -686,13 +687,13 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         )
       })()}
 
-      {/* ── Mover card preview modal ── */}
+      {/*  Mover card preview modal  */}
       {moverCard && <MoverCardModal name={moverCard} onClose={() => setMoverCard(null)} setPage={setPage} />}
 
-      {/* ── Tournament Demand ── */}
+      {/*  Tournament Demand  */}
       <TournamentWidget collection={collection} setPage={setPage} />
 
-      {/* ── Win Rate Strip ── */}
+      {/*  Win Rate Strip  */}
       {matches.length > 0 && (
         <div className="stats-strip" style={{ margin: '12px 16px 0' }}>
           <div className="stat-card gold">
@@ -710,10 +711,10 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         </div>
       )}
 
-      {/* ── MTG News ── */}
+      {/*  MTG News  */}
       <NewsWidget setPage={setPage} />
 
-      {/* ── Matchup Summary ── */}
+      {/*  Matchup Summary  */}
       {Object.keys(matchupSummary).length > 0 && (
         <div style={{ margin: '12px 16px 16px' }}>
           <div className="section-title" style={{ padding: '0 0 8px' }}>Matchup Summary</div>
@@ -736,7 +737,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
         </div>
       )}
 
-      {/* ── Restart tutorial ── */}
+      {/*  Restart tutorial  */}
       <div style={{ textAlign: 'center', padding: '28px 16px 8px' }}>
         <button
           onClick={onStartTutorial}
@@ -747,7 +748,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
             textUnderlineOffset: '3px',
           }}
         >
-          Restart app tour
+           Restart app tour
         </button>
       </div>
 
@@ -854,7 +855,7 @@ function MoverCardModal({ name, onClose, setPage }) {
             <div style={{ flexShrink: 0 }}>
               {img
                 ? <img src={img} alt={name} style={{ width: 'min(200px,40vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
-                : <div style={{ width: 'min(200px,40vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.8rem', color: 'var(--text-muted)' }}>{name}</div>
+                : <div style={{ width: 'min(200px,40vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}></div>
               }
             </div>
 

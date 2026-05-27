@@ -11,7 +11,7 @@ function lsSet(data) {
   localStorage.setItem(LS_KEY, JSON.stringify({ ...current, ...data }))
 }
 
-// ── MATCHES ──────────────────────────────────────────
+//  MATCHES 
 export async function getMatches(userId) {
   if (hasSupabase && userId) {
     const { data } = await supabase.from('matches').select('*').eq('user_id', userId).order('created_at', { ascending: false })
@@ -40,7 +40,7 @@ export async function deleteMatch(id, userId) {
   lsSet({ matches })
 }
 
-// ── COLLECTION ────────────────────────────────────────
+//  COLLECTION 
 // DB columns are snake_case; JS objects use camelCase — map both ways.
 function collectionRowToCard(row) {
   return {
@@ -124,7 +124,7 @@ export async function addCard(card, userId) {
   return newCard
 }
 
-// ── UPDATE COLLECTION CARD ───────────────────────────
+//  UPDATE COLLECTION CARD 
 export async function updateCollectionCard(id, patch, userId) {
   const dbPatch = {}
   if (patch.qty        !== undefined) dbPatch.qty              = patch.qty
@@ -136,7 +136,7 @@ export async function updateCollectionCard(id, patch, userId) {
   }
 }
 
-// ── BULK COLLECTION IMPORT ───────────────────────────
+//  BULK COLLECTION IMPORT 
 // Efficiently imports many cards at once: 1 select + 1 batch insert + N qty-updates.
 // cards: [{ name, qty, condition, setName, img, colors, price }]
 // Returns the full updated collection array.
@@ -198,7 +198,7 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
     return (refreshed || []).map(collectionRowToCard)
   }
 
-  // ── localStorage fallback ──
+  //  localStorage fallback 
   const stored = lsGet()
   const collection = stored.collection || []
   for (let i = 0; i < cards.length; i++) {
@@ -215,7 +215,7 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
   return collection
 }
 
-// ── STORE LISTINGS ────────────────────────────────────
+//  STORE LISTINGS 
 // Upsert a store listing: if an active listing with the same name +
 // condition + is_foil already exists, increment qty_available instead of
 // creating a duplicate row.  Returns { merged: bool, id }.
@@ -269,7 +269,7 @@ export async function removeCard(id, userId) {
   lsSet({ collection })
 }
 
-// ── FRIENDS (Supabase only) ───────────────────────────
+//  FRIENDS (Supabase only) 
 // Both getFriends and getPendingRequests go through a Netlify function (service key)
 // because RLS on `friendships` blocks the recipient from reading rows they don't own.
 async function fetchFriendsBundle(accessToken) {
@@ -347,7 +347,7 @@ export async function denyFriendRequestByUsers(requesterId, accessToken) {
   } catch { /* non-critical */ }
 }
 
-// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+//  NOTIFICATIONS 
 
 export async function getNotifications(userId) {
   if (!hasSupabase || !userId) return []
@@ -497,7 +497,7 @@ export async function removeWant(cardName, userId) {
   await supabase.from('trade_wants').delete().eq('user_id', userId).eq('card_name', cardName)
 }
 
-// ── WISHLIST ──────────────────────────────────────────
+//  WISHLIST 
 // Row shape in Supabase: id, user_id, name, target_price, current_price, img, set_name, added_at
 // JS shape uses camelCase: targetPrice, currentPrice, setName, addedAt
 
@@ -561,7 +561,7 @@ export async function removeWishlistItem(id, userId) {
   lsSet({ wishlist })
 }
 
-// ── DECKS ─────────────────────────────────────────────
+//  DECKS 
 export async function getDecks(userId) {
   if (hasSupabase && userId) {
     const { data } = await supabase.from('decks').select('*').eq('user_id', userId).order('updated_at', { ascending: false })
@@ -603,7 +603,7 @@ export async function deleteDeck(id, userId) {
   lsSet({ decks })
 }
 
-// ── EXPORT / IMPORT ───────────────────────────────────
+//  EXPORT / IMPORT 
 export function exportData(matches, collection) {
   const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), matches, collection }, null, 2)], { type: 'application/json' })
   const a = document.createElement('a')
