@@ -294,7 +294,7 @@ function TournamentWidget({ collection, setPage }) {
                     }}
                     title="Buy on TCGPlayer"
                   >
-                    🛒
+                    TCG
                   </a>
                   <a
                     href={getManaPoolLink({ name: card.name })}
@@ -309,7 +309,7 @@ function TournamentWidget({ collection, setPage }) {
                     }}
                     title="Buy on ManaPool"
                   >
-                    🌊
+                    MP
                   </a>
                   <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>›</span>
                 </div>
@@ -454,7 +454,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
             onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(62,207,178,.6)'}
             onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(62,207,178,.35)'}
           >
-            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>🎯</span>
+            <span style={{ flexShrink: 0 }}></span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--accent-teal)' }}>
                 {hits.length} wishlist card{hits.length > 1 ? 's' : ''} at or below target price!
@@ -542,7 +542,6 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
       ) : collection.length > 0 && (
         <div className="card" style={{ margin: '12px 16px 0', padding: '14px 16px' }}>
           <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>📈</span>
             <span>Portfolio chart appears after your first daily snapshot.</span>
           </div>
         </div>
@@ -638,7 +637,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
             ) : !ready ? (
               <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>📊</div>
+                <div style={{ marginBottom: 6 }}></div>
                 <div style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
                   Building market history
                 </div>
@@ -700,13 +699,13 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
             <div className="stat-label">Win Rate</div>
             <div className="stat-value">{winRate}%</div>
             <div className="stat-sub">{wins}W – {losses}L</div>
-            <div className="stat-icon">📈</div>
+            <div className="stat-icon"></div>
           </div>
           <div className={`stat-card ${streakClass}`}>
             <div className="stat-label">Streak</div>
             <div className="stat-value">{streak.count > 0 ? `${streak.count}${streakLabel}` : '—'}</div>
             <div className="stat-sub">{streak.count > 0 ? (streak.type === 'win' ? 'Win streak' : 'Loss streak') : 'No matches yet'}</div>
-            <div className="stat-icon">🔥</div>
+            <div className="stat-icon"></div>
           </div>
         </div>
       )}
@@ -748,7 +747,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
             textUnderlineOffset: '3px',
           }}
         >
-          🧭 Restart app tour
+          Restart app tour
         </button>
       </div>
 
@@ -855,7 +854,7 @@ function MoverCardModal({ name, onClose, setPage }) {
             <div style={{ flexShrink: 0 }}>
               {img
                 ? <img src={img} alt={name} style={{ width: 'min(200px,40vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
-                : <div style={{ width: 'min(200px,40vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+                : <div style={{ width: 'min(200px,40vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.8rem', color: 'var(--text-muted)' }}>{name}</div>
               }
             </div>
 

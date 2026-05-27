@@ -22,11 +22,11 @@ function saveCart(cart) {
 const CONDITION_LABELS = { NM: 'Near Mint', LP: 'Light Play', MP: 'Moderate Play', HP: 'Heavy Play', DMG: 'Damaged' }
 
 const COLOR_OPTIONS = [
-  { id: 'W', label: '☀️ White' },
-  { id: 'U', label: '💧 Blue' },
-  { id: 'B', label: '💀 Black' },
-  { id: 'R', label: '🔥 Red' },
-  { id: 'G', label: '🌿 Green' },
+  { id: 'W', label: <><span style={{display:'inline-block',width:10,height:10,borderRadius:'50%',background:'#a3a3a3',verticalAlign:'middle',marginRight:5}}/> White</> },
+  { id: 'U', label: <><span style={{display:'inline-block',width:10,height:10,borderRadius:'50%',background:'#3b82f6',verticalAlign:'middle',marginRight:5}}/> Blue</> },
+  { id: 'B', label: <><span style={{display:'inline-block',width:10,height:10,borderRadius:'50%',background:'#1a1a1a',verticalAlign:'middle',marginRight:5,border:'1px solid #555'}}/> Black</> },
+  { id: 'R', label: <><span style={{display:'inline-block',width:10,height:10,borderRadius:'50%',background:'#ef4444',verticalAlign:'middle',marginRight:5}}/> Red</> },
+  { id: 'G', label: <><span style={{display:'inline-block',width:10,height:10,borderRadius:'50%',background:'#22c55e',verticalAlign:'middle',marginRight:5}}/> Green</> },
   { id: 'C', label: '⬡ Colorless' },
 ]
 const RARITY_OPTIONS = ['common', 'uncommon', 'rare', 'mythic']
@@ -91,8 +91,7 @@ function PriceChart({ scryfallId, isFoil, currentPrice }) {
   if (history.length < 2) {
     return (
       <div style={{ textAlign: 'center', padding: '14px 0', color: 'var(--text-muted)', fontSize: '.72rem' }}>
-        <div style={{ fontSize: '1.4rem', marginBottom: 5 }}>📈</div>
-        Price tracking begins today — check back after the next daily sync!
+          Price tracking begins today — check back after the next daily sync!
       </div>
     )
   }
@@ -264,7 +263,7 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
           <div style={{ flexShrink: 0 }}>
             {listing.img_url
               ? <img src={listing.img_url} alt={listing.name} style={{ width: 'min(230px, 42vw)', borderRadius: 12, boxShadow: '0 8px 28px rgba(0,0,0,.6)', display: 'block' }} />
-              : <div style={{ width: 'min(230px, 42vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>🃏</div>
+              : <div style={{ width: 'min(230px, 42vw)', aspectRatio: '63/88', background: 'var(--bg-card)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.8rem', color: 'var(--text-muted)' }}>{listing.name}</div>
             }
           </div>
 
@@ -312,7 +311,7 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
                 </span>
               )}
               {listing.is_foil && (
-                <span style={{ fontSize: '.62rem', fontWeight: 700, background: 'linear-gradient(135deg,#a78bfa,#c084fc)', color: '#fff', borderRadius: 4, padding: '2px 7px' }}>✦ FOIL</span>
+                <span style={{ fontSize: '.62rem', fontWeight: 700, background: 'linear-gradient(135deg,#a78bfa,#c084fc)', color: '#fff', borderRadius: 4, padding: '2px 7px' }}>FOIL</span>
               )}
               {listing.set_name && (
                 <span style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>{listing.set_name}</span>
@@ -350,7 +349,7 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
             <div style={{
               fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
               letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 10,
-            }}>📈 Price History</div>
+            }}>Price History</div>
             <PriceChart
               scryfallId={listing.scryfall_id}
               isFoil={listing.is_foil}
@@ -379,7 +378,7 @@ function ListingCard({ listing, onAdd, inCart, onView }) {
       <div onClick={() => onView(listing)} style={{ cursor: 'pointer', position: 'relative' }}>
         {listing.img_url
           ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: '63/88', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', aspectRatio: '63/88', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🃏</div>
+          : <div style={{ width: '100%', aspectRatio: '63/88', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.7rem', color: 'var(--text-muted)', padding: '8px', textAlign: 'center' }}>{listing.name}</div>
         }
         {listing.is_foil && (
           <div style={{
@@ -387,7 +386,7 @@ function ListingCard({ listing, onAdd, inCart, onView }) {
             background: 'linear-gradient(135deg,#a78bfa,#c084fc)',
             color: '#fff', borderRadius: '4px', padding: '2px 6px',
             fontSize: '.6rem', fontWeight: 800, letterSpacing: '.3px',
-          }}>✦ FOIL</div>
+          }}>FOIL</div>
         )}
         {/* "tap to read" hint overlay */}
         <div style={{
@@ -456,11 +455,8 @@ function VaultedRaritiesArt() {
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 40%, rgba(201,168,76,.12) 0%, transparent 65%)' }} />
-      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
-      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
-      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
-      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}>✦</div>
-      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(201,168,76,.5))' }}>🏛️</div>
+
+      <div style={{ marginBottom: 10 }}></div>
       <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.22em', color: '#c9a84c', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(201,168,76,.6)' }}>
         Vaulted<br />Rarities
       </div>
@@ -483,7 +479,7 @@ function RelicsAwakenedArt() {
       <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
       <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
       <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}>◈</div>
-      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(180,110,30,.5))' }}>⚗️</div>
+      <div style={{ marginBottom: 10 }}></div>
       <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.2em', color: '#b46e1e', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(180,110,30,.55)' }}>
         Relics<br />Awakened
       </div>
@@ -502,7 +498,7 @@ function GenericResealedArt({ name }) {
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 45%, rgba(139,92,246,.1) 0%, transparent 65%)' }} />
-      <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>🎴</div>
+      <div style={{ marginBottom: 10 }}></div>
       <div style={{ fontSize: '.65rem', fontWeight: 900, letterSpacing: '.14em', color: '#a78bfa', textTransform: 'uppercase', textAlign: 'center', maxWidth: '80%', lineHeight: 1.45 }}>{name}</div>
     </div>
   )
@@ -517,7 +513,7 @@ function SealedPackArt({ name, productFormat }) {
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 45%, rgba(59,130,246,.1) 0%, transparent 65%)' }} />
-      <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>📦</div>
+      <div style={{ marginBottom: 10 }}></div>
       <div style={{ fontSize: '.65rem', fontWeight: 900, letterSpacing: '.12em', color: '#60a5fa', textTransform: 'uppercase', textAlign: 'center', maxWidth: '80%', lineHeight: 1.45 }}>{name}</div>
       {productFormat && (
         <div style={{ fontSize: '.5rem', color: 'rgba(96,165,250,.55)', marginTop: 6, letterSpacing: '.1em', textTransform: 'uppercase' }}>{productFormat}</div>
@@ -600,7 +596,7 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
           </div>
         )}
         <span style={{ fontSize: '.6rem', fontWeight: 700, background: 'rgba(139,92,246,.12)', color: '#a78bfa', borderRadius: 4, padding: '2px 6px', alignSelf: 'flex-start' }}>
-          🎴 Resealed Pack
+          Resealed Pack
         </span>
         <div style={{ fontSize: '.6rem', color: stockColor, fontWeight: 600 }}>
           {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
@@ -656,7 +652,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
             )}
             {(listing.product_type || 'single') === 'resealed' && (
               <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(139,92,246,.12)', color: '#a78bfa', borderRadius: 6, padding: '3px 8px', alignSelf: 'flex-start' }}>
-                🎴 Resealed Pack
+                Resealed Pack
               </span>
             )}
             {listing.description && (
@@ -705,14 +701,14 @@ function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout, shipping
         boxShadow: '-8px 0 32px rgba(0,0,0,.4)',
       }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>🛒 Cart ({cart.length})</div>
+          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Cart ({cart.length})</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
           {cart.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🛒</div>
+              <div style={{ marginBottom: 12 }}></div>
               <div>Your cart is empty</div>
             </div>
           ) : (
@@ -729,7 +725,7 @@ function CartDrawer({ cart, onClose, onRemove, onQtyChange, onCheckout, shipping
                   }
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: '.78rem', lineHeight: 1.3 }}>{item.name}</div>
-                    <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>{item.condition}{item.is_foil ? ' · ✦' : ''}</div>
+                    <div style={{ fontSize: '.65rem', color: 'var(--text-muted)' }}>{item.condition}{item.is_foil ? ' · Foil' : ''}</div>
                     <div style={{ fontWeight: 800, fontSize: '.82rem', color: 'var(--accent-gold)', marginTop: 2 }}>
                       {fmt(item.price * item.qty)}
                     </div>
@@ -910,7 +906,7 @@ function CheckoutModal({ cart, onClose, onSuccess, shippingCost }) {
         {/* ── Success ── */}
         {step === 'success' && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: 12 }}>✅</div>
+            <div style={{ marginBottom: 12 }}></div>
             <div style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: 8 }}>Order Confirmed!</div>
             <div style={{ color: 'var(--text-muted)', fontSize: '.88rem', marginBottom: 6 }}>
               Thanks, {shipping.name.split(' ')[0]}! We'll email you a shipping update at
@@ -1043,14 +1039,14 @@ function WaitlistModal({ listing, user, onClose }) {
         <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: '#fff', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         {done ? (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <div style={{ fontSize: '2rem', marginBottom: 10 }}>🔔</div>
+            <div style={{ marginBottom: 10 }}></div>
             <div style={{ fontWeight: 800, fontSize: '1.05rem', marginBottom: 6 }}>You're on the list!</div>
             <div style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>We'll email <strong>{email}</strong> when <em>{listing.name}</em> is back in stock.</div>
             <button onClick={onClose} style={{ marginTop: 18, padding: '10px 24px', borderRadius: 10, border: 'none', background: 'var(--accent-gold)', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}>Done</button>
           </div>
         ) : (
           <>
-            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 4 }}>🔔 Notify Me</div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 4 }}>Notify Me</div>
             <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginBottom: 16 }}>
               Get an email when <strong style={{ color: 'var(--text-primary)' }}>{listing.name}</strong> is back in stock.
             </div>
@@ -1061,7 +1057,7 @@ function WaitlistModal({ listing, user, onClose }) {
                 className="form-input"
                 style={{ padding: '10px 14px', fontSize: '.88rem' }}
               />
-              {err && <div style={{ fontSize: '.75rem', color: '#fca5a5' }}>⚠️ {err}</div>}
+              {err && <div style={{ fontSize: '.75rem', color: '#fca5a5' }}>{err}</div>}
               <button type="submit" disabled={saving} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'var(--accent-gold)', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer' }}>
                 {saving ? 'Saving…' : 'Notify Me When Available'}
               </button>
@@ -1319,7 +1315,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             Vaulted Singles
           </div>
           <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-.5px' }}>
-            🏪 Card Shop
+            Card Shop
           </div>
           <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
             {loading ? 'Loading…' : `${filtered.length} ${category === 'single' ? 'card' : 'product'}${filtered.length !== 1 ? 's' : ''} available`}
@@ -1333,7 +1329,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             color: 'var(--accent-gold)', fontWeight: 700, fontSize: '.88rem', cursor: 'pointer',
           }}
         >
-          🛒 Cart
+          Cart
           {cartCount > 0 && (
             <span style={{
               position: 'absolute', top: -8, right: -8,
@@ -1349,9 +1345,9 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
       {/* ── Category tabs ── */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
         {[
-          { id: 'single',   label: '🃏 Singles'  },
-          { id: 'sealed',   label: '📦 Sealed'   },
-          { id: 'resealed', label: '🎴 Resealed' },
+          { id: 'single',   label: 'Singles'  },
+          { id: 'sealed',   label: 'Sealed'   },
+          { id: 'resealed', label: 'Resealed' },
         ].map(t => (
           <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
             padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
@@ -1388,7 +1384,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
               display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
-            ⚙️ Filter
+            Filter
             {hasActiveFilters && (
               <span style={{
                 background: 'var(--accent-gold)', color: '#1a1000',
@@ -1434,7 +1430,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
               options={RARITY_OPTIONS}
               value={filterRarity}
               onChange={setFilterRarity}
-              labelFn={r => ({ common: '● Common', uncommon: '◈ Uncommon', rare: '◆ Rare', mythic: '✦ Mythic' }[r] || r)}
+              labelFn={r => ({ common: '● Common', uncommon: '◈ Uncommon', rare: '◆ Rare', mythic: 'Mythic' }[r] || r)}
             />
           </div>
 
@@ -1451,7 +1447,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
               options={['foil', 'nonfoil']}
               value={foilFilter === 'all' ? null : foilFilter}
               onChange={v => setFoilFilter(v || 'all')}
-              labelFn={v => v === 'foil' ? '✦ Foil' : 'Non-Foil'}
+              labelFn={v => v === 'foil' ? 'Foil' : 'Non-Foil'}
             />
           </div>
 
@@ -1514,7 +1510,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
 
       {!loading && filtered.length === 0 && !search && (
         <div className="empty-state">
-          <div className="empty-icon">{category === 'single' ? '🃏' : category === 'sealed' ? '📦' : '🎴'}</div>
+          <div className="empty-icon">{'—'}</div>
           <p>
             {category === 'single'   && 'No singles listed yet. Check back soon!'}
             {category === 'sealed'   && 'No sealed products listed yet. Check back soon!'}
@@ -1525,7 +1521,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
 
       {!loading && filtered.length === 0 && search && (
         <div className="empty-state">
-          <div className="empty-icon">🔍</div>
+          <div className="empty-icon"></div>
           <p>No results for "{search}"</p>
           <button className="btn btn-ghost" onClick={() => setSearch('')} style={{ marginTop: 12 }}>Clear search</button>
         </div>
@@ -1576,7 +1572,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
                 <div style={{ position: 'relative' }}>
                   {listing.img_url
                     ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block', aspectRatio: category === 'single' ? '63/88' : '3/4', objectFit: 'cover', filter: 'grayscale(40%)' }} />
-                    : <div style={{ width: '100%', aspectRatio: category === 'single' ? '63/88' : '3/4', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>{category === 'single' ? '🃏' : '📦'}</div>
+                    : <div style={{ width: '100%', aspectRatio: category === 'single' ? '63/88' : '3/4', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>{'—'}</div>
                   }
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: '.65rem', fontWeight: 800, background: 'rgba(0,0,0,.7)', color: '#f87171', borderRadius: 6, padding: '4px 10px', letterSpacing: '.06em' }}>OUT OF STOCK</span>
@@ -1593,7 +1589,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
                       background: 'transparent', color: 'var(--accent-gold)', fontWeight: 700,
                       fontSize: '.72rem', cursor: 'pointer', width: '100%',
                     }}
-                  >🔔 Notify Me</button>
+                  >Notify Me</button>
                 </div>
               </div>
             ))}
@@ -1683,7 +1679,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
                 boxShadow: '0 2px 12px rgba(201,168,76,.35)',
               }}
             >
-              🛒 View Cart →
+              View Cart →
             </button>
           </div>
         </div>
