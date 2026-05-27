@@ -58,7 +58,7 @@ export default function Lab({ setPage }) {
         fontSize: '.78rem', color: 'var(--accent-gold)', fontWeight: 700,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>🧪 Hero Lab</span>
+          <span>Hero Lab</span>
           <span style={{ opacity: .6, fontWeight: 400 }}>
             Sandbox · changes here do not affect the live homepage
           </span>
@@ -121,7 +121,7 @@ export default function Lab({ setPage }) {
               textTransform: 'uppercase', color: 'var(--accent-teal)',
               marginBottom: 16,
             }}>
-              ✦ Packs · Singles · Collection Tools
+              Packs · Singles · Collection Tools
             </div>
 
             <h1 style={{
@@ -165,7 +165,7 @@ export default function Lab({ setPage }) {
                   boxShadow: '0 8px 24px rgba(245,158,11,.35)',
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                 }}
-              >🛒 Shop Singles</button>
+              >Shop Singles</button>
               <button
                 onClick={() => setPage?.('collection')}
                 style={{
@@ -178,7 +178,7 @@ export default function Lab({ setPage }) {
                   backdropFilter: 'blur(8px)',
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                 }}
-              >📊 Track Collection</button>
+              >Track Collection</button>
             </div>
 
             {/* Trust badges */}
@@ -189,13 +189,12 @@ export default function Lab({ setPage }) {
               justifyContent: textAlign === 'center' ? 'center' : 'flex-start',
             }}>
               {[
-                ['🔍', 'Carefully Inspected', 'Quality cards, every time.'],
-                ['🚚', 'Fast & Secure Shipping', 'Packaged with care.'],
-                ['👤', 'Built by a Collector', 'For collectors, by a collector.'],
-              ].map(([icon, title, sub]) => (
+                ['Carefully Inspected', 'Quality cards, every time.'],
+                ['Fast & Secure Shipping', 'Packaged with care.'],
+                ['Built by a Collector', 'For collectors, by a collector.'],
+              ].map(([title, sub]) => (
                 <div key={title} style={{ minWidth: 130 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <span style={{ color: 'var(--accent-gold)' }}>{icon}</span>
                     <span style={{ fontSize: '.7rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '.05em' }}>
                       {title}
                     </span>
@@ -219,7 +218,7 @@ export default function Lab({ setPage }) {
           fontSize: '.62rem', fontWeight: 800, textTransform: 'uppercase',
           letterSpacing: '.15em', color: 'var(--text-muted)', marginBottom: 16,
         }}>
-          🎛 Hero Controls
+          Hero Controls
         </div>
 
         <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
@@ -258,7 +257,7 @@ export default function Lab({ setPage }) {
           background: 'rgba(255,255,255,.025)',
           fontSize: '.78rem', color: 'var(--text-muted)', lineHeight: 1.6,
         }}>
-          <strong style={{ color: '#fff' }}>📁 To wire in your image:</strong>{' '}
+          <strong style={{ color: '#fff' }}>To wire in your image:</strong>{' '}
           save it as <code style={{ background: 'rgba(255,255,255,.08)', padding: '1px 6px', borderRadius: 4 }}>public/hero-vault.jpg</code>
           {' '}in the repo, commit, and push. The hero picks it up on the next deploy.
           (You can also try other filenames — just update <code style={{ background: 'rgba(255,255,255,.08)', padding: '1px 6px', borderRadius: 4 }}>HERO_IMG</code> at the top of <code>src/pages/Lab.jsx</code>.)

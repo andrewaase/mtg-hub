@@ -27,12 +27,13 @@ import About from './pages/About'
 import Membership from './pages/Membership'
 import Lab from './pages/Lab'
 import HeroLanding from './pages/HeroLanding'
+import Terms from './pages/Terms'
 import OnboardingTutorial from './components/OnboardingTutorial'
 import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
 
 // 'lab' is intentionally hidden from Sidebar/MobileNav — reachable only at /#lab
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms']
 
 const PAGE_TITLES = {
   dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
@@ -50,6 +51,7 @@ const PAGE_TITLES = {
   about:      'About | Vaulted Singles',
   admin:      'Control Center | Vaulted Singles',
   lab:        'Hero Lab (sandbox) | Vaulted Singles',
+  terms:      'Terms of Service & Privacy Policy | Vaulted Singles',
 }
 
 const PAGE_DESCRIPTIONS = {
@@ -453,13 +455,14 @@ export default function App() {
               {mountedPages.has('about')      && <div style={{ display: page === 'about'      ? undefined : 'none' }}><About setPage={setPage} /></div>}
               {mountedPages.has('admin')      && <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>}
               {mountedPages.has('lab')        && <div style={{ display: page === 'lab'        ? undefined : 'none' }}><Lab setPage={setPage} /></div>}
+              {mountedPages.has('terms')      && <div style={{ display: page === 'terms'      ? undefined : 'none' }}><Terms setPage={setPage} /></div>}
             </>
           )}
         </div>
       </div>
       <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
-      {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} />}
+      {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} setPage={setPage} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
       {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}

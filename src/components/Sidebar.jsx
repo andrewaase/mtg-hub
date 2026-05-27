@@ -4,20 +4,20 @@ import logoPng from '../assets/vaulted_singles_logo.png'
 export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sidebarOpen, setSidebarOpen }) {
 
   const navItems = [
-    { id: 'dashboard',  icon: '🏠', label: 'Dashboard',        section: 'Main'      },
-    { id: 'store',      icon: '🏪', label: 'Store',             section: 'Main'      },
-    { id: 'membership', icon: '⚡', label: 'VS Pro',             section: 'Main'      },
-    { id: 'about',      icon: '💬', label: 'About Us',          section: 'Main'      },
-    { id: 'cards',      icon: '🔍', label: 'Card Lookup',       section: 'Resources' },
-    { id: 'releases',   icon: '📅', label: 'Set Releases',      section: 'Resources' },
-    { id: 'news',       icon: '📰', label: 'MTG News',          section: 'Resources' },
-    { id: 'collection', icon: '📦', label: 'My Collection',     section: 'Tools',    requiresSupabase: true },
-    { id: 'decks',      icon: '🃏', label: 'My Decks',          section: 'Tools',    requiresSupabase: true },
-    { id: 'wishlist',   icon: '🎯', label: 'Wishlist',          section: 'Tools',    requiresSupabase: true },
-    { id: 'log',        icon: '⚔️', label: 'Match Log',         section: 'Tools',    requiresSupabase: true },
-    { id: 'stats',      icon: '📊', label: 'Stats',             section: 'Tools',    requiresSupabase: true },
-    { id: 'friends',    icon: '🤝', label: 'Friends & Trades',  section: 'Social',   requiresSupabase: true },
-    { id: 'admin',      icon: '🎛️', label: 'Control Center',   section: 'Admin',    requiresAdmin: true },
+    { id: 'dashboard',  label: 'Dashboard',        section: 'Main'      },
+    { id: 'store',      label: 'Store',             section: 'Main'      },
+    { id: 'membership', label: 'VS Pro',             section: 'Main'      },
+    { id: 'about',      label: 'About Us',          section: 'Main'      },
+    { id: 'cards',      label: 'Card Lookup',       section: 'Resources' },
+    { id: 'releases',   label: 'Set Releases',      section: 'Resources' },
+    { id: 'news',       label: 'MTG News',          section: 'Resources' },
+    { id: 'collection', label: 'My Collection',     section: 'Tools',    requiresSupabase: true },
+    { id: 'decks',      label: 'My Decks',          section: 'Tools',    requiresSupabase: true },
+    { id: 'wishlist',   label: 'Wishlist',          section: 'Tools',    requiresSupabase: true },
+    { id: 'log',        label: 'Match Log',         section: 'Tools',    requiresSupabase: true },
+    { id: 'stats',      label: 'Stats',             section: 'Tools',    requiresSupabase: true },
+    { id: 'friends',    label: 'Friends & Trades',  section: 'Social',   requiresSupabase: true },
+    { id: 'admin',      label: 'Control Center',   section: 'Admin',    requiresAdmin: true },
   ]
 
   const sections = {
@@ -63,7 +63,6 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
                 className={`nav-item ${page === item.id ? 'active' : ''}`}
                 onClick={() => handleNavClick(item.id)}
               >
-                <span className="icon">{item.icon}</span>
                 {item.label}
               </button>
             ))}

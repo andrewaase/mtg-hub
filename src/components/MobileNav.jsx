@@ -4,13 +4,13 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
   const [showSheet, setShowSheet] = useState(false)
 
   const leftItems = [
-    { id: 'dashboard',  icon: '🏠', label: 'Home' },
-    { id: 'collection', icon: '💎', label: 'Collection' },
+    { id: 'dashboard',  label: 'Home' },
+    { id: 'collection', label: 'Collection' },
   ]
 
   const rightItems = [
-    { id: 'cards', icon: '🔍', label: 'Lookup' },
-    { id: 'decks', icon: '🃏', label: 'Decks' },
+    { id: 'cards', label: 'Lookup' },
+    { id: 'decks', label: 'Decks' },
   ]
 
   return (
@@ -37,10 +37,10 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
           display: 'flex', flexDirection: 'column', gap: '2px',
           minWidth: '230px', boxShadow: '0 8px 40px rgba(0,0,0,.7)',
         }}>
-          <SheetBtn icon="📷" label="Scan a Card" sub="Use your camera" onClick={() => { setShowSheet(false); openCamera?.() }} />
-          <SheetBtn icon="✏️" label="Type Manually" sub="Search by name" onClick={() => { setShowSheet(false); openAddCard?.() }} />
+          <SheetBtn label="Scan a Card" sub="Use your camera" onClick={() => { setShowSheet(false); openCamera?.() }} />
+          <SheetBtn label="Type Manually" sub="Search by name" onClick={() => { setShowSheet(false); openAddCard?.() }} />
           <div style={{ height: '1px', background: 'var(--border)', margin: '4px 10px' }} />
-          <SheetBtn icon="⚔️" label="Log a Match" onClick={() => { setShowSheet(false); openLogMatch?.() }} muted />
+          <SheetBtn label="Log a Match" onClick={() => { setShowSheet(false); openLogMatch?.() }} muted />
         </div>
       )}
 
@@ -48,7 +48,6 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
         <div className="mobile-nav-items">
           {leftItems.map(item => (
             <div key={item.id} className={`mobile-nav-item ${page === item.id ? 'active' : ''}`} onClick={() => setPage(item.id)}>
-              <span className="icon">{item.icon}</span>
               {item.label}
             </div>
           ))}
@@ -67,7 +66,6 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
 
           {rightItems.map(item => (
             <div key={item.id} className={`mobile-nav-item ${page === item.id ? 'active' : ''}`} onClick={() => setPage(item.id)}>
-              <span className="icon">{item.icon}</span>
               {item.label}
             </div>
           ))}
@@ -77,7 +75,7 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
   )
 }
 
-function SheetBtn({ icon, label, sub, onClick, muted }) {
+function SheetBtn({ label, sub, onClick, muted }) {
   return (
     <button
       onClick={onClick}
@@ -90,7 +88,6 @@ function SheetBtn({ icon, label, sub, onClick, muted }) {
         width: '100%',
       }}
     >
-      <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>{icon}</span>
       <div>
         <div>{label}</div>
         {sub && <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: '1px' }}>{sub}</div>}

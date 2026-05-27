@@ -122,7 +122,7 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
               onMouseEnter={e => { e.currentTarget.style.opacity = '.9'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(245,158,11,.45)' }}
               onMouseLeave={e => { e.currentTarget.style.opacity = '1';  e.currentTarget.style.boxShadow = '0 8px 24px rgba(245,158,11,.35)' }}
             >
-              🏠 Go to Dashboard
+              Go to Dashboard
             </button>
 
             <button
@@ -141,7 +141,7 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(20,184,166,.25)'; e.currentTarget.style.borderColor = 'rgba(20,184,166,.8)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(20,184,166,.15)'; e.currentTarget.style.borderColor = 'rgba(20,184,166,.5)' }}
             >
-              🛒 Shop Singles &amp; Repacks
+              Shop Singles &amp; Repacks
             </button>
 
             <button
@@ -160,7 +160,7 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.16)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.5)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.28)' }}
             >
-              📊 Manage Collection
+              Manage Collection
             </button>
 
           </div>
@@ -183,12 +183,6 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
               onMouseEnter={e => { e.currentTarget.style.color = '#fff' }}
               onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.6)' }}
             >
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 22, height: 22, borderRadius: '50%',
-                background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.28)',
-                fontSize: '.72rem',
-              }}>👤</span>
               Sign In / Sign Up
             </button>
           )}
