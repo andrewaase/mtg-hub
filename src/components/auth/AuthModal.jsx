@@ -72,7 +72,15 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
     }
     setLoading(true)
     try {
-      const { data, error: signUpErr } = await supabase.auth.signUp({ email, password })
+      const { data, error: signUpErr } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          // After clicking the confirmation link, Supabase redirects here.
+          // Must also be listed in Supabase Dashboard → Auth → URL Configuration → Redirect URLs.
+          emailRedirectTo: window.location.origin,
+        },
+      })
       if (signUpErr) throw signUpErr
 
       // Persist profile data — upsert so it works whether the DB trigger

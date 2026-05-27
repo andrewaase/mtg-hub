@@ -69,6 +69,8 @@ const PAGE_DESCRIPTIONS = {
 
 function getInitialPage() {
   const hash = window.location.hash.replace('#', '')
+  // Supabase auth callbacks arrive as ?error=... or #access_token=... — treat as dashboard
+  if (hash.startsWith('access_token=') || hash.startsWith('error=')) return 'dashboard'
   return VALID_PAGES.includes(hash) ? hash : 'dashboard'
 }
 
@@ -234,13 +236,34 @@ export default function App() {
     setTimeout(() => setToast(null), duration)
   }, [])
 
-  // Auth listener
+  // Auth listener + email-confirmation callback handler
   useEffect(() => {
     if (!hasSupabase) { setLoading(false); return }
+
+    // Handle Supabase redirect after email confirmation.
+    // The URL hash contains either access_token=... (success) or error=... (failure).
+    const rawHash = window.location.hash.slice(1)
+    if (rawHash.startsWith('access_token=') || rawHash.startsWith('error=')) {
+      const params = new URLSearchParams(rawHash)
+      if (params.get('error')) {
+        const desc = params.get('error_description')?.replace(/\+/g, ' ') || 'Email confirmation failed.'
+        // Show error once auth state settles
+        setTimeout(() => showToast(`Email confirmation error: ${desc}`, 5000), 800)
+      }
+      // Strip the auth tokens from the URL bar so they don't persist on refresh
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null)
+      if (event === 'SIGNED_IN' && rawHash.startsWith('access_token=')) {
+        // User just confirmed their email and got signed in automatically
+        setTimeout(() => showToast('Email confirmed — welcome to Vaulted Singles!', 4000), 400)
+      }
+    })
     return () => subscription.unsubscribe()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show onboarding tutorial once per new user (after sign-up / first sign-in)
   useEffect(() => {
