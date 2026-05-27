@@ -8,12 +8,12 @@ import { getABUPriceMap, getABUBuyPrice, getABUBuylistLink } from '../lib/abugam
 import { getSCGPriceMap, getSCGBuyPrice, isSCGHotlist, getSCGBuylistLink } from '../lib/starcitygames'
 
 const COLOR_OPTIONS = [
-  { id: 'W', label: ' White' },
-  { id: 'U', label: ' Blue' },
-  { id: 'B', label: ' Black' },
-  { id: 'R', label: ' Red' },
-  { id: 'G', label: ' Green' },
-  { id: 'C', label: ' Colorless' },
+  { id: 'W', label: 'White',     dot: '#e5e7eb' },
+  { id: 'U', label: 'Blue',      dot: '#3b82f6' },
+  { id: 'B', label: 'Black',     dot: '#1f2937' },
+  { id: 'R', label: 'Red',       dot: '#ef4444' },
+  { id: 'G', label: 'Green',     dot: '#22c55e' },
+  { id: 'C', label: 'Colorless', dot: '#6b7280' },
 ]
 const RARITY_OPTIONS    = ['common', 'uncommon', 'rare', 'mythic']
 const CONDITION_OPTIONS = ['NM', 'LP', 'MP', 'HP']
@@ -33,6 +33,7 @@ function ChipRow({ options, value, onChange, multi = false, labelFn }) {
       {options.map(opt => {
         const id = typeof opt === 'string' ? opt : opt.id
         const label = labelFn ? labelFn(opt) : (typeof opt === 'string' ? opt : opt.label)
+        const dot = typeof opt === 'object' ? opt.dot : null
         return (
           <button
             key={id}
@@ -45,8 +46,17 @@ function ChipRow({ options, value, onChange, multi = false, labelFn }) {
               color: isActive(id) ? 'var(--accent-teal)' : 'var(--text-secondary)',
               fontSize: '.72rem', fontWeight: isActive(id) ? 700 : 400,
               cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
             }}
           >
+            {dot && (
+              <span style={{
+                display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                background: dot, flexShrink: 0,
+                border: id === 'W' ? '1px solid rgba(255,255,255,.25)' : 'none',
+                boxShadow: id === 'B' ? '0 0 0 1px rgba(255,255,255,.15)' : 'none',
+              }} />
+            )}
             {label}
           </button>
         )
@@ -992,8 +1002,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
           style={{ flex: 1, minWidth: 0, maxWidth: '220px' }}
         />
         <button className="btn btn-primary" onClick={() => openAddCard()}>+ Add</button>
-        <button className="btn btn-ghost" onClick={() => openCamera()}> Scan</button>
-        <button className="btn btn-ghost" onClick={() => setShowBulk(true)} title="Bulk import from text or file" style={{ fontSize: '.78rem' }}> Import</button>
+        <button className="btn btn-ghost" onClick={() => openCamera()}>Scan</button>
+        <button className="btn btn-ghost" onClick={() => setShowBulk(true)} title="Bulk import from text or file" style={{ fontSize: '.78rem' }}>Import</button>
         <button
           className="btn btn-ghost"
           onClick={handleBulkRefresh}
@@ -1001,11 +1011,11 @@ export default function Collection({ collection, setCollection, user, openAddCar
           title="Re-fetch prices from Scryfall"
           style={{ fontSize: '.78rem' }}
         >
-          {refreshing ? `${refreshProg?.done || 0}/${refreshProg?.total || '?'}` : ''}
+          {refreshing ? `${refreshProg?.done || 0}/${refreshProg?.total || '?'}` : 'Refresh'}
         </button>
-        <button className="btn btn-ghost" onClick={handleExport} title="Export CSV"></button>
-        <button className="btn btn-ghost" onClick={handleBackup} title="Backup JSON"></button>
-        <button className="btn btn-ghost" onClick={() => setShowInsurance(true)} title="Insurance / Print Report" style={{ fontSize: '.78rem' }}></button>
+        <button className="btn btn-ghost" onClick={handleExport} title="Export CSV" style={{ fontSize: '.82rem' }}>CSV</button>
+        <button className="btn btn-ghost" onClick={handleBackup} title="Backup JSON" style={{ fontSize: '.82rem' }}>JSON</button>
+        <button className="btn btn-ghost" onClick={() => setShowInsurance(true)} title="Insurance / Print Report" style={{ fontSize: '.78rem' }}>Report</button>
         <span style={{ marginLeft: 'auto', fontSize: '.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {total} cards
           {totalValue > 0 && (
