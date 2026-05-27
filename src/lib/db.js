@@ -69,9 +69,23 @@ export async function getCollection(userId) {
 
 export async function addCard(card, userId) {
   if (hasSupabase && userId) {
-    // Check if card already exists for this user
-    const { data: existing, error: selectErr } = await supabase
-      .from('collection').select('*').eq('user_id', userId).eq('name', card.name).maybeSingle()
+    // Dedup key: scryfall_id + is_foil + condition uniquely identifies a specific
+    // printing variant (art, foiling, set). Fall back to name-only when no
+    // scryfall_id so bulk-imported cards still merge as before.
+    let dupQuery = supabase.from('collection').select('*').eq('user_id', userId)
+    if (card.scryfallId) {
+      dupQuery = dupQuery
+        .eq('scryfall_id', card.scryfallId)
+        .eq('is_foil',     card.isFoil    || false)
+        .eq('condition',   card.condition || 'NM')
+    } else {
+      dupQuery = dupQuery
+        .eq('name',    card.name)
+        .is('scryfall_id', null)
+        .eq('is_foil', card.isFoil    || false)
+        .eq('condition', card.condition || 'NM')
+    }
+    const { data: existing, error: selectErr } = await dupQuery.maybeSingle()
     if (selectErr) {
       console.error('[db] collection select error:', selectErr)
       throw new Error(selectErr.message)
@@ -113,7 +127,12 @@ export async function addCard(card, userId) {
     return collectionRowToCard(data)
   }
   const collection = lsGet().collection || []
-  const existing = collection.find(c => c.name.toLowerCase() === card.name.toLowerCase())
+  // localStorage: match on scryfallId + isFoil + condition if available
+  const existing = collection.find(c =>
+    card.scryfallId
+      ? c.scryfallId === card.scryfallId && (c.isFoil || false) === (card.isFoil || false) && (c.condition || 'NM') === (card.condition || 'NM')
+      : c.name.toLowerCase() === card.name.toLowerCase() && !c.scryfallId && (c.isFoil || false) === (card.isFoil || false)
+  )
   if (existing) {
     existing.qty += card.qty
     lsSet({ collection })
@@ -142,17 +161,22 @@ export async function updateCollectionCard(id, patch, userId) {
 // Returns the full updated collection array.
 export async function bulkAddCards(cards, userId, { onProgress } = {}) {
   if (hasSupabase && userId) {
-    // Fetch what the user already has so we can dedup by name
+    // Fetch what the user already has so we can dedup
     const { data: existing } = await supabase
-      .from('collection').select('id, name, qty').eq('user_id', userId)
-    const existingMap = Object.fromEntries(
-      (existing || []).map(r => [r.name.toLowerCase(), r])
-    )
+      .from('collection').select('id, name, qty, scryfall_id, is_foil, condition').eq('user_id', userId)
+    // Key: scryfallId|isFoil|condition when available, else name|isFoil
+    const makeKey = (r) => r.scryfall_id
+      ? `${r.scryfall_id}|${!!r.is_foil}|${r.condition || 'NM'}`
+      : `${(r.name || '').toLowerCase()}|${!!r.is_foil}`
+    const existingMap = Object.fromEntries((existing || []).map(r => [makeKey(r), r]))
 
     const toInsert = []
     const toUpdate = [] // { id, qty }
     for (const card of cards) {
-      const ex = existingMap[card.name.toLowerCase()]
+      const cardKey = card.scryfallId
+        ? `${card.scryfallId}|${!!card.isFoil}|${card.condition || 'NM'}`
+        : `${(card.name || '').toLowerCase()}|${!!card.isFoil}`
+      const ex = existingMap[cardKey]
       if (ex) {
         toUpdate.push({ id: ex.id, qty: ex.qty + (card.qty || 1) })
       } else {
@@ -216,18 +240,32 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
 }
 
 //  STORE LISTINGS 
-// Upsert a store listing: if an active listing with the same name +
-// condition + is_foil already exists, increment qty_available instead of
-// creating a duplicate row.  Returns { merged: bool, id }.
+// Upsert a store listing: if an active listing for the exact same card
+// variant already exists, increment qty_available instead of creating a
+// duplicate row.  Returns { merged: bool, id }.
+//
+// Dedup key (in priority order):
+//   1. scryfall_id + condition + is_foil  — unique per printing/art/foiling
+//   2. name + condition + is_foil         — fallback for listings without scryfall_id
+//
+// This means a regular printing and a showcase/extended-art/foil printing of
+// the same card will always be separate store listings with independent pricing.
 export async function upsertStoreListing({ name, set_name, condition, is_foil, price, img_url, scryfall_id, qty = 1 }) {
-  // Find any existing listing that matches on name + condition + foil
-  const { data: existing, error: selErr } = await supabase
-    .from('store_listings')
-    .select('id, qty_available')
-    .eq('name', name)
-    .eq('condition', condition || 'NM')
-    .eq('is_foil', is_foil || false)
-    .maybeSingle()
+  // Build the dedup query
+  let dupQuery = supabase.from('store_listings').select('id, qty_available').eq('active', true)
+  if (scryfall_id) {
+    dupQuery = dupQuery
+      .eq('scryfall_id', scryfall_id)
+      .eq('condition',   condition || 'NM')
+      .eq('is_foil',     is_foil   || false)
+  } else {
+    dupQuery = dupQuery
+      .eq('name',      name)
+      .is('scryfall_id', null)
+      .eq('condition', condition || 'NM')
+      .eq('is_foil',   is_foil   || false)
+  }
+  const { data: existing, error: selErr } = await dupQuery.maybeSingle()
 
   if (selErr) {
     console.error('[db] upsertStoreListing select error:', selErr)
