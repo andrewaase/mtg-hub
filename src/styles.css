@@ -1059,16 +1059,22 @@ body {
   user-select: none;
 }
 
-.mobile-nav-item .icon {
+.mobile-nav-item .icon,
+.mobile-nav-item .mobile-nav-icon {
   font-size: 1.35rem;
   line-height: 1;
   margin-bottom: 1px;
   transition: transform .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mobile-nav-item.active { color: var(--accent-gold); }
-.mobile-nav-item.active .icon { filter: drop-shadow(0 0 5px rgba(201, 168, 76, .5)); }
-.mobile-nav-item:active .icon { transform: scale(.88); }
+.mobile-nav-item.active .icon,
+.mobile-nav-item.active .mobile-nav-icon { filter: drop-shadow(0 0 5px rgba(201, 168, 76, .5)); }
+.mobile-nav-item:active .icon,
+.mobile-nav-item:active .mobile-nav-icon { transform: scale(.88); }
 
 /* Center FAB */
 .mobile-nav-fab-wrap {
