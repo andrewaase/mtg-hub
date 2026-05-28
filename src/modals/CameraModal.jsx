@@ -818,41 +818,73 @@ export default function CameraModal({
           cursor: 'pointer', fontSize: '1rem', color: '#fff', backdropFilter: 'blur(8px)',
         }}>✕</button>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+
+          {/* Rapid Mode — auto-adds after each confirmed scan */}
           <button
             onClick={() => setRapidMode(r => !r)}
-            title={rapidMode ? 'Rapid Mode ON — auto-adds after each scan' : 'Enable Rapid Mode for bulk-cataloging'}
             style={{
-              background: rapidMode ? 'rgba(74,222,128,0.9)' : 'rgba(0,0,0,0.5)',
-              border: `1.5px solid ${rapidMode ? '#4ade80' : 'rgba(255,255,255,0.15)'}`,
-              borderRadius: '50%', width: '38px', height: '38px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', fontSize: '1rem', backdropFilter: 'blur(8px)',
+              background: rapidMode ? 'rgba(74,222,128,0.9)' : 'rgba(0,0,0,0.55)',
+              border: `1.5px solid ${rapidMode ? '#4ade80' : 'rgba(255,255,255,0.18)'}`,
+              borderRadius: '20px', padding: '6px 11px',
+              display: 'flex', alignItems: 'center', gap: '5px',
+              cursor: 'pointer', backdropFilter: 'blur(10px)',
               color: rapidMode ? '#000' : '#fff',
             }}
-          ></button>
+          >
+            {/* Lightning bolt */}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            <span style={{ fontSize: '.68rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              {rapidMode ? 'Rapid ON' : 'Rapid'}
+            </span>
+          </button>
+
+          {/* Torch / Flashlight */}
           {torchSupported && (
             <button onClick={toggleTorch} style={{
-              background: torchOn ? 'rgba(255,220,50,0.85)' : 'rgba(0,0,0,0.5)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '50%', width: '38px', height: '38px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', fontSize: '1.1rem', backdropFilter: 'blur(8px)',
-            }}>{torchOn ? '' : ''}</button>
+              background: torchOn ? 'rgba(255,220,50,0.9)' : 'rgba(0,0,0,0.55)',
+              border: `1.5px solid ${torchOn ? '#fbbf24' : 'rgba(255,255,255,0.18)'}`,
+              borderRadius: '20px', padding: '6px 11px',
+              display: 'flex', alignItems: 'center', gap: '5px',
+              cursor: 'pointer', backdropFilter: 'blur(10px)',
+              color: torchOn ? '#000' : '#fff',
+            }}>
+              {/* Lightbulb */}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21h6M12 3a6 6 0 016 6c0 2.5-1.5 4.5-3 6v1H9v-1c-1.5-1.5-3-3.5-3-6a6 6 0 016-6z"/>
+              </svg>
+              <span style={{ fontSize: '.68rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                {torchOn ? 'Flash ON' : 'Flash'}
+              </span>
+            </button>
           )}
+
+          {/* Store Mode (admin only) — scans go to shop inventory */}
           {isAdmin && (
             <button
               onClick={() => setStoreMode(p => !p)}
-              title={storeMode ? 'Store Mode ON — tap to switch to Collection' : 'Switch to Store Mode'}
               style={{
-                background: storeMode ? 'rgba(201,168,76,0.9)' : 'rgba(0,0,0,0.5)',
-                border: `1.5px solid ${storeMode ? '#c9a84c' : 'rgba(255,255,255,0.15)'}`,
-                borderRadius: '50%', width: '38px', height: '38px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: '1rem', backdropFilter: 'blur(8px)',
+                background: storeMode ? 'rgba(201,168,76,0.9)' : 'rgba(0,0,0,0.55)',
+                border: `1.5px solid ${storeMode ? '#c9a84c' : 'rgba(255,255,255,0.18)'}`,
+                borderRadius: '20px', padding: '6px 11px',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                cursor: 'pointer', backdropFilter: 'blur(10px)',
+                color: storeMode ? '#000' : '#fff',
               }}
-            ></button>
+            >
+              {/* Price tag */}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+                <circle cx="7" cy="7" r="1" fill="currentColor"/>
+              </svg>
+              <span style={{ fontSize: '.68rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                {storeMode ? 'Store ON' : 'Store'}
+              </span>
+            </button>
           )}
+
         </div>
       </div>
 
