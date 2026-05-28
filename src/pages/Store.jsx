@@ -619,7 +619,162 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
   )
 }
 
-//  Product detail modal (sealed / resealed — no Scryfall data) 
+// ─── Resealed Showcase ────────────────────────────────────────────────────────
+
+// A single product slot rendered inside one of the three stone archways.
+// Background is transparent so the arch's warm interior light shows through.
+function ArchSlot({ listing, inCart, onAdd, onView }) {
+  if (!listing) {
+    return (
+      <div style={{
+        height: '100%', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 6, pointerEvents: 'none',
+      }}>
+        <div style={{ fontSize: '.5rem', color: 'rgba(201,168,76,.35)', textTransform: 'uppercase', letterSpacing: '.12em', textAlign: 'center', lineHeight: 1.5 }}>
+          Coming<br />Soon
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onClick={() => onView(listing)}
+      style={{
+        height: '100%', display: 'flex', flexDirection: 'column',
+        cursor: 'pointer', position: 'relative',
+      }}
+    >
+      {/* Product art — transparent background lets the arch's glow show through */}
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', padding: '4% 10% 2%', position: 'relative',
+      }}>
+        {listing.img_url ? (
+          <img
+            src={listing.img_url}
+            alt={listing.name}
+            style={{
+              maxWidth: '100%', maxHeight: '100%',
+              objectFit: 'contain', borderRadius: 4,
+              boxShadow: '0 6px 24px rgba(0,0,0,.7), 0 0 20px rgba(201,168,76,.12)',
+              filter: 'drop-shadow(0 2px 8px rgba(201,168,76,.2))',
+              display: 'block',
+            }}
+          />
+        ) : (
+          <div style={{
+            width: '78%', aspectRatio: '3/4',
+            background: 'linear-gradient(160deg,#1a1000 0%,#0f0a00 100%)',
+            borderRadius: 6, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', padding: '12%',
+            boxShadow: '0 6px 24px rgba(0,0,0,.7)',
+            border: '1px solid rgba(201,168,76,.15)',
+          }}>
+            <div style={{ fontSize: '.6rem', fontWeight: 800, color: '#c9a84c', textAlign: 'center', letterSpacing: '.05em', lineHeight: 1.4 }}>
+              {listing.name}
+            </div>
+          </div>
+        )}
+
+        {/* Low-stock badge */}
+        {listing.qty_available <= 5 && listing.qty_available > 0 && (
+          <div style={{
+            position: 'absolute', top: '6%', left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(249,115,22,.95)', color: '#fff',
+            fontSize: '.42rem', fontWeight: 800, padding: '2px 6px', borderRadius: 3,
+            letterSpacing: '.04em', whiteSpace: 'nowrap',
+            boxShadow: '0 2px 6px rgba(0,0,0,.5)',
+          }}>
+            {listing.qty_available === 1 ? 'LAST ONE!' : `ONLY ${listing.qty_available} LEFT`}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom bar: name + price + cart button */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          padding: '4px 6px 5px',
+          background: 'linear-gradient(to top, rgba(0,0,0,.92) 0%, rgba(0,0,0,.65) 100%)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4,
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{
+            fontSize: '.48rem', color: 'rgba(255,255,255,.7)', fontWeight: 600, lineHeight: 1.2,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {listing.name}
+          </div>
+          <div style={{ fontSize: '.68rem', fontWeight: 800, color: '#c9a84c', lineHeight: 1.1 }}>
+            {fmt(listing.price)}
+          </div>
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); onAdd(listing) }}
+          style={{
+            padding: '3px 7px', borderRadius: 4, border: 'none', cursor: 'pointer',
+            fontSize: '.5rem', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0,
+            background: inCart ? 'rgba(201,168,76,.3)' : '#c9a84c',
+            color: inCart ? '#c9a84c' : '#000',
+          }}
+        >
+          {inCart ? '✓' : '+ Cart'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// The full resealed showcase: background image + 3 absolutely-positioned arch slots.
+// Arch positions are expressed as percentages of the image so they scale perfectly
+// on every screen size.
+function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
+  const slots = [listings[0] || null, listings[1] || null, listings[2] || null]
+
+  // Arch interior coordinates (% of image width / height).
+  // Tuned to align with the stone archways in resealed-background.png.
+  const arches = [
+    { label: 'Treasure Vault',  left: '5%',    top: '49%', width: '26.5%', bottom: '13.5%' },
+    { label: 'Legendary Cache', left: '36.5%', top: '43%', width: '27%',   bottom: '10%'   },
+    { label: 'Vault Hunter',    left: '67.5%', top: '49%', width: '26.5%', bottom: '13.5%' },
+  ]
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', userSelect: 'none' }}>
+      <img
+        src="/resealed-background.png"
+        alt="Premium Repacks"
+        style={{ width: '100%', display: 'block' }}
+        draggable={false}
+      />
+
+      {arches.map((arch, i) => (
+        <div
+          key={arch.label}
+          style={{
+            position: 'absolute',
+            left: arch.left, top: arch.top,
+            width: arch.width, bottom: arch.bottom,
+          }}
+        >
+          <ArchSlot
+            listing={slots[i]}
+            inCart={slots[i] ? cartIds.has(slots[i].id) : false}
+            onAdd={onAdd}
+            onView={onView}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── End Resealed Showcase ────────────────────────────────────────────────────
+
+//  Product detail modal (sealed / resealed — no Scryfall data)
 function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
   const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
   const getPackArt = () => {
@@ -1503,8 +1658,8 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         </div>
       )}
 
-      {/*  Empty / loading states  */}
-      {loading && (
+      {/*  Loading skeletons  */}
+      {loading && category !== 'resealed' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))', gap: 12 }}>
           {[...Array(8)].map((_, i) => (
             <div key={i} style={{ aspectRatio: '63/120', borderRadius: 14, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
@@ -1512,18 +1667,46 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         </div>
       )}
 
-      {!loading && filtered.length === 0 && !search && (
+      {/* Resealed: always show the archway showcase (even while loading / empty) */}
+      {category === 'resealed' && (
+        <>
+          <ResealedShowcase
+            listings={loading ? [] : filtered.slice(0, 3)}
+            cartIds={cartIds}
+            onAdd={addToCart}
+            onView={setSelectedListing}
+          />
+
+          {/* Overflow products beyond the 3 arch slots */}
+          {!loading && filtered.length > 3 && (
+            <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              {filtered.slice(3).map(listing => (
+                <ResealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+              ))}
+            </div>
+          )}
+
+          {!loading && filtered.length === 0 && search && (
+            <div style={{ textAlign: 'center', paddingTop: 12, color: 'var(--text-muted)', fontSize: '.82rem' }}>
+              No packs match "{search}" —{' '}
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: 'var(--accent-gold)', cursor: 'pointer', fontSize: '.82rem', fontWeight: 600 }}>clear</button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/*  Empty states (singles / sealed)  */}
+      {!loading && category !== 'resealed' && filtered.length === 0 && !search && (
         <div className="empty-state">
-          <div className="empty-icon">{category === 'single' ? '' : category === 'sealed' ? '' : ''}</div>
+          <div className="empty-icon">{category === 'single' ? '' : ''}</div>
           <p>
-            {category === 'single'   && 'No singles listed yet. Check back soon!'}
-            {category === 'sealed'   && 'No sealed products listed yet. Check back soon!'}
-            {category === 'resealed' && 'No resealed packs listed yet. Check back soon!'}
+            {category === 'single' && 'No singles listed yet. Check back soon!'}
+            {category === 'sealed' && 'No sealed products listed yet. Check back soon!'}
           </p>
         </div>
       )}
 
-      {!loading && filtered.length === 0 && search && (
+      {!loading && category !== 'resealed' && filtered.length === 0 && search && (
         <div className="empty-state">
           <div className="empty-icon"></div>
           <p>No results for "{search}"</p>
@@ -1531,24 +1714,20 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         </div>
       )}
 
-      {/*  Card / product grid  */}
-      {!loading && filtered.length > 0 && (
+      {/*  Singles / Sealed product grid  */}
+      {!loading && filtered.length > 0 && category !== 'resealed' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: category === 'single'
             ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
-            : category === 'resealed'
-            ? 'repeat(3, 1fr)'
             : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
           gap: 12,
         }}>
           {filtered.map(listing =>
             category === 'single' ? (
               <ListingCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
-            ) : category === 'sealed' ? (
-              <SealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
             ) : (
-              <ResealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
+              <SealedCard key={listing.id} listing={listing} inCart={cartIds.has(listing.id)} onAdd={addToCart} onView={setSelectedListing} />
             )
           )}
         </div>
