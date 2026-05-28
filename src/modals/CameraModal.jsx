@@ -241,13 +241,20 @@ function Chip({ children, active, onClick, disabled }) {
 export default function CameraModal({
   onClose, showToast, user, isAdmin, collection, setCollection, openAddCard, setPage, membership
 }) {
-  const scanningRef    = useRef(false)
-  const frozenRef      = useRef(false)
-  const prevThumbRef   = useRef(null)
-  const stableRef      = useRef(0)
-  const unknownCountRef = useRef(0)  // consecutive "unknown" responses
-  const MAX_UNKNOWN     = 2
-  const STABLE_NEEDED   = 2
+  const scanningRef         = useRef(false)
+  const frozenRef           = useRef(false)
+  const prevThumbRef        = useRef(null)
+  const stableRef           = useRef(0)
+  const unknownCountRef     = useRef(0)    // consecutive "unknown" responses
+  const lastScanNameRef     = useRef('')   // last OCR name (for consensus matching)
+  const consecutiveMatchRef = useRef(0)    // how many consecutive scans agree on the name
+  const pendingLookupRef    = useRef(null) // { name, promise } — Scryfall started on first match
+  const lastScanTimeRef     = useRef(0)    // timestamp of last scan start (cooldown gate)
+
+  const MAX_UNKNOWN      = 2
+  const STABLE_NEEDED    = 2
+  const CONSENSUS_NEEDED = 2    // consecutive matching OCR reads before showing a card
+  const SCAN_COOLDOWN_MS = 750  // minimum ms between scan attempts
   const [showUpgrade, setShowUpgrade] = useState(false)
 
   const videoRef  = useRef(null)
@@ -271,6 +278,7 @@ export default function CameraModal({
   const [editingName,    setEditingName]    = useState(false)
   const [editValue,      setEditValue]      = useState('')
   const [dfcFlipped,     setDfcFlipped]     = useState(false)
+  const [verifyingName,  setVerifyingName]  = useState('')   // first-scan name, awaiting consensus
 
   // Rapid Mode — auto-adds the identified card after a short delay so users
   // can bulk-catalog without tapping. Persisted across sessions.
@@ -313,6 +321,13 @@ export default function CameraModal({
     return () => { active = false; stopTracks() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Option B: Pre-warm the Netlify function as soon as the camera is live so the
+  // Lambda container is hot by the time the first real scan fires.
+  useEffect(() => {
+    if (!cameraReady) return
+    fetch('/.netlify/functions/scan-card', { method: 'GET' }).catch(() => {})
+  }, [cameraReady])
+
   const stopTracks = () => streamRef.current?.getTracks().forEach(t => t.stop())
 
   async function toggleTorch() {
@@ -347,15 +362,27 @@ export default function CameraModal({
     if (prevThumbRef.current) {
       if (frameDiff(curr, prevThumbRef.current) < 12) {
         stableRef.current++
-        if (stableRef.current === STABLE_NEEDED && !scanningRef.current) scanFrame()
+        // Option E: scan continuously — fire once per cooldown window while the
+        // frame is stable, without waiting for the user to press anything.
+        const now = Date.now()
+        if (stableRef.current >= STABLE_NEEDED && !scanningRef.current &&
+            now - lastScanTimeRef.current >= SCAN_COOLDOWN_MS) {
+          lastScanTimeRef.current = now
+          scanFrame()
+        }
       } else {
+        // Card moved — reset stability and clear in-progress consensus so a
+        // fresh card doesn't inherit votes from the previous one.
         stableRef.current = 0
+        lastScanNameRef.current = ''
+        consecutiveMatchRef.current = 0
+        pendingLookupRef.current = null
       }
     }
     prevThumbRef.current = curr
   }
 
-  //  Core scan 
+  //  Core scan — Option E (continuous) + Option B (parallel Scryfall)
   async function scanFrame() {
     if (scanningRef.current || frozenRef.current) return
     const video = videoRef.current
@@ -420,46 +447,90 @@ export default function CameraModal({
 
       if (isUsable) {
         unknownCountRef.current = 0
-        setNameRead(cleanName)
-        setLookingUp(true)
         setLookupFailed(false)
-        const { card } = await lookupCard(cleanName, setCode, collectorNumber)
-        setLookingUp(false)
-        if (card) {
+        const nameLower = cleanName.toLowerCase()
+
+        if (nameLower === lastScanNameRef.current) {
+          // Same name as last scan — increment consensus counter
+          consecutiveMatchRef.current++
+        } else {
+          // New name seen — reset consensus and immediately kick off Scryfall
+          // in the background (Option B). By the time the next scan confirms
+          // the same name, the lookup is already in-flight or complete.
+          lastScanNameRef.current = nameLower
+          consecutiveMatchRef.current = 1
+          const lookupPromise = lookupCard(cleanName, setCode, collectorNumber)
+          pendingLookupRef.current = { name: nameLower, promise: lookupPromise }
+          setVerifyingName(cleanName)
+        }
+
+        if (consecutiveMatchRef.current >= CONSENSUS_NEEDED) {
+          // Consensus reached — lock in the card
           frozenRef.current = true
           stableRef.current = 0
-          setFoundCard(card)
-          setPriceMode('normal')
-          setScanError(null)
-          if (navigator.vibrate) navigator.vibrate(40)
-          // Fetch all printings in background.
-          // Sort: same-set prints first (so STA / Secret Lair / etc. variants
-          // surface immediately), then everything else by release date.
-          // Auto-open the printings panel when the *same set* has multiple
-          // variants — this is the Strixhaven-Mystical-Archive case where the
-          // scanner picks one print but the user actually scanned a Japanese
-          // alt-art / etched / showcase version.
-          fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`)
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-              const all       = data?.data || []
-              const sameSet   = all.filter(p => p.set === card.set)
-              const otherSets = all.filter(p => p.set !== card.set)
-              const sorted    = [...sameSet, ...otherSets].slice(0, 30)
-              setPrintings(sorted)
-              if (sameSet.length > 1 && !rapidMode) setShowPrintings(true)
-            })
-            .catch(() => {})
-        } else {
-          setLookupFailed(true)
+          setNameRead(cleanName)
+          setVerifyingName('')
+          setLookingUp(true)
+
+          // Use the already-in-flight Scryfall promise when names match, otherwise
+          // fire a fresh lookup (e.g. if pendingLookupRef was cleared by frame movement).
+          let card = null
+          try {
+            const pending = pendingLookupRef.current
+            if (pending && pending.name === nameLower) {
+              const { card: c } = await pending.promise
+              card = c
+            } else {
+              const { card: c } = await lookupCard(cleanName, setCode, collectorNumber)
+              card = c
+            }
+          } catch { card = null }
+
+          setLookingUp(false)
+
+          if (card) {
+            setFoundCard(card)
+            setPriceMode('normal')
+            setScanError(null)
+            if (navigator.vibrate) navigator.vibrate(40)
+            // Fetch all printings in background.
+            // Sort: same-set prints first (so STA / Secret Lair / etc. variants
+            // surface immediately), then everything else by release date.
+            // Auto-open the printings panel when the *same set* has multiple
+            // variants — this is the Strixhaven-Mystical-Archive case where the
+            // scanner picks one print but the user actually scanned a Japanese
+            // alt-art / etched / showcase version.
+            fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${card.name}"`)}&unique=prints&order=released`)
+              .then(r => r.ok ? r.json() : null)
+              .then(data => {
+                const all       = data?.data || []
+                const sameSet   = all.filter(p => p.set === card.set)
+                const otherSets = all.filter(p => p.set !== card.set)
+                const sorted    = [...sameSet, ...otherSets].slice(0, 30)
+                setPrintings(sorted)
+                if (sameSet.length > 1 && !rapidMode) setShowPrintings(true)
+              })
+              .catch(() => {})
+          } else {
+            // Lookup failed even after consensus — unfreeze so the user can try again
+            frozenRef.current = false
+            setLookupFailed(true)
+          }
         }
+        // Else: consensus not yet reached — don't freeze; the stability loop
+        // will fire another scan automatically after SCAN_COOLDOWN_MS.
+
       } else {
         // Claude couldn't read a name — count it. After MAX_UNKNOWN consecutive
         // failures, freeze so we stop burning API calls and prompt the user.
         unknownCountRef.current++
+        lastScanNameRef.current = ''
+        consecutiveMatchRef.current = 0
+        pendingLookupRef.current = null
         if (unknownCountRef.current >= MAX_UNKNOWN) {
           frozenRef.current = true
           setNameRead('')
+          setVerifyingName('')
           setLookupFailed(true)
         } else {
           // Reset stability so a fresh stable+sharp frame retries automatically.
@@ -646,8 +717,13 @@ export default function CameraModal({
     stableRef.current = 0
     prevThumbRef.current = null
     unknownCountRef.current = 0
+    lastScanNameRef.current = ''
+    consecutiveMatchRef.current = 0
+    pendingLookupRef.current = null
+    lastScanTimeRef.current = 0
     setFoundCard(null)
     setNameRead('')
+    setVerifyingName('')
     setLookingUp(false)
     setLookupFailed(false)
     setPrintings([])
@@ -871,6 +947,19 @@ export default function CameraModal({
           padding: '6px 18px', borderRadius: '20px', fontSize: '0.75rem',
           whiteSpace: 'nowrap', backdropFilter: 'blur(8px)',
         }}> Reading card…</div>
+      )}
+
+      {/*  Verifying indicator — name seen once, waiting for consensus confirmation  */}
+      {verifyingName && !foundCard && !lookingUp && scanStatus !== 'scanning' && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          background: 'rgba(0,0,0,0.78)', borderRadius: '20px',
+          padding: '8px 20px', backdropFilter: 'blur(8px)', textAlign: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ fontSize: '.74rem', color: '#f59e0b', fontWeight: 700 }}>"{verifyingName}"</div>
+          <div style={{ fontSize: '.6rem', color: 'rgba(255,255,255,0.45)', marginTop: '3px' }}>Hold steady…</div>
+        </div>
       )}
 
       {/*  "Tap to scan again" hint  */}

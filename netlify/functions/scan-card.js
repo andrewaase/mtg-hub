@@ -15,6 +15,11 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: corsHeaders(event) }
   }
+  // GET request — lightweight pre-warm so the Lambda container is hot for the next POST.
+  // No auth, no image, just confirms the function is alive.
+  if (event.httpMethod === 'GET') {
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(event) }, body: JSON.stringify({ status: 'warm' }) }
+  }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
@@ -53,10 +58,20 @@ exports.handler = async (event) => {
   }
 
   // ── Check membership tier & daily scan limit ─────────────────────────────────
-  const profileRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
-    { headers: adminHeaders }
-  )
+  // Fire both Supabase lookups in parallel — saves one sequential round-trip
+  // (~100-200 ms) for free users who need both the tier check and the scan count.
+  const today = new Date().toISOString().slice(0, 10)
+  const [profileRes, scanCountRes] = await Promise.all([
+    fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
+      { headers: adminHeaders }
+    ),
+    fetch(
+      `${SUPABASE_URL}/rest/v1/scan_logs?user_id=eq.${userId}&scan_date=eq.${today}&select=id`,
+      { headers: adminHeaders }
+    ),
+  ])
+
   const profiles = await profileRes.json()
   const profile  = Array.isArray(profiles) ? profiles[0] : null
   let tier = profile?.membership_tier || 'free'
@@ -67,12 +82,6 @@ exports.handler = async (event) => {
   }
 
   if (tier !== 'pro') {
-    // Count today's scans
-    const today = new Date().toISOString().slice(0, 10)
-    const scanCountRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/scan_logs?user_id=eq.${userId}&scan_date=eq.${today}&select=id`,
-      { headers: adminHeaders }
-    )
     const scanRows   = await scanCountRes.json()
     const scansToday = Array.isArray(scanRows) ? scanRows.length : 0
 
@@ -165,7 +174,6 @@ If this is clearly not a Magic card, reply with: {"name":"unknown","setCode":nul
     // Log this scan in scan_logs. We await so the row is durable before the
     // lambda freezes — fire-and-forget in serverless can drop the request and
     // silently undercount the daily limit. ~30ms cost; worth the accuracy.
-    const today = new Date().toISOString().slice(0, 10)
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
         method:  'POST',
