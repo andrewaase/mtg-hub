@@ -661,6 +661,7 @@ function ArchSlot({ listing, inCart, onAdd, onView }) {
               boxShadow: '0 6px 24px rgba(0,0,0,.7), 0 0 20px rgba(201,168,76,.12)',
               filter: 'drop-shadow(0 2px 8px rgba(201,168,76,.2))',
               display: 'block',
+              mixBlendMode: 'multiply',
             }}
           />
         ) : (
