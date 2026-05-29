@@ -635,11 +635,11 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
   ]
 
   return (
-    // Container: fills available viewport height so no scrolling is ever needed.
-    // 100dvh minus the tab row (~44px) minus the mobile nav (~62px) = the image height.
+    // Container: fills every pixel from the tab row to the bottom of the viewport.
+    // 100dvh - topbar (56px) - tab row (~44px) = remaining height, no scroll ever.
     <div style={{
-      position: 'relative', userSelect: 'none', overflow: 'hidden', borderRadius: 10,
-      height: 'calc(100dvh - 106px)',
+      position: 'relative', userSelect: 'none', overflow: 'hidden',
+      height: 'calc(100dvh - 100px)',
     }}>
       <img
         src="/resealed-background.png"
@@ -1248,6 +1248,19 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
   const [cardDataCache,   setCardDataCache]   = useState({}) // scryfall_id -> {colors,rarity,typeLine}
   const [dataLoading,     setDataLoading]     = useState(false)
   const [showFilters,     setShowFilters]     = useState(false)
+
+  // On the Resealed tab, strip all #content padding so the showcase image
+  // sits flush against the topbar — no gap anywhere. Restored on unmount or tab change.
+  useEffect(() => {
+    const el = document.getElementById('content')
+    if (!el) return
+    if (category === 'resealed') {
+      el.style.padding = '0'
+    } else {
+      el.style.padding = ''
+    }
+    return () => { el.style.padding = '' }
+  }, [category])
 
   // Dynamic shipping from admin settings
   const [shippingCost,    setShippingCost]    = useState(DEFAULT_SHIPPING)
