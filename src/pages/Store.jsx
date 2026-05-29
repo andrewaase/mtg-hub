@@ -1449,45 +1449,47 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
 
   return (
     <div style={{ paddingBottom: cartCount > 0 ? 100 : 80 }}>
-      {/*  Header  */}
-      <div style={{
-        background: 'linear-gradient(135deg,#0f172a 0%,#1a1200 100%)',
-        borderRadius: 14, padding: '18px 20px', marginBottom: 20,
-        border: '1px solid rgba(201,168,76,.2)',
-        boxShadow: '0 4px 20px rgba(201,168,76,.1)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      }}>
-        <div>
-          <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.15em', color: 'var(--accent-gold)', textTransform: 'uppercase', marginBottom: 4 }}>
-            Vaulted Singles
+      {/*  Header — hidden on Resealed tab to give the showcase full vertical space */}
+      {category !== 'resealed' && (
+        <div style={{
+          background: 'linear-gradient(135deg,#0f172a 0%,#1a1200 100%)',
+          borderRadius: 14, padding: '18px 20px', marginBottom: 20,
+          border: '1px solid rgba(201,168,76,.2)',
+          boxShadow: '0 4px 20px rgba(201,168,76,.1)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.15em', color: 'var(--accent-gold)', textTransform: 'uppercase', marginBottom: 4 }}>
+              Vaulted Singles
+            </div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-.5px' }}>
+               Card Shop
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
+              {loading ? 'Loading…' : `${filtered.length} ${category === 'single' ? 'card' : 'product'}${filtered.length !== 1 ? 's' : ''} available`}
+            </div>
           </div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-.5px' }}>
-             Card Shop
-          </div>
-          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
-            {loading ? 'Loading…' : `${filtered.length} ${category === 'single' ? 'card' : 'product'}${filtered.length !== 1 ? 's' : ''} available`}
-          </div>
+          <button
+            onClick={() => setCartOpen(true)}
+            style={{
+              position: 'relative', padding: '10px 16px', borderRadius: 12,
+              border: '1px solid var(--accent-gold)', background: cartCount > 0 ? 'rgba(201,168,76,.15)' : 'transparent',
+              color: 'var(--accent-gold)', fontWeight: 700, fontSize: '.88rem', cursor: 'pointer',
+            }}
+          >
+             Cart
+            {cartCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -8, right: -8,
+                background: 'var(--accent-gold)', color: '#000',
+                borderRadius: '50%', width: 20, height: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '.65rem', fontWeight: 900,
+              }}>{cartCount}</span>
+            )}
+          </button>
         </div>
-        <button
-          onClick={() => setCartOpen(true)}
-          style={{
-            position: 'relative', padding: '10px 16px', borderRadius: 12,
-            border: '1px solid var(--accent-gold)', background: cartCount > 0 ? 'rgba(201,168,76,.15)' : 'transparent',
-            color: 'var(--accent-gold)', fontWeight: 700, fontSize: '.88rem', cursor: 'pointer',
-          }}
-        >
-           Cart
-          {cartCount > 0 && (
-            <span style={{
-              position: 'absolute', top: -8, right: -8,
-              background: 'var(--accent-gold)', color: '#000',
-              borderRadius: '50%', width: 20, height: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '.65rem', fontWeight: 900,
-            }}>{cartCount}</span>
-          )}
-        </button>
-      </div>
+      )}
 
       {/*  Category tabs  */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
