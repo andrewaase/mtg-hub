@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
@@ -635,11 +636,10 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
   ]
 
   return (
-    // Container: fills every pixel from the tab row to the bottom of the viewport.
-    // 100dvh - topbar (56px) - tab row (~44px) = remaining height, no scroll ever.
+    // Tabs are in the topbar, so image fills 100dvh minus just the topbar (56px).
     <div style={{
       position: 'relative', userSelect: 'none', overflow: 'hidden',
-      height: 'calc(100dvh - 100px)',
+      height: 'calc(100dvh - 56px)',
     }}>
       <img
         src="/resealed-background.png"
@@ -1237,6 +1237,9 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
   const [selectedListing, setSelectedListing] = useState(null)
   const [waitlistListing, setWaitlistListing] = useState(null)
   const [category,        setCategory]        = useState('single')
+  const [topbarEl,        setTopbarEl]        = useState(null)
+  useEffect(() => { setTopbarEl(document.getElementById('topbar')) }, [])
+
   // Singles filters
   const [priceMin,        setPriceMin]        = useState('')
   const [priceMax,        setPriceMax]        = useState('')
@@ -1508,25 +1511,51 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         </div>
       )}
 
-      {/*  Category tabs  */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: category === 'resealed' ? 0 : 20, borderBottom: '1px solid var(--border)' }}>
-        {[
-          { id: 'single',   label: ' Singles'  },
-          { id: 'sealed',   label: ' Sealed'   },
-          { id: 'resealed', label: ' Resealed' },
-        ].map(t => (
-          <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
-            padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
-            background: category === t.id ? 'rgba(201,168,76,.1)' : 'transparent',
-            color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
-            fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem', cursor: 'pointer',
-            borderBottom: `2px solid ${category === t.id ? 'var(--accent-gold)' : 'transparent'}`,
-            transition: 'all .15s',
-          }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/*  Category tabs
+            On Resealed: portalled into #topbar so they sit on the same row as the logo.
+            On Singles/Sealed: rendered here in the normal flow with the underline border. */}
+      {(() => {
+        const TABS = [
+          { id: 'single',   label: 'Singles'  },
+          { id: 'sealed',   label: 'Sealed'   },
+          { id: 'resealed', label: 'Resealed' },
+        ]
+        if (category === 'resealed' && topbarEl) {
+          return createPortal(
+            <div style={{
+              position: 'absolute', left: '50%', top: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex', gap: 4,
+            }}>
+              {TABS.map(t => (
+                <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
+                  padding: '6px 16px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                  background: category === t.id ? 'rgba(201,168,76,.15)' : 'transparent',
+                  color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem',
+                  outline: category === t.id ? '1.5px solid rgba(201,168,76,.4)' : 'none',
+                  transition: 'all .15s',
+                }}>{t.label}</button>
+              ))}
+            </div>,
+            topbarEl
+          )
+        }
+        return (
+          <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
+                padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
+                background: category === t.id ? 'rgba(201,168,76,.1)' : 'transparent',
+                color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
+                fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem', cursor: 'pointer',
+                borderBottom: `2px solid ${category === t.id ? 'var(--accent-gold)' : 'transparent'}`,
+                transition: 'all .15s',
+              }}>{t.label}</button>
+            ))}
+          </div>
+        )
+      })()}
 
       {/*  Search + Sort + Filters — hidden on Resealed (only 3 products, no need) */}
       {category !== 'resealed' && <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
