@@ -621,26 +621,30 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
 
 // ─── Resealed Showcase ────────────────────────────────────────────────────────
 
-// Resealed-final.png has products, prices, and "CLICK TO ADD TO CART" buttons
-// baked into the artwork. We layer invisible clickable zones over each arch so
-// tapping anywhere on a product or its button opens the detail modal.
+// resealed-background.png has products baked into the artwork.
+// We layer invisible clickable zones over each arch so tapping anywhere
+// on a product or its "CLICK TO ADD TO CART" area opens the detail modal.
 function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
   const slots = [listings[0] || null, listings[1] || null, listings[2] || null]
 
-  // Click-zone coordinates as % of image dimensions, calibrated to Resealed-final.png.
-  // Each zone covers the product image + "CLICK TO ADD TO CART" button for that arch.
+  // Click-zone coordinates as % of image dimensions, calibrated to resealed-background.png.
   const zones = [
-    { left: '1%',  top: '14%', width: '33%', bottom: '3%' }, // Treasure Vault (left arch)
+    { left: '1%',  top: '14%', width: '32%', bottom: '3%' }, // Treasure Vault (left arch)
     { left: '34%', top: '11%', width: '32%', bottom: '3%' }, // Legendary Cache (center arch)
-    { left: '66%', top: '14%', width: '33%', bottom: '3%' }, // Vault Hunter (right arch)
+    { left: '67%', top: '14%', width: '32%', bottom: '3%' }, // Vault Hunter (right arch)
   ]
 
   return (
-    <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', userSelect: 'none' }}>
+    // Container: fills available viewport height so no scrolling is ever needed.
+    // 100dvh minus the tab row (~44px) minus the mobile nav (~62px) = the image height.
+    <div style={{
+      position: 'relative', userSelect: 'none', overflow: 'hidden', borderRadius: 10,
+      height: 'calc(100dvh - 106px)',
+    }}>
       <img
-        src="/Resealed-final.png"
+        src="/resealed-background.png"
         alt="Premium Repacks"
-        style={{ width: '100%', display: 'block' }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         draggable={false}
       />
 
@@ -1448,7 +1452,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0)
 
   return (
-    <div style={{ paddingBottom: cartCount > 0 ? 100 : 80 }}>
+    <div style={{ paddingBottom: category === 'resealed' ? 0 : (cartCount > 0 ? 100 : 80) }}>
       {/*  Header — hidden on Resealed tab to give the showcase full vertical space */}
       {category !== 'resealed' && (
         <div style={{
@@ -1492,7 +1496,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
       )}
 
       {/*  Category tabs  */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: 2, marginBottom: category === 'resealed' ? 0 : 20, borderBottom: '1px solid var(--border)' }}>
         {[
           { id: 'single',   label: ' Singles'  },
           { id: 'sealed',   label: ' Sealed'   },
