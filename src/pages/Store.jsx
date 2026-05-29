@@ -1509,8 +1509,8 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         ))}
       </div>
 
-      {/*  Search + Sort + Filters  */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+      {/*  Search + Sort + Filters — hidden on Resealed (only 3 products, no need) */}
+      {category !== 'resealed' && <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
         <input
           type="text"
           placeholder={`Search ${category === 'single' ? 'cards' : 'products'}…`}
@@ -1554,7 +1554,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
           <option value="price_desc">Sort: Price ↓</option>
           <option value="newest">Sort: Newest</option>
         </select>
-      </div>
+      </div>}
 
       {/*  Singles filter panel  */}
       {category === 'single' && showFilters && (
