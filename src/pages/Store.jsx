@@ -622,16 +622,16 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
 // ─── Resealed Showcase ────────────────────────────────────────────────────────
 
 // A single product slot rendered inside one of the three stone archways.
-// Background is transparent so the arch's warm interior light shows through.
+// Everything is absolutely positioned so the bottom bar never escapes the slot.
 function ArchSlot({ listing, inCart, onAdd, onView }) {
   if (!listing) {
     return (
       <div style={{
-        height: '100%', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: 6, pointerEvents: 'none',
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
       }}>
-        <div style={{ fontSize: '.5rem', color: 'rgba(201,168,76,.35)', textTransform: 'uppercase', letterSpacing: '.12em', textAlign: 'center', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '.55rem', color: 'rgba(201,168,76,.4)', textTransform: 'uppercase', letterSpacing: '.12em', textAlign: 'center', lineHeight: 1.6 }}>
           Coming<br />Soon
         </div>
       </div>
@@ -639,85 +639,84 @@ function ArchSlot({ listing, inCart, onAdd, onView }) {
   }
 
   return (
+    // Outer wrapper: fills the slot, clips everything inside it
     <div
       onClick={() => onView(listing)}
       style={{
-        height: '100%', display: 'flex', flexDirection: 'column',
-        cursor: 'pointer', position: 'relative',
+        position: 'absolute', inset: 0,
+        cursor: 'pointer', overflow: 'hidden', borderRadius: 4,
       }}
     >
-      {/* Product art — transparent background lets the arch's glow show through */}
-      <div style={{
-        flex: 1, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', padding: '4% 10% 2%', position: 'relative',
-      }}>
-        {listing.img_url ? (
-          <img
-            src={listing.img_url}
-            alt={listing.name}
-            style={{
-              maxWidth: '100%', maxHeight: '100%',
-              objectFit: 'contain', borderRadius: 4,
-              boxShadow: '0 6px 24px rgba(0,0,0,.7), 0 0 20px rgba(201,168,76,.12)',
-              filter: 'drop-shadow(0 2px 8px rgba(201,168,76,.2))',
-              display: 'block',
-              mixBlendMode: 'multiply',
-            }}
-          />
-        ) : (
-          <div style={{
-            width: '78%', aspectRatio: '3/4',
-            background: 'linear-gradient(160deg,#1a1000 0%,#0f0a00 100%)',
-            borderRadius: 6, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', padding: '12%',
-            boxShadow: '0 6px 24px rgba(0,0,0,.7)',
-            border: '1px solid rgba(201,168,76,.15)',
-          }}>
-            <div style={{ fontSize: '.6rem', fontWeight: 800, color: '#c9a84c', textAlign: 'center', letterSpacing: '.05em', lineHeight: 1.4 }}>
-              {listing.name}
-            </div>
-          </div>
-        )}
+      {/* Warm amber tint fills behind the image so white product edges
+          blend into the arch interior rather than flashing as hard white */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(55,32,0,0.55)' }} />
 
-        {/* Low-stock badge */}
-        {listing.qty_available <= 5 && listing.qty_available > 0 && (
-          <div style={{
-            position: 'absolute', top: '6%', left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(249,115,22,.95)', color: '#fff',
-            fontSize: '.42rem', fontWeight: 800, padding: '2px 6px', borderRadius: 3,
-            letterSpacing: '.04em', whiteSpace: 'nowrap',
-            boxShadow: '0 2px 6px rgba(0,0,0,.5)',
-          }}>
-            {listing.qty_available === 1 ? 'LAST ONE!' : `ONLY ${listing.qty_available} LEFT`}
+      {/* Product image — centred, leaving room for the bottom bar */}
+      {listing.img_url ? (
+        <img
+          src={listing.img_url}
+          alt={listing.name}
+          style={{
+            position: 'absolute',
+            top: '4%', left: '8%', right: '8%', bottom: '22%',
+            width: '84%', height: '74%',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 4px 14px rgba(0,0,0,.85))',
+          }}
+        />
+      ) : (
+        <div style={{
+          position: 'absolute',
+          top: '6%', left: '12%', right: '12%', bottom: '24%',
+          background: 'linear-gradient(160deg,#1a1000,#0f0800)',
+          borderRadius: 4, border: '1px solid rgba(201,168,76,.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8%',
+        }}>
+          <div style={{ fontSize: '.55rem', fontWeight: 800, color: '#c9a84c', textAlign: 'center', letterSpacing: '.05em', lineHeight: 1.4 }}>
+            {listing.name}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Bottom bar: name + price + cart button */}
+      {/* Low-stock badge — top-centre */}
+      {listing.qty_available <= 5 && listing.qty_available > 0 && (
+        <div style={{
+          position: 'absolute', top: '3%', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(249,115,22,.95)', color: '#fff',
+          fontSize: '.42rem', fontWeight: 800, padding: '2px 6px', borderRadius: 3,
+          letterSpacing: '.04em', whiteSpace: 'nowrap',
+          boxShadow: '0 2px 6px rgba(0,0,0,.6)',
+        }}>
+          {listing.qty_available === 1 ? 'LAST ONE!' : `ONLY ${listing.qty_available} LEFT`}
+        </div>
+      )}
+
+      {/* Bottom bar — always pinned inside the slot's bottom edge */}
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          padding: '4px 6px 5px',
-          background: 'linear-gradient(to top, rgba(0,0,0,.92) 0%, rgba(0,0,0,.65) 100%)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4,
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,.96) 0%, rgba(0,0,0,.75) 100%)',
+          padding: '5px 7px 6px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{
-            fontSize: '.48rem', color: 'rgba(255,255,255,.7)', fontWeight: 600, lineHeight: 1.2,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: '.5rem', fontWeight: 600, color: 'rgba(255,255,255,.8)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2,
           }}>
             {listing.name}
           </div>
-          <div style={{ fontSize: '.68rem', fontWeight: 800, color: '#c9a84c', lineHeight: 1.1 }}>
+          <div style={{ fontSize: '.72rem', fontWeight: 800, color: '#c9a84c', lineHeight: 1.15 }}>
             {fmt(listing.price)}
           </div>
         </div>
         <button
           onClick={e => { e.stopPropagation(); onAdd(listing) }}
           style={{
-            padding: '3px 7px', borderRadius: 4, border: 'none', cursor: 'pointer',
-            fontSize: '.5rem', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0,
+            flexShrink: 0, padding: '4px 8px', borderRadius: 4, border: 'none',
+            cursor: 'pointer', fontSize: '.52rem', fontWeight: 800, whiteSpace: 'nowrap',
             background: inCart ? 'rgba(201,168,76,.3)' : '#c9a84c',
             color: inCart ? '#c9a84c' : '#000',
           }}
@@ -730,17 +729,17 @@ function ArchSlot({ listing, inCart, onAdd, onView }) {
 }
 
 // The full resealed showcase: background image + 3 absolutely-positioned arch slots.
-// Arch positions are expressed as percentages of the image so they scale perfectly
-// on every screen size.
+// Coordinates are % of image dims so they scale perfectly on every screen size.
+// Each slot container has position:relative + overflow:hidden so nothing leaks out.
 function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
   const slots = [listings[0] || null, listings[1] || null, listings[2] || null]
 
-  // Arch interior coordinates (% of image width / height).
-  // Tuned to align with the stone archways in resealed-background.png.
+  // Tuned to the actual stone archway interiors in resealed-background.png.
+  // top/bottom are % of image height; left/width are % of image width.
   const arches = [
-    { label: 'Treasure Vault',  left: '5%',    top: '49%', width: '26.5%', bottom: '13.5%' },
-    { label: 'Legendary Cache', left: '36.5%', top: '43%', width: '27%',   bottom: '10%'   },
-    { label: 'Vault Hunter',    left: '67.5%', top: '49%', width: '26.5%', bottom: '13.5%' },
+    { label: 'Treasure Vault',  left: '6%',    top: '47%', width: '24%',   bottom: '18%' },
+    { label: 'Legendary Cache', left: '38%',   top: '43%', width: '24%',   bottom: '15%' },
+    { label: 'Vault Hunter',    left: '70%',   top: '47%', width: '24%',   bottom: '18%' },
   ]
 
   return (
@@ -753,12 +752,14 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
       />
 
       {arches.map((arch, i) => (
+        // Slot container: sized to the arch interior, clips its children
         <div
           key={arch.label}
           style={{
             position: 'absolute',
             left: arch.left, top: arch.top,
             width: arch.width, bottom: arch.bottom,
+            overflow: 'hidden',
           }}
         >
           <ArchSlot
