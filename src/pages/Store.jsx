@@ -725,88 +725,64 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
         }}>✕</button>
 
         {isResealed ? (
-          /* ── Resealed: large image hero + front/back toggle + details below ── */
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {/* Hero image */}
+          /* ── Resealed: image fills the entire modal, overlays for toggle + CTA ── */
+          <div style={{ position: 'relative', background: '#0c0c0c', borderRadius: 20, overflow: 'hidden' }}>
+            {/* Bag image — sized to fill the modal without scrolling */}
+            {heroSrc
+              ? <img
+                  key={heroSrc}
+                  src={heroSrc}
+                  alt={`${listing.name} — ${imgSide}`}
+                  style={{ width: '100%', maxHeight: '90vh', objectFit: 'contain', display: 'block' }}
+                />
+              : <div style={{ padding: '32px 24px' }}>{getPackArt()}</div>
+            }
+
+            {/* Front / Back toggle — centre-bottom of image */}
+            {resealedImgs && (
+              <div style={{
+                position: 'absolute', bottom: 72, left: '50%', transform: 'translateX(-50%)',
+                display: 'flex', gap: 6,
+                background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(10px)',
+                borderRadius: 99, padding: '4px 6px',
+                border: '1px solid rgba(255,255,255,.12)',
+              }}>
+                {['front', 'back'].map(side => (
+                  <button
+                    key={side}
+                    onClick={() => setImgSide(side)}
+                    style={{
+                      padding: '7px 22px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                      fontWeight: 700, fontSize: '.75rem', letterSpacing: '.05em', textTransform: 'uppercase',
+                      background: imgSide === side ? 'var(--accent-gold)' : 'transparent',
+                      color: imgSide === side ? '#000' : 'rgba(255,255,255,.55)',
+                      transition: 'all .15s',
+                    }}
+                  >{side}</button>
+                ))}
+              </div>
+            )}
+
+            {/* Action bar — frosted strip pinned to the bottom edge */}
             <div style={{
-              position: 'relative',
-              width: '100%', background: '#0c0c0c', borderRadius: '20px 20px 0 0',
-              overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              minHeight: 260,
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(14px)',
+              borderTop: '1px solid rgba(201,168,76,.2)',
+              padding: '10px 18px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
             }}>
-              {heroSrc
-                ? <img
-                    key={heroSrc}
-                    src={heroSrc}
-                    alt={`${listing.name} — ${imgSide}`}
-                    style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', display: 'block', transition: 'opacity .2s' }}
-                  />
-                : <div style={{ padding: '32px 24px', width: '100%' }}>{getPackArt()}</div>
-              }
-
-              {/* Front / Back toggle — floated bottom-center over the image */}
-              {resealedImgs && (
-                <div style={{
-                  position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
-                  display: 'flex', gap: 6,
-                  background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(8px)',
-                  borderRadius: 99, padding: '4px 6px',
-                  border: '1px solid rgba(255,255,255,.1)',
-                }}>
-                  {['front', 'back'].map(side => (
-                    <button
-                      key={side}
-                      onClick={() => setImgSide(side)}
-                      style={{
-                        padding: '6px 18px', borderRadius: 99, border: 'none', cursor: 'pointer',
-                        fontWeight: 700, fontSize: '.75rem', letterSpacing: '.04em', textTransform: 'uppercase',
-                        background: imgSide === side ? 'var(--accent-gold)' : 'transparent',
-                        color: imgSide === side ? '#000' : 'rgba(255,255,255,.6)',
-                        transition: 'all .15s',
-                      }}
-                    >{side}</button>
-                  ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ fontWeight: 900, fontSize: '1.6rem', color: 'var(--accent-gold)', lineHeight: 1 }}>{fmt(listing.price)}</div>
+                <div style={{ fontSize: '.68rem', fontWeight: 600, color: stockColor }}>
+                  {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
                 </div>
-              )}
-            </div>
-
-            {/* Details strip */}
-            <div style={{ padding: '22px 28px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Name + badge row */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ fontWeight: 900, fontSize: '1.35rem', lineHeight: 1.2, letterSpacing: '-.01em' }}>{listing.name}</div>
-                <span style={{ fontSize: '.72rem', fontWeight: 700, background: 'rgba(139,92,246,.15)', color: '#a78bfa', borderRadius: 6, padding: '4px 10px', whiteSpace: 'nowrap', alignSelf: 'center' }}>
-                   Resealed Pack
-                </span>
               </div>
-
-              {listing.product_format && (
-                <span style={{ fontSize: '.72rem', fontWeight: 700, background: 'rgba(59,130,246,.12)', color: '#60a5fa', borderRadius: 6, padding: '4px 10px', alignSelf: 'flex-start' }}>
-                  {listing.product_format}
-                </span>
-              )}
-
-              {listing.description && (
-                <div style={{ fontSize: '.88rem', lineHeight: 1.75, color: 'var(--text-secondary)', padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
-                  {listing.description}
-                </div>
-              )}
-
-              {/* Price + stock + CTA */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', paddingTop: 4 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ fontWeight: 900, fontSize: '2rem', color: 'var(--accent-gold)', lineHeight: 1 }}>{fmt(listing.price)}</div>
-                  <div style={{ fontSize: '.72rem', fontWeight: 600, color: stockColor }}>
-                    {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
-                  </div>
-                </div>
-                <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
-                  padding: '13px 32px', borderRadius: 12, border: 'none', cursor: inCart ? 'default' : 'pointer',
-                  background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
-                  color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 900, fontSize: '1rem',
-                  letterSpacing: '.01em',
-                }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
-              </div>
+              <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
+                padding: '11px 28px', borderRadius: 12, border: 'none', cursor: inCart ? 'default' : 'pointer',
+                background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+                color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 900, fontSize: '.95rem',
+                letterSpacing: '.01em', whiteSpace: 'nowrap',
+              }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
             </div>
           </div>
         ) : (
