@@ -670,8 +670,24 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
 
 // ─── End Resealed Showcase ────────────────────────────────────────────────────
 
+// Front + back image map — keyed by substring of listing.name (lowercase).
+// Images live in /public/ and are served as static assets.
+const RESEALED_IMAGES = {
+  'legendary cache': { front: '/legendary-cache-front.png', back: '/legendary-cache-back.png' },
+  'treasure vault':  { front: '/treasure-vault-front.png',  back: '/treasure-vault-back.png'  },
+  'vault hunter':    { front: '/vault-hunter-front.png',    back: '/vault-hunter-back.png'    },
+}
+
+function getResealedImages(name = '') {
+  const n = name.toLowerCase()
+  const entry = Object.entries(RESEALED_IMAGES).find(([key]) => n.includes(key))
+  return entry ? entry[1] : null
+}
+
 //  Product detail modal (sealed / resealed — no Scryfall data)
 function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
+  const [imgSide, setImgSide] = useState('front')
+
   const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
   const getPackArt = () => {
     const n = listing.name.toLowerCase()
@@ -681,6 +697,11 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
     return <SealedPackArt name={listing.name} productFormat={listing.product_format} />
   }
   const isResealed = (listing.product_type || 'single') === 'resealed'
+  const resealedImgs = isResealed ? getResealedImages(listing.name) : null
+  // Which image src to show right now
+  const heroSrc = resealedImgs
+    ? resealedImgs[imgSide]
+    : (listing.img_url || null)
 
   return (
     <>
@@ -704,18 +725,49 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
         }}>✕</button>
 
         {isResealed ? (
-          /* ── Resealed: large image hero + details below ── */
+          /* ── Resealed: large image hero + front/back toggle + details below ── */
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {/* Hero image — as large as possible */}
+            {/* Hero image */}
             <div style={{
-              width: '100%', background: '#0a0a0a', borderRadius: '20px 20px 0 0',
+              position: 'relative',
+              width: '100%', background: '#0c0c0c', borderRadius: '20px 20px 0 0',
               overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
               minHeight: 260,
             }}>
-              {listing.img_url
-                ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', maxHeight: '68vh', objectFit: 'contain', display: 'block' }} />
+              {heroSrc
+                ? <img
+                    key={heroSrc}
+                    src={heroSrc}
+                    alt={`${listing.name} — ${imgSide}`}
+                    style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', display: 'block', transition: 'opacity .2s' }}
+                  />
                 : <div style={{ padding: '32px 24px', width: '100%' }}>{getPackArt()}</div>
               }
+
+              {/* Front / Back toggle — floated bottom-center over the image */}
+              {resealedImgs && (
+                <div style={{
+                  position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
+                  display: 'flex', gap: 6,
+                  background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(8px)',
+                  borderRadius: 99, padding: '4px 6px',
+                  border: '1px solid rgba(255,255,255,.1)',
+                }}>
+                  {['front', 'back'].map(side => (
+                    <button
+                      key={side}
+                      onClick={() => setImgSide(side)}
+                      style={{
+                        padding: '6px 18px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                        fontWeight: 700, fontSize: '.75rem', letterSpacing: '.04em', textTransform: 'uppercase',
+                        background: imgSide === side ? 'var(--accent-gold)' : 'transparent',
+                        color: imgSide === side ? '#000' : 'rgba(255,255,255,.6)',
+                        transition: 'all .15s',
+                      }}
+                    >{side}</button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Details strip */}
