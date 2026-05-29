@@ -621,26 +621,24 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
 
 // ─── Resealed Showcase ────────────────────────────────────────────────────────
 
-// The image (Resealed-image.png) already shows the products with names, prices,
-// and "CLICK TO ADD TO CART" buttons baked in as artwork.
-// We layer invisible clickable zones over each arch's product + button area so
-// tapping anywhere on the product OR the button opens the detail modal.
+// Resealed-final.png has products, prices, and "CLICK TO ADD TO CART" buttons
+// baked into the artwork. We layer invisible clickable zones over each arch so
+// tapping anywhere on a product or its button opens the detail modal.
 function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
   const slots = [listings[0] || null, listings[1] || null, listings[2] || null]
 
-  // Click-zone coordinates as % of image dimensions (left/width = % of width,
-  // top/bottom = % of height). Covers product image + "CLICK TO ADD TO CART"
-  // button for each arch in Resealed-image.png.
+  // Click-zone coordinates as % of image dimensions, calibrated to Resealed-final.png.
+  // Each zone covers the product image + "CLICK TO ADD TO CART" button for that arch.
   const zones = [
-    { left: '3%',  top: '23%', width: '30%', bottom: '10%' }, // Treasure Vault
-    { left: '34%', top: '20%', width: '32%', bottom: '8%'  }, // Legendary Cache
-    { left: '67%', top: '23%', width: '30%', bottom: '10%' }, // Vault Hunter
+    { left: '1%',  top: '14%', width: '33%', bottom: '3%' }, // Treasure Vault (left arch)
+    { left: '34%', top: '11%', width: '32%', bottom: '3%' }, // Legendary Cache (center arch)
+    { left: '66%', top: '14%', width: '33%', bottom: '3%' }, // Vault Hunter (right arch)
   ]
 
   return (
     <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', userSelect: 'none' }}>
       <img
-        src="/Resealed-image.png"
+        src="/Resealed-final.png"
         alt="Premium Repacks"
         style={{ width: '100%', display: 'block' }}
         draggable={false}
@@ -653,14 +651,14 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
           <div
             key={i}
             onClick={() => onView(listing)}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(201,168,76,0.07)' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(201,168,76,0.08)' }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
             style={{
               position: 'absolute',
               left: zone.left, top: zone.top,
               width: zone.width, bottom: zone.bottom,
               cursor: 'pointer',
-              borderRadius: 6,
+              borderRadius: 8,
               transition: 'background-color .18s',
             }}
           />
@@ -682,54 +680,118 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
     if ((listing.product_type || 'single') === 'resealed') return <GenericResealedArt name={listing.name} />
     return <SealedPackArt name={listing.name} productFormat={listing.product_format} />
   }
+  const isResealed = (listing.product_type || 'single') === 'resealed'
+
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 400 }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400 }} />
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: 'min(520px,96vw)', maxHeight: '90vh', overflowY: 'auto',
-        background: 'var(--bg-primary)', border: '1px solid var(--border)',
-        borderRadius: 18, zIndex: 401, padding: '20px',
-        boxShadow: '0 24px 60px rgba(0,0,0,.65)',
+        width: isResealed ? 'min(900px,96vw)' : 'min(600px,96vw)',
+        maxHeight: '94vh', overflowY: 'auto',
+        background: 'var(--bg-primary)',
+        border: isResealed ? '1px solid rgba(201,168,76,.35)' : '1px solid var(--border)',
+        borderRadius: 20, zIndex: 401, padding: 0,
+        boxShadow: isResealed ? '0 32px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(201,168,76,.1)' : '0 24px 60px rgba(0,0,0,.65)',
       }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          <div style={{ width: 'min(170px,38vw)', flexShrink: 0, borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 28px rgba(0,0,0,.6)' }}>
-            {listing.img_url
-              ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block' }} />
-              : getPackArt()}
-          </div>
-          <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontWeight: 800, fontSize: '1.1rem', lineHeight: 1.25, paddingRight: 32 }}>{listing.name}</div>
-            {listing.set_name && <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{listing.set_name}</div>}
-            {listing.product_format && (
-              <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(59,130,246,.12)', color: '#60a5fa', borderRadius: 6, padding: '3px 8px', alignSelf: 'flex-start' }}>
-                {listing.product_format}
-              </span>
-            )}
-            {(listing.product_type || 'single') === 'resealed' && (
-              <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(139,92,246,.12)', color: '#a78bfa', borderRadius: 6, padding: '3px 8px', alignSelf: 'flex-start' }}>
-                 Resealed Pack
-              </span>
-            )}
-            {listing.description && (
-              <div style={{ fontSize: '.82rem', lineHeight: 1.7, color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
-                {listing.description}
+        {/* Close button */}
+        <button onClick={onClose} style={{
+          position: 'absolute', top: 14, right: 14, zIndex: 10,
+          background: 'rgba(0,0,0,.55)', border: 'none', borderRadius: '50%',
+          width: 34, height: 34, cursor: 'pointer', color: '#fff', fontSize: '1rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(6px)',
+        }}>✕</button>
+
+        {isResealed ? (
+          /* ── Resealed: large image hero + details below ── */
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* Hero image — as large as possible */}
+            <div style={{
+              width: '100%', background: '#0a0a0a', borderRadius: '20px 20px 0 0',
+              overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              minHeight: 260,
+            }}>
+              {listing.img_url
+                ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', maxHeight: '68vh', objectFit: 'contain', display: 'block' }} />
+                : <div style={{ padding: '32px 24px', width: '100%' }}>{getPackArt()}</div>
+              }
+            </div>
+
+            {/* Details strip */}
+            <div style={{ padding: '22px 28px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Name + badge row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 900, fontSize: '1.35rem', lineHeight: 1.2, letterSpacing: '-.01em' }}>{listing.name}</div>
+                <span style={{ fontSize: '.72rem', fontWeight: 700, background: 'rgba(139,92,246,.15)', color: '#a78bfa', borderRadius: 6, padding: '4px 10px', whiteSpace: 'nowrap', alignSelf: 'center' }}>
+                   Resealed Pack
+                </span>
               </div>
-            )}
-            <div style={{ fontSize: '.72rem', fontWeight: 600, color: stockColor }}>
-              {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
-              <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
-              <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
-                padding: '10px 22px', borderRadius: 10, border: 'none', cursor: inCart ? 'default' : 'pointer',
-                background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
-                color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 800, fontSize: '.88rem',
-              }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
+
+              {listing.product_format && (
+                <span style={{ fontSize: '.72rem', fontWeight: 700, background: 'rgba(59,130,246,.12)', color: '#60a5fa', borderRadius: 6, padding: '4px 10px', alignSelf: 'flex-start' }}>
+                  {listing.product_format}
+                </span>
+              )}
+
+              {listing.description && (
+                <div style={{ fontSize: '.88rem', lineHeight: 1.75, color: 'var(--text-secondary)', padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+                  {listing.description}
+                </div>
+              )}
+
+              {/* Price + stock + CTA */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', paddingTop: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ fontWeight: 900, fontSize: '2rem', color: 'var(--accent-gold)', lineHeight: 1 }}>{fmt(listing.price)}</div>
+                  <div style={{ fontSize: '.72rem', fontWeight: 600, color: stockColor }}>
+                    {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+                  </div>
+                </div>
+                <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
+                  padding: '13px 32px', borderRadius: 12, border: 'none', cursor: inCart ? 'default' : 'pointer',
+                  background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                  color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 900, fontSize: '1rem',
+                  letterSpacing: '.01em',
+                }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* ── Singles / Sealed: original side-by-side layout, slightly larger ── */
+          <div style={{ padding: '20px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ width: 'min(200px,42vw)', flexShrink: 0, borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 28px rgba(0,0,0,.6)' }}>
+              {listing.img_url
+                ? <img src={listing.img_url} alt={listing.name} style={{ width: '100%', display: 'block' }} />
+                : getPackArt()}
+            </div>
+            <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 24 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.15rem', lineHeight: 1.25 }}>{listing.name}</div>
+              {listing.set_name && <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{listing.set_name}</div>}
+              {listing.product_format && (
+                <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(59,130,246,.12)', color: '#60a5fa', borderRadius: 6, padding: '3px 8px', alignSelf: 'flex-start' }}>
+                  {listing.product_format}
+                </span>
+              )}
+              {listing.description && (
+                <div style={{ fontSize: '.82rem', lineHeight: 1.7, color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+                  {listing.description}
+                </div>
+              )}
+              <div style={{ fontSize: '.72rem', fontWeight: 600, color: stockColor }}>
+                {listing.qty_available === 1 ? '1 in stock' : `${listing.qty_available} in stock`}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 'auto', paddingTop: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
+                <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
+                  padding: '10px 22px', borderRadius: 10, border: 'none', cursor: inCart ? 'default' : 'pointer',
+                  background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                  color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 800, fontSize: '.88rem',
+                }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
