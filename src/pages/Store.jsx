@@ -1703,7 +1703,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         </div>
       )}
 
-      {/* Resealed: always show the archway showcase (even while loading / empty) */}
+      {/* Resealed: showcase + seamless infographic scroll */}
       {category === 'resealed' && (
         <>
           <ResealedShowcase
@@ -1712,6 +1712,22 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             onAdd={addToCart}
             onView={setSelectedListing}
           />
+
+          {/* Infographics — full-bleed, zero gap, scroll in order below the showcase */}
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 0 }}>
+            <img
+              src="/infographic-1.png"
+              alt="What Every Repack Includes"
+              style={{ width: '100%', display: 'block' }}
+              draggable={false}
+            />
+            <img
+              src="/infographic-2.png"
+              alt="Compare the 3 Repacks"
+              style={{ width: '100%', display: 'block' }}
+              draggable={false}
+            />
+          </div>
 
           {/* Overflow products beyond the 3 arch slots */}
           {!loading && filtered.length > 3 && (
