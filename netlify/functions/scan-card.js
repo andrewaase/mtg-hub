@@ -45,56 +45,64 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   }
 
-  let userId
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+
+  let userId, userEmail
   try {
     const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
     })
     if (!verifyRes.ok) throw new Error('invalid token')
     const userData = await verifyRes.json()
-    userId = userData.id
+    userId    = userData.id
+    userEmail = userData.email
   } catch {
     return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
   }
 
+  // Admins always scan for free — skip the tier + limit check entirely
+  const isAdmin = ADMIN_EMAIL && userEmail === ADMIN_EMAIL
+
   // ── Check membership tier & daily scan limit ─────────────────────────────────
   // Fire both Supabase lookups in parallel — saves one sequential round-trip
   // (~100-200 ms) for free users who need both the tier check and the scan count.
-  const today = new Date().toISOString().slice(0, 10)
-  const [profileRes, scanCountRes] = await Promise.all([
-    fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
-      { headers: adminHeaders }
-    ),
-    fetch(
-      `${SUPABASE_URL}/rest/v1/scan_logs?user_id=eq.${userId}&scan_date=eq.${today}&select=id`,
-      { headers: adminHeaders }
-    ),
-  ])
+  if (!isAdmin) {
+    const today = new Date().toISOString().slice(0, 10)
+    const [profileRes, scanCountRes] = await Promise.all([
+      fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
+        { headers: adminHeaders }
+      ),
+      fetch(
+        `${SUPABASE_URL}/rest/v1/scan_logs?user_id=eq.${userId}&scan_date=eq.${today}&select=id`,
+        { headers: adminHeaders }
+      ),
+    ])
 
-  const profiles = await profileRes.json()
-  const profile  = Array.isArray(profiles) ? profiles[0] : null
-  let tier = profile?.membership_tier || 'free'
+    const profiles = await profileRes.json()
+    const profile  = Array.isArray(profiles) ? profiles[0] : null
+    let tier = profile?.membership_tier || 'free'
 
-  // Treat expired pro as free
-  if (tier === 'pro' && profile?.membership_end && new Date(profile.membership_end) < new Date()) {
-    tier = 'free'
-  }
+    // Treat expired pro as free
+    if (tier === 'pro' && profile?.membership_end && new Date(profile.membership_end) < new Date()) {
+      tier = 'free'
+    }
 
-  if (tier !== 'pro') {
-    const scanRows   = await scanCountRes.json()
-    const scansToday = Array.isArray(scanRows) ? scanRows.length : 0
+    if (tier !== 'pro') {
+      const scanRows   = await scanCountRes.json()
+      const scansToday = Array.isArray(scanRows) ? scanRows.length : 0
 
-    if (scansToday >= FREE_SCAN_LIMIT) {
-      return {
-        statusCode: 429,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
-        body: JSON.stringify({
-          error:      'Daily scan limit reached',
-          limit:      FREE_SCAN_LIMIT,
-          scansToday,
-          upgradeRequired: true,
-        }),
+      if (scansToday >= FREE_SCAN_LIMIT) {
+        return {
+          statusCode: 429,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
+          body: JSON.stringify({
+            error:      'Daily scan limit reached',
+            limit:      FREE_SCAN_LIMIT,
+            scansToday,
+            upgradeRequired: true,
+          }),
+        }
       }
     }
   }
