@@ -120,7 +120,7 @@ function SetCard({ set, showCountdown = false }) {
         {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontWeight: 700, fontSize: '0.88rem', color: '#f1f5f9',
+            fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             marginBottom: 3,
           }}>
@@ -129,17 +129,17 @@ function SetCard({ set, showCountdown = false }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: '0.72rem', fontWeight: 600,
-              color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em',
+              color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em',
             }}>
               {set.code.toUpperCase()}
             </span>
-            <span style={{ color: '#334155', fontSize: '0.7rem' }}>·</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>·</span>
             <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
               {fmtDate(set.released_at)}
             </span>
             {set.card_count > 0 && !showCountdown && (
               <>
-                <span style={{ color: '#334155', fontSize: '0.7rem' }}>·</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>·</span>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                   {set.card_count} cards
                 </span>
@@ -199,7 +199,7 @@ function SectionHeader({ icon, title, count }) {
         <span style={{
           marginLeft: 4,
           background: 'rgba(255,255,255,0.08)',
-          color: '#64748b', fontSize: '0.72rem', fontWeight: 600,
+          color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600,
           padding: '1px 8px', borderRadius: 12,
         }}>
           {count}
@@ -260,17 +260,17 @@ export default function SetReleases() {
 
       {/*  Header  */}
       <div style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        background: 'linear-gradient(135deg, var(--accent-gold) 0%, #16a389 100%)',
         borderRadius: 12, padding: '18px 20px 16px', marginBottom: 16,
         border: '1px solid rgba(255,255,255,0.08)',
       }}>
-        <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.15em', color: '#475569', textTransform: 'uppercase', marginBottom: 4 }}>
+        <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.15em', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
           Powered by Scryfall
         </div>
-        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>
            Set Release Calendar
         </div>
-        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 4 }}>
           Upcoming and recent Magic: The Gathering releases
         </div>
       </div>
@@ -323,7 +323,7 @@ export default function SetReleases() {
             <div style={{
               padding: '16px 20px', borderRadius: 10, marginBottom: 28,
               background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-              color: '#475569', fontSize: '0.85rem', textAlign: 'center',
+              color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center',
             }}>
               No upcoming releases announced yet for this filter.
             </div>
@@ -345,7 +345,7 @@ export default function SetReleases() {
                     padding: '10px', borderRadius: 8,
                     background: 'rgba(255,255,255,0.04)',
                     border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#64748b', cursor: 'pointer', fontSize: '0.82rem',
+                    color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.82rem',
                     transition: 'background 0.15s',
                   }}
                 >
