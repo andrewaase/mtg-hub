@@ -547,7 +547,7 @@ function SearchView({ onBack, onCardSelect }) {
                 <div
                   key={s}
                   onClick={() => pick(s)}
-                  style={{ padding: '11px 16px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '.88rem', borderBottom: i < suggestions.length - 1 ? `1px solid #1a1a1a` : 'none', transition: 'background .1s' }}
+                  style={{ padding: '11px 16px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '.88rem', borderBottom: i < suggestions.length - 1 ? `1px solid var(--border)` : 'none', transition: 'background .1s' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#1a1a1a'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -893,7 +893,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
               width: '100%', boxSizing: 'border-box',
               background: 'var(--bg-card)', border: '1px solid #222',
               borderRadius: '8px', padding: '9px 14px',
-              color: '#e0e0e0', fontSize: '.85rem', outline: 'none',
+              color: 'var(--text-primary)', fontSize: '.85rem', outline: 'none',
             }}
           />
         </div>
@@ -945,7 +945,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
               >
                 <SetIcon uri={set.icon_svg_uri} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: '#e0e0e0', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {set.name}
                   </div>
                   <div style={{ fontSize: '.68rem', color: MUTED, marginTop: '1px' }}>
@@ -964,9 +964,9 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
                   <div style={{
                     padding: '10px 16px 4px',
                     fontSize: '.65rem', fontWeight: 800,
-                    textTransform: 'uppercase', letterSpacing: '1.2px', color: '#444',
+                    textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-secondary)',
                     display: 'flex', justifyContent: 'space-between',
-                    borderTop: `1px solid #0a0a0a`,
+                    borderTop: `1px solid var(--border)`,
                   }}>
                     <span>{year}</span>
                     <span style={{ color: 'var(--text-muted)' }}>{byYear[year].length}</span>
