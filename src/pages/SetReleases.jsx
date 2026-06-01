@@ -72,7 +72,7 @@ function SetIcon({ uri, size = 28 }) {
       style={{
         width: size, height: size,
         objectFit: 'contain',
-        filter: 'invert(1) opacity(0.75)',
+        filter: 'opacity(0.55)',
         flexShrink: 0,
       }}
     />

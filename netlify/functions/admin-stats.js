@@ -33,7 +33,7 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) }
   }
 
-  let callerEmail
+  let callerEmail, callerId
   try {
     const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: {
@@ -44,12 +44,27 @@ exports.handler = async (event) => {
     if (!verifyRes.ok) throw new Error('invalid token')
     const verifyJson = await verifyRes.json()
     callerEmail = verifyJson.email
+    callerId    = verifyJson.id
   } catch {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) }
   }
 
+  // Allow primary admin OR any user with profiles.is_admin = true
   if (callerEmail !== ADMIN_EMAIL) {
-    return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
+    let grantedAdmin = false
+    try {
+      const profileRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${callerId}&select=is_admin`,
+        { headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` } }
+      )
+      if (profileRes.ok) {
+        const rows = await profileRes.json()
+        grantedAdmin = Array.isArray(rows) && rows[0]?.is_admin === true
+      }
+    } catch {}
+    if (!grantedAdmin) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
+    }
   }
 
   // ── 2. Fetch all data in parallel ────────────────────────────────────────
