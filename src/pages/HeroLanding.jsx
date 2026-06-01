@@ -98,7 +98,7 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
           }}>
             Stock Better<br />
             <span style={{
-              background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+              background: 'linear-gradient(135deg, #3dd6ba 0%, #1ec4a6 100%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
             }}>Singles.</span>
@@ -110,17 +110,17 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
             <button
               onClick={() => onNavigate('dashboard')}
               style={{
-                background: 'linear-gradient(135deg, var(--accent-gold) 0%, #f59e0b 100%)',
+                background: 'linear-gradient(135deg, var(--accent-gold) 0%, #1ec4a6 100%)',
                 color: '#0a0a0c', border: 'none',
                 padding: '14px 26px', borderRadius: 99,
                 fontSize: '.92rem', fontWeight: 800,
                 cursor: 'pointer', letterSpacing: '.03em',
-                boxShadow: '0 8px 24px rgba(245,158,11,.35)',
+                boxShadow: '0 8px 24px rgba(30,196,166,.35)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 transition: 'opacity .15s, box-shadow .15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '.9'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(245,158,11,.45)' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1';  e.currentTarget.style.boxShadow = '0 8px 24px rgba(245,158,11,.35)' }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '.9'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(30,196,166,.45)' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1';  e.currentTarget.style.boxShadow = '0 8px 24px rgba(30,196,166,.35)' }}
             >
               Go to Dashboard
             </button>

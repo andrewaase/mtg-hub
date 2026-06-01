@@ -36,22 +36,22 @@ import { useMembership } from './hooks/useMembership'
 const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms']
 
 const PAGE_TITLES = {
-  dashboard:  'Vaulted Singles | MTG Card Collection Tracker',
-  log:        'Match Log | Vaulted Singles',
-  stats:      'Stats | Vaulted Singles',
-  news:       'MTG News | Vaulted Singles',
-  cards:      'Card Lookup | Vaulted Singles',
-  collection: 'My Collection | Vaulted Singles',
-  releases:   'Set Releases | Vaulted Singles',
-  friends:    'Friends & Trades | Vaulted Singles',
-  decks:      'My Decks | Vaulted Singles',
-  wishlist:   'Wishlist | Vaulted Singles',
-  store:      'Buy MTG Singles | Vaulted Singles Card Shop',
-  membership: 'VS Pro | Vaulted Singles',
-  about:      'About | Vaulted Singles',
-  admin:      'Control Center | Vaulted Singles',
-  lab:        'Hero Lab (sandbox) | Vaulted Singles',
-  terms:      'Terms of Service & Privacy Policy | Vaulted Singles',
+  dashboard:  'Mana Mint | MTG Card Collection Tracker',
+  log:        'Match Log | Mana Mint',
+  stats:      'Stats | Mana Mint',
+  news:       'MTG News | Mana Mint',
+  cards:      'Card Lookup | Mana Mint',
+  collection: 'My Collection | Mana Mint',
+  releases:   'Set Releases | Mana Mint',
+  friends:    'Friends & Trades | Mana Mint',
+  decks:      'My Decks | Mana Mint',
+  wishlist:   'Wishlist | Mana Mint',
+  store:      'Buy MTG Singles | Mana Mint Card Shop',
+  membership: 'MM Pro | Mana Mint',
+  about:      'About | Mana Mint',
+  admin:      'Control Center | Mana Mint',
+  lab:        'Hero Lab (sandbox) | Mana Mint',
+  terms:      'Terms of Service & Privacy Policy | Mana Mint',
 }
 
 const PAGE_DESCRIPTIONS = {
@@ -61,8 +61,8 @@ const PAGE_DESCRIPTIONS = {
   cards:      'Look up any Magic: The Gathering card — prices, rulings, set info, and format legality.',
   decks:      'Build and manage your MTG decks with format-staple suggestions and card lookups.',
   wishlist:   'Track cards you want and set price alerts for your MTG wishlist.',
-  membership: 'Upgrade to Vaulted Singles Pro for unlimited card scans, unlimited decks, and the hand simulator.',
-  about:      'Learn about Vaulted Singles — an MTG singles store and collection tracker built by a Magic player, for Magic players.',
+  membership: 'Upgrade to Mana Mint Pro for unlimited card scans, unlimited decks, and the hand simulator.',
+  about:      'Learn about Mana Mint — an MTG singles store and collection tracker built by a Magic player, for Magic players.',
   log:        'Log your Magic: The Gathering matches and track your win rates by deck and format.',
   stats:      'Detailed stats and charts for your Magic: The Gathering match history.',
 }
@@ -137,7 +137,7 @@ export default function App() {
     }
     setPageState(newPage)
     window.history.pushState({ page: newPage }, '', `#${newPage}`)
-    document.title = PAGE_TITLES[newPage] || 'Vaulted Singles'
+    document.title = PAGE_TITLES[newPage] || 'Mana Mint'
     // Update meta description for social sharing
     const desc = PAGE_DESCRIPTIONS[newPage]
     if (desc) {
@@ -259,7 +259,7 @@ export default function App() {
       setUser(session?.user ?? null)
       if (event === 'SIGNED_IN' && rawHash.startsWith('access_token=')) {
         // User just confirmed their email and got signed in automatically
-        setTimeout(() => showToast('Email confirmed — welcome to Vaulted Singles!', 4000), 400)
+        setTimeout(() => showToast('Email confirmed — welcome to Mana Mint!', 4000), 400)
       }
     })
     return () => subscription.unsubscribe()

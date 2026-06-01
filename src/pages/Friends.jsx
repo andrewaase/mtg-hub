@@ -295,7 +295,7 @@ export default function Friends({ user, showToast, isActive }) {
             {findStatus === 'already'   && foundUser && <div style={{ marginTop: 10, fontSize: '.82rem', color: 'var(--text-muted)' }}>Already friends with {foundUser.displayName}.</div>}
             {findStatus === 'found'     && foundUser && (
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(74,222,128,.06)', border: '1px solid rgba(74,222,128,.2)' }}>
-                <div className="user-avatar" style={{ backgroundColor: '#c9a84c', width: 36, height: 36, fontSize: '.9rem' }}>{initials(foundUser)}</div>
+                <div className="user-avatar" style={{ backgroundColor: '#16a389', width: 36, height: 36, fontSize: '.9rem' }}>{initials(foundUser)}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{foundUser.displayName}</div>
                   <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{foundUser.email}</div>
@@ -315,12 +315,12 @@ export default function Friends({ user, showToast, isActive }) {
             <div style={{ display: 'grid', gap: 10 }}>
               {friends.map(f => (
                 <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12 }}>
-                  <div className="user-avatar" style={{ backgroundColor: f.friend?.avatar_color || '#c9a84c' }}>{initials(f.friend)}</div>
+                  <div className="user-avatar" style={{ backgroundColor: f.friend?.avatar_color || '#16a389' }}>{initials(f.friend)}</div>
                   <div style={{ flex: 1, fontWeight: 600, fontSize: '.9rem' }}>{displayName(f.friend)}</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
                       onClick={() => handleBrowse(f)}
-                      style={{ padding: '5px 12px', borderRadius: 8, background: 'rgba(201,168,76,.12)', border: '1px solid rgba(201,168,76,.3)', color: 'var(--accent-gold)', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
+                      style={{ padding: '5px 12px', borderRadius: 8, background: 'rgba(30,196,166,.12)', border: '1px solid rgba(30,196,166,.3)', color: 'var(--accent-gold)', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
                     >
                        Browse
                     </button>
@@ -333,7 +333,7 @@ export default function Friends({ user, showToast, isActive }) {
                     <button
                       onClick={() => { setReportTarget({ id: f.friend.id, email: f.friend.email, name: displayName(f.friend) }); setReportReason('') }}
                       title="Report this user"
-                      style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.18)', color: '#fbbf24', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
+                      style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(61,214,186,.06)', border: '1px solid rgba(61,214,186,.18)', color: '#3dd6ba', fontWeight: 600, fontSize: '.75rem', cursor: 'pointer' }}
                     >
                        Report
                     </button>
@@ -350,7 +350,7 @@ export default function Friends({ user, showToast, isActive }) {
               <div style={{ display: 'grid', gap: 10 }}>
                 {pendingRequests.map(req => (
                   <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12 }}>
-                    <div className="user-avatar" style={{ backgroundColor: req.requester?.avatar_color || '#c9a84c' }}>{initials(req.requester)}</div>
+                    <div className="user-avatar" style={{ backgroundColor: req.requester?.avatar_color || '#16a389' }}>{initials(req.requester)}</div>
                     <div style={{ flex: 1, fontWeight: 600, fontSize: '.9rem' }}>{displayName(req.requester)}</div>
                     <button className="btn btn-primary btn-sm" onClick={() => handleAcceptRequest(req.id, req.requester?.id)}>Accept</button>
                   </div>
@@ -406,7 +406,7 @@ export default function Friends({ user, showToast, isActive }) {
                   {filteredCollection.map((card, i) => {
                     const inCart = cart.find(c => c.id === card.id)
                     return (
-                      <div key={i} style={{ background: 'var(--bg-card)', border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      <div key={i} style={{ background: 'var(--bg-card)', border: `1px solid ${inCart ? 'rgba(30,196,166,.5)' : 'var(--border)'}`, borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {card.img
                           ? <img src={card.img} alt={card.name} style={{ width: '100%', aspectRatio: '63/88', objectFit: 'cover' }} />
                           : <div style={{ aspectRatio: '63/88', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.7rem', color: 'var(--text-muted)' }}>No image</div>
@@ -415,7 +415,7 @@ export default function Friends({ user, showToast, isActive }) {
                           <div style={{ fontSize: '.75rem', fontWeight: 600, lineHeight: 1.3, marginBottom: 4 }}>{card.name}</div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
                             {card.condition && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{card.condition}</span>}
-                            {card.isFoil   && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'rgba(201,168,76,.15)', color: 'var(--accent-gold)' }}>Foil</span>}
+                            {card.isFoil   && <span style={{ fontSize: '.62rem', padding: '1px 5px', borderRadius: 4, background: 'rgba(30,196,166,.15)', color: 'var(--accent-gold)' }}>Foil</span>}
                             <span style={{ fontSize: '.62rem', color: 'var(--text-muted)' }}>×{card.qty}</span>
                           </div>
                           <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 6, minHeight: '1em' }}>
@@ -426,8 +426,8 @@ export default function Friends({ user, showToast, isActive }) {
                             style={{
                               width: '100%', padding: '7px 0', borderRadius: 7, fontSize: '.72rem', fontWeight: 700,
                               cursor: inCart ? 'default' : 'pointer',
-                              background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
-                              border: `1px solid ${inCart ? 'rgba(201,168,76,.5)' : 'transparent'}`,
+                              background: inCart ? 'rgba(30,196,166,.15)' : 'var(--accent-gold)',
+                              border: `1px solid ${inCart ? 'rgba(30,196,166,.5)' : 'transparent'}`,
                               color: inCart ? 'var(--accent-gold)' : '#000',
                               transition: 'all .15s', marginTop: 'auto',
                             }}
@@ -456,9 +456,9 @@ export default function Friends({ user, showToast, isActive }) {
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             background: 'rgba(15,12,5,.92)',
-            border: '1px solid rgba(201,168,76,.45)',
+            border: '1px solid rgba(30,196,166,.45)',
             borderRadius: 16, padding: '12px 16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(201,168,76,.15)',
+            boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(30,196,166,.15)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{
@@ -483,7 +483,7 @@ export default function Friends({ user, showToast, isActive }) {
                 background: 'var(--accent-gold)', color: '#000',
                 fontWeight: 800, fontSize: '.88rem', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 12px rgba(201,168,76,.35)',
+                boxShadow: '0 2px 12px rgba(30,196,166,.35)',
               }}
             >
                View Trade →
@@ -578,7 +578,7 @@ export default function Friends({ user, showToast, isActive }) {
           <div style={{
             position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
             width: 'min(420px, 92vw)', background: 'var(--bg-card)',
-            border: '1px solid rgba(251,191,36,.3)', borderRadius: 16,
+            border: '1px solid rgba(61,214,186,.3)', borderRadius: 16,
             zIndex: 401, padding: '24px 24px 20px',
             boxShadow: '0 16px 48px rgba(0,0,0,.6)',
           }}>
@@ -612,7 +612,7 @@ export default function Friends({ user, showToast, isActive }) {
                 disabled={!reportReason.trim() || reportSubmitting}
                 style={{
                   padding: '8px 18px', borderRadius: 8, border: 'none',
-                  background: reportReason.trim() ? 'rgba(251,191,36,.85)' : 'rgba(251,191,36,.25)',
+                  background: reportReason.trim() ? 'rgba(61,214,186,.85)' : 'rgba(61,214,186,.25)',
                   color: '#000', fontWeight: 700, fontSize: '.8rem',
                   cursor: reportReason.trim() && !reportSubmitting ? 'pointer' : 'default',
                   opacity: reportSubmitting ? 0.6 : 1,
@@ -632,11 +632,11 @@ export default function Friends({ user, showToast, isActive }) {
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 10,
             padding: '10px 14px', marginBottom: 16, borderRadius: 10,
-            background: 'rgba(251,191,36,.07)', border: '1px solid rgba(251,191,36,.25)',
+            background: 'rgba(61,214,186,.07)', border: '1px solid rgba(61,214,186,.25)',
           }}>
             <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}></span>
             <p style={{ margin: 0, fontSize: '.76rem', color: '#fcd34d', lineHeight: 1.5 }}>
-              <strong>Trade safely.</strong> Only exchange cards in person or with trusted individuals. Vaulted Singles does not mediate disputes or guarantee trades. If a user behaves suspiciously, use the <strong>Report</strong> button on their friend card.
+              <strong>Trade safely.</strong> Only exchange cards in person or with trusted individuals. Mana Mint does not mediate disputes or guarantee trades. If a user behaves suspiciously, use the <strong>Report</strong> button on their friend card.
             </p>
           </div>
 

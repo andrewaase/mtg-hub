@@ -50,8 +50,8 @@ export default function Lab({ setPage }) {
 
       {/* ── Sandbox banner — always visible so you don't forget where you are ── */}
       <div style={{
-        background: 'linear-gradient(90deg, rgba(245,158,11,.18), rgba(245,158,11,.05))',
-        borderBottom: '1px solid rgba(245,158,11,.4)',
+        background: 'linear-gradient(90deg, rgba(30,196,166,.18), rgba(30,196,166,.05))',
+        borderBottom: '1px solid rgba(30,196,166,.4)',
         padding: '10px 18px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap',
@@ -66,7 +66,7 @@ export default function Lab({ setPage }) {
         <button
           onClick={() => setPage?.('dashboard')}
           style={{
-            background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.4)',
+            background: 'rgba(30,196,166,.15)', border: '1px solid rgba(30,196,166,.4)',
             color: 'var(--accent-gold)', padding: '5px 12px', borderRadius: 99,
             fontSize: '.7rem', fontWeight: 700, cursor: 'pointer',
           }}
@@ -133,7 +133,7 @@ export default function Lab({ setPage }) {
             }}>
               Stock Better<br />
               <span style={{
-                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                background: 'linear-gradient(135deg, #3dd6ba 0%, #1ec4a6 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}>Singles.</span>
@@ -157,12 +157,12 @@ export default function Lab({ setPage }) {
               <button
                 onClick={() => setPage?.('store')}
                 style={{
-                  background: 'linear-gradient(135deg, var(--accent-gold) 0%, #f59e0b 100%)',
+                  background: 'linear-gradient(135deg, var(--accent-gold) 0%, #1ec4a6 100%)',
                   color: '#0a0a0c', border: 'none',
                   padding: '14px 28px', borderRadius: 99,
                   fontSize: '.92rem', fontWeight: 800,
                   cursor: 'pointer', letterSpacing: '.04em',
-                  boxShadow: '0 8px 24px rgba(245,158,11,.35)',
+                  boxShadow: '0 8px 24px rgba(30,196,166,.35)',
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                 }}
               >Shop Singles</button>
@@ -292,7 +292,7 @@ function ChipBtn({ active, onClick, children }) {
         padding: '5px 12px', borderRadius: 99,
         fontSize: '.7rem', fontWeight: 700, cursor: 'pointer',
         border: `1px solid ${active ? 'var(--accent-gold)' : 'rgba(255,255,255,.15)'}`,
-        background: active ? 'rgba(245,158,11,.18)' : 'transparent',
+        background: active ? 'rgba(30,196,166,.18)' : 'transparent',
         color: active ? 'var(--accent-gold)' : 'rgba(255,255,255,.6)',
         transition: 'all .15s',
       }}

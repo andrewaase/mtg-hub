@@ -55,7 +55,7 @@ function ChipRow({ options, value, onChange, multi = false, labelFn }) {
             style={{
               padding: '5px 12px', borderRadius: '99px',
               border: `1.5px solid ${isActive(id) ? 'var(--accent-gold)' : 'var(--border)'}`,
-              background: isActive(id) ? 'rgba(201,168,76,.15)' : 'var(--bg-secondary)',
+              background: isActive(id) ? 'rgba(30,196,166,.15)' : 'var(--bg-secondary)',
               color: isActive(id) ? 'var(--accent-gold)' : 'var(--text-secondary)',
               fontSize: '.72rem', fontWeight: isActive(id) ? 700 : 400,
               cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
@@ -332,7 +332,7 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
                 style={{
                   padding: '9px 22px', borderRadius: 10, border: 'none',
                   cursor: inCart ? 'default' : 'pointer',
-                  background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                  background: inCart ? 'rgba(30,196,166,.15)' : 'var(--accent-gold)',
                   color: inCart ? 'var(--accent-gold)' : '#000',
                   fontWeight: 800, fontSize: '.88rem', transition: 'all .15s',
                 }}
@@ -433,7 +433,7 @@ function ListingCard({ listing, onAdd, inCart, onView }) {
             style={{
               padding: '5px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
               fontSize: '.72rem', fontWeight: 700,
-              background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+              background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
               color: inCart ? 'var(--accent-gold)' : '#000',
               transition: 'all .15s',
             }}
@@ -456,17 +456,17 @@ function VaultedRaritiesArt() {
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 40%, rgba(201,168,76,.12) 0%, transparent 65%)' }} />
-      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}></div>
-      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}></div>
-      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}></div>
-      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.55rem', color: 'rgba(201,168,76,.55)' }}></div>
-      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(201,168,76,.5))' }}></div>
-      <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.22em', color: '#c9a84c', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(201,168,76,.6)' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 40%, rgba(30,196,166,.12) 0%, transparent 65%)' }} />
+      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
+      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
+      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
+      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
+      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(30,196,166,.5))' }}></div>
+      <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.22em', color: '#16a389', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(30,196,166,.6)' }}>
         Vaulted<br />Rarities
       </div>
-      <div style={{ width: 44, height: 1, background: 'linear-gradient(90deg,transparent,#c9a84c,transparent)', margin: '9px 0' }} />
-      <div style={{ fontSize: '.5rem', color: 'rgba(201,168,76,.55)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Premium Singles</div>
+      <div style={{ width: 44, height: 1, background: 'linear-gradient(90deg,transparent,#16a389,transparent)', margin: '9px 0' }} />
+      <div style={{ fontSize: '.5rem', color: 'rgba(30,196,166,.55)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Premium Singles</div>
     </div>
   )
 }
@@ -558,7 +558,7 @@ function SealedCard({ listing, onAdd, inCart, onView }) {
           <button onClick={() => onAdd(listing)} style={{
             padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
             fontSize: '.72rem', fontWeight: 700,
-            background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+            background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
             color: inCart ? 'var(--accent-gold)' : '#000', transition: 'all .15s',
           }}>{inCart ? '✓ In Cart' : '+ Cart'}</button>
         </div>
@@ -611,7 +611,7 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
           <button onClick={() => onAdd(listing)} style={{
             padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
             fontSize: '.72rem', fontWeight: 700,
-            background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+            background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
             color: inCart ? 'var(--accent-gold)' : '#000', transition: 'all .15s',
           }}>{inCart ? '✓ In Cart' : '+ Cart'}</button>
         </div>
@@ -655,7 +655,7 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
           <div
             key={i}
             onClick={() => onView(listing)}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(201,168,76,0.08)' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(30,196,166,0.08)' }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
             style={{
               position: 'absolute',
@@ -715,9 +715,9 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
         width: isResealed ? 'min(900px,96vw)' : 'min(600px,96vw)',
         maxHeight: '94vh', overflowY: 'auto',
         background: 'var(--bg-primary)',
-        border: isResealed ? '1px solid rgba(201,168,76,.35)' : '1px solid var(--border)',
+        border: isResealed ? '1px solid rgba(30,196,166,.35)' : '1px solid var(--border)',
         borderRadius: 20, zIndex: 401, padding: 0,
-        boxShadow: isResealed ? '0 32px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(201,168,76,.1)' : '0 24px 60px rgba(0,0,0,.65)',
+        boxShadow: isResealed ? '0 32px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(30,196,166,.1)' : '0 24px 60px rgba(0,0,0,.65)',
       }}>
         {/* Close button */}
         <button onClick={onClose} style={{
@@ -771,7 +771,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
             <div style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,
               background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(14px)',
-              borderTop: '1px solid rgba(201,168,76,.2)',
+              borderTop: '1px solid rgba(30,196,166,.2)',
               padding: '10px 18px',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
             }}>
@@ -783,7 +783,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
               </div>
               <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
                 padding: '11px 28px', borderRadius: 12, border: 'none', cursor: inCart ? 'default' : 'pointer',
-                background: inCart ? 'rgba(201,168,76,.2)' : 'var(--accent-gold)',
+                background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
                 color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 900, fontSize: '.95rem',
                 letterSpacing: '.01em', whiteSpace: 'nowrap',
               }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
@@ -817,7 +817,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
                 <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--accent-gold)' }}>{fmt(listing.price)}</div>
                 <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
                   padding: '10px 22px', borderRadius: 10, border: 'none', cursor: inCart ? 'default' : 'pointer',
-                  background: inCart ? 'rgba(201,168,76,.15)' : 'var(--accent-gold)',
+                  background: inCart ? 'rgba(30,196,166,.15)' : 'var(--accent-gold)',
                   color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 800, fontSize: '.88rem',
                 }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
               </div>
@@ -1116,7 +1116,7 @@ function CheckoutModal({ cart, onClose, onSuccess, shippingCost }) {
 
               <button type="submit" disabled={creatingPI} style={{
                 padding: 14, borderRadius: 12, border: 'none', marginTop: 4,
-                background: creatingPI ? 'rgba(201,168,76,.5)' : 'var(--accent-gold)',
+                background: creatingPI ? 'rgba(30,196,166,.5)' : 'var(--accent-gold)',
                 color: '#000', fontWeight: 800, fontSize: '.9rem',
                 cursor: creatingPI ? 'not-allowed' : 'pointer',
               }}>
@@ -1140,7 +1140,7 @@ function CheckoutModal({ cart, onClose, onSuccess, shippingCost }) {
                 appearance: {
                   theme: 'night',
                   variables: {
-                    colorPrimary: '#c9a84c',
+                    colorPrimary: '#16a389',
                     colorBackground: '#111',
                     colorText: '#e2e8f0',
                     borderRadius: '8px',
@@ -1474,13 +1474,13 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
         <div style={{
           background: 'linear-gradient(135deg,#0f172a 0%,#1a1200 100%)',
           borderRadius: 14, padding: '18px 20px', marginBottom: 20,
-          border: '1px solid rgba(201,168,76,.2)',
-          boxShadow: '0 4px 20px rgba(201,168,76,.1)',
+          border: '1px solid rgba(30,196,166,.2)',
+          boxShadow: '0 4px 20px rgba(30,196,166,.1)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div>
             <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.15em', color: 'var(--accent-gold)', textTransform: 'uppercase', marginBottom: 4 }}>
-              Vaulted Singles
+              Mana Mint
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-.5px' }}>
                Card Shop
@@ -1493,7 +1493,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             onClick={() => setCartOpen(true)}
             style={{
               position: 'relative', padding: '10px 16px', borderRadius: 12,
-              border: '1px solid var(--accent-gold)', background: cartCount > 0 ? 'rgba(201,168,76,.15)' : 'transparent',
+              border: '1px solid var(--accent-gold)', background: cartCount > 0 ? 'rgba(30,196,166,.15)' : 'transparent',
               color: 'var(--accent-gold)', fontWeight: 700, fontSize: '.88rem', cursor: 'pointer',
             }}
           >
@@ -1530,10 +1530,10 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
               {TABS.map(t => (
                 <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
                   padding: '6px 16px', borderRadius: 99, border: 'none', cursor: 'pointer',
-                  background: category === t.id ? 'rgba(201,168,76,.15)' : 'transparent',
+                  background: category === t.id ? 'rgba(30,196,166,.15)' : 'transparent',
                   color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
                   fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem',
-                  outline: category === t.id ? '1.5px solid rgba(201,168,76,.4)' : 'none',
+                  outline: category === t.id ? '1.5px solid rgba(30,196,166,.4)' : 'none',
                   transition: 'all .15s',
                 }}>{t.label}</button>
               ))}
@@ -1546,7 +1546,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             {TABS.map(t => (
               <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
                 padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
-                background: category === t.id ? 'rgba(201,168,76,.1)' : 'transparent',
+                background: category === t.id ? 'rgba(30,196,166,.1)' : 'transparent',
                 color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
                 fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem', cursor: 'pointer',
                 borderBottom: `2px solid ${category === t.id ? 'var(--accent-gold)' : 'transparent'}`,
@@ -1573,7 +1573,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             style={{
               padding: '9px 14px', borderRadius: 10,
               border: `1.5px solid ${hasActiveFilters ? 'var(--accent-gold)' : 'var(--border)'}`,
-              background: hasActiveFilters ? 'rgba(201,168,76,.12)' : 'transparent',
+              background: hasActiveFilters ? 'rgba(30,196,166,.12)' : 'transparent',
               color: hasActiveFilters ? 'var(--accent-gold)' : 'var(--text-muted)',
               fontWeight: hasActiveFilters ? 700 : 400, fontSize: '.82rem', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
@@ -1820,7 +1820,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
                   <button
                     onClick={() => setWaitlistListing(listing)}
                     style={{
-                      marginTop: 6, padding: '7px', borderRadius: 8, border: '1px solid rgba(201,168,76,.4)',
+                      marginTop: 6, padding: '7px', borderRadius: 8, border: '1px solid rgba(30,196,166,.4)',
                       background: 'transparent', color: 'var(--accent-gold)', fontWeight: 700,
                       fontSize: '.72rem', cursor: 'pointer', width: '100%',
                     }}
@@ -1881,9 +1881,9 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             background: 'rgba(15,12,5,.92)',
-            border: '1px solid rgba(201,168,76,.45)',
+            border: '1px solid rgba(30,196,166,.45)',
             borderRadius: 16, padding: '12px 16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(201,168,76,.15)',
+            boxShadow: '0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(30,196,166,.15)',
           }}>
             {/* Left: count + total */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1911,7 +1911,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
                 background: 'var(--accent-gold)', color: '#000',
                 fontWeight: 800, fontSize: '.88rem', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 12px rgba(201,168,76,.35)',
+                boxShadow: '0 2px 12px rgba(30,196,166,.35)',
               }}
             >
                View Cart →

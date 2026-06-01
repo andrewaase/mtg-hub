@@ -407,7 +407,7 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
               <button
                 type="button"
                 className="btn"
-                style={{ background: 'rgba(201,168,76,.15)', color: 'var(--accent-gold)', border: '1px solid rgba(201,168,76,.3)' }}
+                style={{ background: 'rgba(30,196,166,.15)', color: 'var(--accent-gold)', border: '1px solid rgba(30,196,166,.3)' }}
                 disabled={!canSubmit}
                 onClick={handleSubmitAndList}
               >

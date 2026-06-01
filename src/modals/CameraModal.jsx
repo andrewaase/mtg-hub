@@ -223,7 +223,7 @@ function Chip({ children, active, onClick, disabled }) {
       style={{
         padding: '5px 12px', borderRadius: '99px',
         border: `1.5px solid ${active ? 'var(--accent-teal)' : 'rgba(255,255,255,0.15)'}`,
-        background: active ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.06)',
+        background: active ? 'rgba(30,196,166,0.18)' : 'rgba(255,255,255,0.06)',
         color: active ? 'var(--accent-teal)' : 'rgba(255,255,255,0.7)',
         fontSize: '.75rem', fontWeight: active ? 700 : 400,
         cursor: disabled ? 'default' : 'pointer',
@@ -845,7 +845,7 @@ export default function CameraModal({
           {torchSupported && (
             <button onClick={toggleTorch} style={{
               background: torchOn ? 'rgba(255,220,50,0.9)' : 'rgba(0,0,0,0.55)',
-              border: `1.5px solid ${torchOn ? '#fbbf24' : 'rgba(255,255,255,0.18)'}`,
+              border: `1.5px solid ${torchOn ? '#3dd6ba' : 'rgba(255,255,255,0.18)'}`,
               borderRadius: '20px', padding: '6px 11px',
               display: 'flex', alignItems: 'center', gap: '5px',
               cursor: 'pointer', backdropFilter: 'blur(10px)',
@@ -866,8 +866,8 @@ export default function CameraModal({
             <button
               onClick={() => setStoreMode(p => !p)}
               style={{
-                background: storeMode ? 'rgba(201,168,76,0.9)' : 'rgba(0,0,0,0.55)',
-                border: `1.5px solid ${storeMode ? '#c9a84c' : 'rgba(255,255,255,0.18)'}`,
+                background: storeMode ? 'rgba(30,196,166,0.9)' : 'rgba(0,0,0,0.55)',
+                border: `1.5px solid ${storeMode ? '#16a389' : 'rgba(255,255,255,0.18)'}`,
                 borderRadius: '20px', padding: '6px 11px',
                 display: 'flex', alignItems: 'center', gap: '5px',
                 cursor: 'pointer', backdropFilter: 'blur(10px)',
@@ -944,8 +944,8 @@ export default function CameraModal({
             style={{
               width: '100%', height: '100%', objectFit: 'contain',
               borderRadius: '10px',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(245,158,11,0.3)',
-              filter: 'drop-shadow(0 0 24px rgba(245,158,11,0.25))',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(30,196,166,0.3)',
+              filter: 'drop-shadow(0 0 24px rgba(30,196,166,0.25))',
               animation: 'scanCardIn .25s ease-out',
             }}
           />
@@ -975,7 +975,7 @@ export default function CameraModal({
       {scanStatus === 'scanning' && !foundCard && (
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          background: 'rgba(0,0,0,0.72)', color: '#f59e0b',
+          background: 'rgba(0,0,0,0.72)', color: '#1ec4a6',
           padding: '6px 18px', borderRadius: '20px', fontSize: '0.75rem',
           whiteSpace: 'nowrap', backdropFilter: 'blur(8px)',
         }}> Reading card…</div>
@@ -989,7 +989,7 @@ export default function CameraModal({
           padding: '8px 20px', backdropFilter: 'blur(8px)', textAlign: 'center',
           pointerEvents: 'none',
         }}>
-          <div style={{ fontSize: '.74rem', color: '#f59e0b', fontWeight: 700 }}>"{verifyingName}"</div>
+          <div style={{ fontSize: '.74rem', color: '#1ec4a6', fontWeight: 700 }}>"{verifyingName}"</div>
           <div style={{ fontSize: '.6rem', color: 'rgba(255,255,255,0.45)', marginTop: '3px' }}>Hold steady…</div>
         </div>
       )}
@@ -1162,7 +1162,7 @@ export default function CameraModal({
                   {foundCard.set_name}
                   {alreadyOwned && <span style={{ color: '#93c5fd', marginLeft: '6px' }}>Own ×{alreadyOwned.qty}</span>}
                   {sameSetVariants > 1 && (
-                    <span style={{ color: '#fbbf24', marginLeft: '6px', fontWeight: 700 }}>
+                    <span style={{ color: '#3dd6ba', marginLeft: '6px', fontWeight: 700 }}>
                        {sameSetVariants} variants
                     </span>
                   )}
@@ -1233,7 +1233,7 @@ export default function CameraModal({
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
                         width: '100%', padding: '9px 12px',
-                        background: isSelected ? 'rgba(245,158,11,0.1)' : 'transparent',
+                        background: isSelected ? 'rgba(30,196,166,0.1)' : 'transparent',
                         border: 'none',
                         borderBottom: i < printings.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                         cursor: 'pointer', textAlign: 'left',
@@ -1289,7 +1289,7 @@ export default function CameraModal({
               <div>
                 {/* Store mode label */}
                 <div style={{
-                  fontSize: '.68rem', fontWeight: 700, color: '#c9a84c',
+                  fontSize: '.68rem', fontWeight: 700, color: '#16a389',
                   marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px',
                 }}>
                   <span></span> Store Mode — adds directly to shop inventory
@@ -1327,7 +1327,7 @@ export default function CameraModal({
                   onClick={handleAddToStore}
                   disabled={adding}
                   style={{
-                    width: '100%', background: '#c9a84c', color: '#000', border: 'none',
+                    width: '100%', background: '#16a389', color: '#000', border: 'none',
                     borderRadius: '12px', padding: '13px 8px',
                     fontWeight: 800, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
                     opacity: adding ? 0.7 : 1,
@@ -1350,8 +1350,8 @@ export default function CameraModal({
                   onClick={() => handleAdd({ forSale: true })}
                   disabled={adding}
                   style={{
-                    flex: 1, background: 'rgba(245,158,11,0.12)', color: 'var(--accent-teal)',
-                    border: '1px solid rgba(245,158,11,0.3)',
+                    flex: 1, background: 'rgba(30,196,166,0.12)', color: 'var(--accent-teal)',
+                    border: '1px solid rgba(30,196,166,0.3)',
                     borderRadius: '12px', padding: '13px 8px',
                     fontWeight: 700, fontSize: '.88rem', cursor: adding ? 'wait' : 'pointer',
                     opacity: adding ? 0.7 : 1,

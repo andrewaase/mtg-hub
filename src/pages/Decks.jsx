@@ -16,7 +16,7 @@ const ARCHETYPE_COLOR = {
   Control:   { bg: 'rgba(99,163,255,.12)',  border: '#63a3ff', text: '#63a3ff' },
   Midrange:  { bg: 'rgba(74,222,128,.12)',  border: '#4ade80', text: '#4ade80' },
   Combo:     { bg: 'rgba(167,139,250,.12)', border: '#a78bfa', text: '#a78bfa' },
-  Tempo:     { bg: 'rgba(251,191,36,.12)',  border: '#fbbf24', text: '#fbbf24' },
+  Tempo:     { bg: 'rgba(61,214,186,.12)',  border: '#3dd6ba', text: '#3dd6ba' },
   Ramp:      { bg: 'rgba(74,222,128,.12)',  border: '#4ade80', text: '#4ade80' },
 }
 
@@ -390,7 +390,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
           )}
 
           {!user && decks.length > 0 && (
-            <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#fbbf24' }}>
+            <div style={{ background: 'rgba(61,214,186,.08)', border: '1px solid rgba(61,214,186,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#3dd6ba' }}>
                Sign in to save decks to your profile. Decks stored locally will be lost on refresh.
             </div>
           )}
@@ -799,7 +799,7 @@ function MetaDeckDetail({ deck, onBack, onSave, showToast, openCardSearch, user 
   const handleManaPool = async () => {
     const text = mainboard.map(c => `${c.qty} ${c.name}`).join('\n')
     try { await navigator.clipboard.writeText(text) } catch { /* ok */ }
-    window.open('https://manapool.com/add-deck?ref=vaultedsingles', '_blank', 'noopener')
+    window.open('https://manapool.com/add-deck?ref=manamint', '_blank', 'noopener')
     showToast('Decklist copied — paste it into ManaPool!')
   }
 
@@ -1034,7 +1034,7 @@ function DeckStatsBar({ mainboard, cardStats, cardTypes }) {
                     width: '100%', borderRadius: '3px 3px 0 0',
                     height: `${Math.max(pct * 48, count > 0 ? 4 : 0)}px`,
                     background: count > 0
-                      ? `linear-gradient(180deg, #c9a84c, #f59e0b)`
+                      ? `linear-gradient(180deg, #16a389, #1ec4a6)`
                       : 'var(--bg-secondary)',
                     transition: 'height .3s',
                   }} />
@@ -1238,7 +1238,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
   // The ?ref= affiliate cookie is set on landing.
   async function openManaPool() {
     try { await navigator.clipboard.writeText(buildDecklistText()) } catch { /* clipboard blocked */ }
-    window.open('https://manapool.com/add-deck?ref=vaultedsingles', '_blank', 'noopener')
+    window.open('https://manapool.com/add-deck?ref=manamint', '_blank', 'noopener')
     showToast('✓ Decklist copied — paste it into ManaPool!')
     setShowBuyMenu(false)
   }
@@ -1503,7 +1503,7 @@ function DeckDetail({ deck, collection, user, showToast, onBack, onEdit, onDelet
             className="btn btn-ghost btn-sm"
             onClick={handleAddToCollection}
             disabled={addingToCollection}
-            style={{ color: '#c9a84c' }}
+            style={{ color: '#16a389' }}
           >
             {addingToCollection
               ? ` Adding… ${addCollProg ? `${addCollProg.done}/${addCollProg.total}` : ''}`

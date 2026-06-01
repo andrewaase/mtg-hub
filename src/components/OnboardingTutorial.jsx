@@ -7,7 +7,7 @@ const STEPS = [
   {
     page:  'dashboard',
     icon:  '',
-    title: 'Welcome to Vaulted Singles!',
+    title: 'Welcome to Mana Mint!',
     body:  "This is your Dashboard — a quick overview of your collection value, recent price changes, and format staples. It updates automatically as you add cards.",
     cta:   'Next: Find Cards',
   },
@@ -36,7 +36,7 @@ const STEPS = [
     page:  'decks',
     icon:  '',
     title: 'Build & Track Decks',
-    body:  'Import a decklist from Arena, MTGO, or Moxfield — or build one from scratch. Vaulted Singles automatically values your deck and highlights cards you already own.',
+    body:  'Import a decklist from Arena, MTGO, or Moxfield — or build one from scratch. Mana Mint automatically values your deck and highlights cards you already own.',
     cta:   'Next: Hand Simulator',
   },
   {
@@ -121,13 +121,13 @@ export default function OnboardingTutorial({ setPage, onDone }) {
     >
       <div style={{
         background: '#1a1a1e',
-        border: '1px solid rgba(201,168,76,.4)',
+        border: '1px solid rgba(30,196,166,.4)',
         borderRadius: '16px',
         boxShadow: '0 8px 40px rgba(0,0,0,.8)',
         overflow: 'hidden',
       }}>
         {/* Gold accent bar */}
-        <div style={{ height: '3px', background: 'linear-gradient(90deg, var(--accent-gold), #f59e0b)' }} />
+        <div style={{ height: '3px', background: 'linear-gradient(90deg, var(--accent-gold), #1ec4a6)' }} />
 
         {/* Progress dots */}
         <div style={{ display: 'flex', gap: '5px', padding: '14px 16px 0', justifyContent: 'center' }}>
@@ -137,7 +137,7 @@ export default function OnboardingTutorial({ setPage, onDone }) {
               style={{
                 width: i === step ? '18px' : '6px', height: '6px', borderRadius: '99px',
                 transition: 'width .2s, background .2s',
-                background: i === step ? '#c9a84c' : i < step ? 'rgba(201,168,76,.4)' : 'rgba(255,255,255,.15)',
+                background: i === step ? '#16a389' : i < step ? 'rgba(30,196,166,.4)' : 'rgba(255,255,255,.15)',
               }}
             />
           ))}

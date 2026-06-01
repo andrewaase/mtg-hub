@@ -1,5 +1,5 @@
 import { hasSupabase } from '../lib/supabase'
-import logoPng from '../assets/vaulted_singles_logo.png'
+const logoPng = '/Mana-Mint-Logo-With-Box.png'
 import NotificationBell from './NotificationBell'
 
 export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, onMenuClick, onLogoClick }) {
@@ -16,11 +16,10 @@ export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, o
         >
           <img
             src={logoPng}
-            alt="Vaulted Singles"
+            alt="Mana Mint"
             style={{
               height: '40px', width: 'auto', display: 'block',
-              filter: 'invert(1) sepia(1) hue-rotate(12deg) saturate(3) brightness(0.82)',
-              mixBlendMode: 'screen',
+              borderRadius: '10px',
             }}
           />
         </div>

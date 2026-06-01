@@ -1,12 +1,12 @@
 import { hasSupabase } from '../lib/supabase'
-import logoPng from '../assets/vaulted_singles_logo.png'
+const logoPng = '/Horizontal-Mana-Mint-logo-transparent.png'
 
 export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sidebarOpen, setSidebarOpen }) {
 
   const navItems = [
     { id: 'dashboard',  label: 'Dashboard',        section: 'Main'      },
     { id: 'store',      label: 'Store',             section: 'Main'      },
-    { id: 'membership', label: 'VS Pro',             section: 'Main'      },
+    { id: 'membership', label: 'MM Pro',             section: 'Main'      },
     { id: 'about',      label: 'About Us',          section: 'Main'      },
     { id: 'cards',      label: 'Card Lookup',       section: 'Resources' },
     { id: 'releases',   label: 'Set Releases',      section: 'Resources' },
@@ -38,11 +38,9 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
       <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 16px' }}>
         <img
           src={logoPng}
-          alt="Vaulted Singles"
+          alt="Mana Mint"
           style={{
-            width: '140px', height: 'auto',
-            filter: 'invert(1) sepia(1) hue-rotate(12deg) saturate(3) brightness(0.82)',
-            mixBlendMode: 'screen',
+            width: '160px', height: 'auto',
           }}
         />
       </div>
@@ -81,7 +79,7 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.05)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            <div className="user-avatar" style={{ backgroundColor: '#c9a84c' }}>
+            <div className="user-avatar" style={{ backgroundColor: '#16a389' }}>
               {user.email?.[0]?.toUpperCase()}
             </div>
             <div style={{ fontSize: '.8rem', minWidth: 0 }}>

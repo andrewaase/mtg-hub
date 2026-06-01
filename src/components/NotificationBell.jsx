@@ -149,8 +149,8 @@ export default function NotificationBell({ user, setPage }) {
         title="Notifications"
         style={{
           position: 'relative',
-          background: open ? 'rgba(201,168,76,.15)' : 'transparent',
-          border: `1px solid ${open ? 'rgba(201,168,76,.35)' : 'transparent'}`,
+          background: open ? 'rgba(30,196,166,.15)' : 'transparent',
+          border: `1px solid ${open ? 'rgba(30,196,166,.35)' : 'transparent'}`,
           borderRadius: '50%', width: 36, height: 36,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', fontSize: '1rem',
@@ -216,12 +216,12 @@ export default function NotificationBell({ user, setPage }) {
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10,
                     padding: '12px 14px',
-                    background: n.read ? 'transparent' : 'rgba(201,168,76,.05)',
+                    background: n.read ? 'transparent' : 'rgba(30,196,166,.05)',
                     borderBottom: '1px solid var(--border)',
                     cursor: 'pointer', transition: 'background .15s',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
-                  onMouseLeave={e => e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(201,168,76,.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(30,196,166,.05)'}
                 >
                   {/* Icon */}
                   <span style={{ fontSize: '1.05rem', flexShrink: 0, marginTop: 2 }}>

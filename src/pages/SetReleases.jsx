@@ -25,7 +25,7 @@ function daysAgo(dateStr) {
 
 const TYPE_META = {
   expansion:        { label: 'Expansion',    color: '#3b82f6', bg: 'rgba(59,130,246,0.15)'  },
-  core:             { label: 'Core Set',     color: '#f59e0b', bg: 'rgba(245,158,11,0.15)'  },
+  core:             { label: 'Core Set',     color: '#1ec4a6', bg: 'rgba(30,196,166,0.15)'  },
   masters:          { label: 'Masters',      color: '#a855f7', bg: 'rgba(168,85,247,0.15)'  },
   draft_innovation: { label: 'Innovation',   color: '#14b8a6', bg: 'rgba(20,184,166,0.15)'  },
   commander:        { label: 'Commander',    color: '#10b981', bg: 'rgba(16,185,129,0.15)'  },
@@ -153,9 +153,9 @@ function SetCard({ set, showCountdown = false }) {
           {showCountdown && days !== null && (
             <div style={{
               padding: '3px 10px', borderRadius: 20,
-              background: days <= 14 ? 'rgba(34,197,94,0.15)' : days <= 60 ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.12)',
-              border: `1px solid ${days <= 14 ? 'rgba(34,197,94,0.3)' : days <= 60 ? 'rgba(245,158,11,0.3)' : 'rgba(59,130,246,0.25)'}`,
-              color: days <= 14 ? '#4ade80' : days <= 60 ? '#fbbf24' : '#93c5fd',
+              background: days <= 14 ? 'rgba(34,197,94,0.15)' : days <= 60 ? 'rgba(30,196,166,0.15)' : 'rgba(59,130,246,0.12)',
+              border: `1px solid ${days <= 14 ? 'rgba(34,197,94,0.3)' : days <= 60 ? 'rgba(30,196,166,0.3)' : 'rgba(59,130,246,0.25)'}`,
+              color: days <= 14 ? '#4ade80' : days <= 60 ? '#3dd6ba' : '#93c5fd',
               fontSize: '0.75rem', fontWeight: 700,
             }}>
               {days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `${days}d`}
@@ -280,9 +280,9 @@ export default function SetReleases() {
         {FILTERS.map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)} style={{
             padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
-            border: filter === f.id ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
-            background: filter === f.id ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-            color: filter === f.id ? '#f59e0b' : '#64748b',
+            border: filter === f.id ? '1px solid #1ec4a6' : '1px solid rgba(255,255,255,0.1)',
+            background: filter === f.id ? 'rgba(30,196,166,0.15)' : 'rgba(255,255,255,0.04)',
+            color: filter === f.id ? '#1ec4a6' : '#64748b',
             fontWeight: filter === f.id ? 700 : 500,
             fontSize: '0.8rem', transition: 'all 0.15s',
           }}>

@@ -1,9 +1,9 @@
 // ManaPool affiliate links
-// Affiliate ref: vaultedsingles
-// Deep-link format: https://manapool.com/card/{setCode}/{collectorNumber}/{nameSlug}?ref=vaultedsingles
-// Fallback:        https://manapool.com/?ref=vaultedsingles
+// Affiliate ref: manamint
+// Deep-link format: https://manapool.com/card/{setCode}/{collectorNumber}/{nameSlug}?ref=manamint
+// Fallback:        https://manapool.com/?ref=manamint
 
-const REF  = 'vaultedsingles'
+const REF  = 'manamint'
 const BASE = 'https://manapool.com'
 
 // Convert a card name to a URL slug: lowercase, spaces → hyphens, strip punctuation.

@@ -7,7 +7,7 @@ import { addWishlistItem } from '../lib/db'
 
 //  Rarity helpers 
 const RARITY_ORDER  = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, bonus: 5 }
-const RARITY_COLOR  = { mythic: '#f97316', rare: '#c9a84c', uncommon: '#94a3b8', common: '#6b7280' }
+const RARITY_COLOR  = { mythic: '#f97316', rare: '#16a389', uncommon: '#94a3b8', common: '#6b7280' }
 const RARITY_LABEL  = { mythic: 'Mythic Rare', rare: 'Rare', uncommon: 'Uncommon', common: 'Common', special: 'Special', bonus: 'Bonus' }
 
 //  Tiny helpers 
@@ -204,9 +204,9 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
                   <span style={{ fontSize: '.76rem', color: '#888' }}>{label}</span>
                   <span style={{
                     fontSize: '.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap',
-                    background: isLegal ? 'rgba(74,222,128,.1)' : isBanned ? 'rgba(239,68,68,.1)' : isRestricted ? 'rgba(251,191,36,.1)' : 'rgba(255,255,255,.03)',
-                    border: `1px solid ${isLegal ? 'rgba(74,222,128,.25)' : isBanned ? 'rgba(239,68,68,.25)' : isRestricted ? 'rgba(251,191,36,.25)' : '#1e1e1e'}`,
-                    color: isLegal ? '#4ade80' : isBanned ? '#f87171' : isRestricted ? '#fbbf24' : '#333',
+                    background: isLegal ? 'rgba(74,222,128,.1)' : isBanned ? 'rgba(239,68,68,.1)' : isRestricted ? 'rgba(61,214,186,.1)' : 'rgba(255,255,255,.03)',
+                    border: `1px solid ${isLegal ? 'rgba(74,222,128,.25)' : isBanned ? 'rgba(239,68,68,.25)' : isRestricted ? 'rgba(61,214,186,.25)' : '#1e1e1e'}`,
+                    color: isLegal ? '#4ade80' : isBanned ? '#f87171' : isRestricted ? '#3dd6ba' : '#333',
                   }}>
                     {isLegal ? 'Legal' : isBanned ? 'Banned' : isRestricted ? 'Restricted' : 'Not Legal'}
                   </span>
@@ -257,18 +257,18 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
       {/* Action buttons */}
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {/* Buy from Vaulted Singles — only shown when in stock */}
+        {/* Buy from Mana Mint — only shown when in stock */}
         {storeListing && (
           <button
             onClick={() => onStoreSearch?.(card.name)}
             style={{
               width: '100%', padding: '13px',
-              background: 'linear-gradient(135deg, #c9a84c, #f0c060)',
+              background: 'linear-gradient(135deg, #16a389, #f0c060)',
               color: '#000', border: 'none', borderRadius: '12px',
               fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', letterSpacing: '.3px',
             }}
           >
-             Buy from Vaulted Singles — ${storeListing.price?.toFixed(2)}
+             Buy from Mana Mint — ${storeListing.price?.toFixed(2)}
             {storeListing.is_foil ? ' ' : ''}
             {storeListing.condition && storeListing.condition !== 'NM' ? ` (${storeListing.condition})` : ''}
           </button>

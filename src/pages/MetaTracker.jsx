@@ -222,7 +222,7 @@ function CategorySection({ cat, source }) {
 
 const SIGNAL_STYLE = {
   buy:      { bg: 'rgba(34,197,94,.12)',  border: '#22c55e44', text: '#4ade80', label: ' Buy Window',  dot: '#22c55e' },
-  watch:    { bg: 'rgba(251,191,36,.10)', border: '#fbbf2444', text: '#fbbf24', label: ' Watch',       dot: '#fbbf24' },
+  watch:    { bg: 'rgba(61,214,186,.10)', border: '#3dd6ba44', text: '#3dd6ba', label: ' Watch',       dot: '#3dd6ba' },
   dropping: { bg: 'rgba(239,68,68,.10)',  border: '#ef444444', text: '#f87171', label: ' Dropping',    dot: '#ef4444' },
 }
 
@@ -590,10 +590,10 @@ function SpikePredictor() {
       )}
 
       {!spikeLoading && !spikeError && spikeData?.noData && (
-        <div style={{ borderRadius: 10, padding: '32px 20px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', textAlign: 'center' }}>
+        <div style={{ borderRadius: 10, padding: '32px 20px', background: 'rgba(61,214,186,.06)', border: '1px solid rgba(61,214,186,.2)', textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}></div>
-          <div style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 6 }}>Building the dataset</div>
-          <div style={{ color: '#92400e', fontSize: '.82rem', maxWidth: 340, margin: '0 auto', marginBottom: 18 }}>
+          <div style={{ color: '#3dd6ba', fontWeight: 700, marginBottom: 6 }}>Building the dataset</div>
+          <div style={{ color: '#0a6655', fontSize: '.82rem', maxWidth: 340, margin: '0 auto', marginBottom: 18 }}>
             The spike predictor needs at least two weekly snapshots to compare. A new snapshot saves automatically each week — or seed last week's data now to unlock signals immediately.
           </div>
           <button
@@ -601,9 +601,9 @@ function SpikePredictor() {
             disabled={seedingPrev}
             style={{
               padding: '9px 22px', borderRadius: 8,
-              background: seedingPrev ? 'rgba(251,191,36,.1)' : 'rgba(251,191,36,.18)',
-              border: '1px solid rgba(251,191,36,.4)',
-              color: seedingPrev ? '#92400e' : '#fbbf24',
+              background: seedingPrev ? 'rgba(61,214,186,.1)' : 'rgba(61,214,186,.18)',
+              border: '1px solid rgba(61,214,186,.4)',
+              color: seedingPrev ? '#0a6655' : '#3dd6ba',
               fontWeight: 700, fontSize: '.82rem', cursor: seedingPrev ? 'not-allowed' : 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 7,
               transition: 'all 0.15s',
@@ -639,7 +639,7 @@ function SpikePredictor() {
 
           {watches.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#fbbf24', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#3dd6ba', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>
                  Watch — Trending up, price starting to follow
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
@@ -721,14 +721,14 @@ export default function MetaTracker() {
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.12em',
-                color: isLive ? '#4ade80' : isCurated ? '#fbbf24' : '#93c5fd',
+                color: isLive ? '#4ade80' : isCurated ? '#3dd6ba' : '#93c5fd',
                 textTransform: 'uppercase',
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: isLive ? '#4ade80' : isCurated ? '#fbbf24' : '#94a3b8',
+                  background: isLive ? '#4ade80' : isCurated ? '#3dd6ba' : '#94a3b8',
                   display: 'inline-block',
-                  boxShadow: isLive ? '0 0 6px #4ade80' : isCurated ? '0 0 6px #fbbf24' : 'none',
+                  boxShadow: isLive ? '0 0 6px #4ade80' : isCurated ? '0 0 6px #3dd6ba' : 'none',
                 }} />
                 {isLive ? 'Live · MTGTop8.com' : isCurated ? 'Community Estimates' : 'Loading…'}
               </div>
@@ -741,7 +741,7 @@ export default function MetaTracker() {
             {data?.totalDecks && (
               <div style={{ fontSize: '0.78rem', color: '#bfdbfe', marginTop: 4 }}>
                 {data.totalDecks.toLocaleString()} decks analysed
-                {isCurated && <span style={{ color: '#fbbf24', marginLeft: 6 }}>(estimated)</span>}
+                {isCurated && <span style={{ color: '#3dd6ba', marginLeft: 6 }}>(estimated)</span>}
               </div>
             )}
             {lastFetched && !loading && (
@@ -820,9 +820,9 @@ export default function MetaTracker() {
         {WINDOWS.map(w => (
           <button key={w.id} onClick={() => setTimeWindow(w.id)} style={{
             padding: '5px 12px', borderRadius: 16,
-            border: timeWindow === w.id ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
-            background: timeWindow === w.id ? 'rgba(245,158,11,0.15)' : 'transparent',
-            color: timeWindow === w.id ? '#f59e0b' : '#64748b',
+            border: timeWindow === w.id ? '1px solid #1ec4a6' : '1px solid rgba(255,255,255,0.1)',
+            background: timeWindow === w.id ? 'rgba(30,196,166,0.15)' : 'transparent',
+            color: timeWindow === w.id ? '#1ec4a6' : '#64748b',
             fontWeight: timeWindow === w.id ? 600 : 400,
             fontSize: '0.76rem', cursor: 'pointer', transition: 'all 0.15s',
           }}>
@@ -880,16 +880,16 @@ export default function MetaTracker() {
           {isCurated && (
             <div style={{
               marginTop: 4, padding: '12px 16px',
-              borderRadius: 8, border: '1px solid rgba(251,191,36,0.2)',
-              background: 'rgba(251,191,36,0.06)',
-              fontSize: '0.75rem', color: '#92400e',
+              borderRadius: 8, border: '1px solid rgba(61,214,186,0.2)',
+              background: 'rgba(61,214,186,0.06)',
+              fontSize: '0.75rem', color: '#0a6655',
               display: 'flex', gap: 8, alignItems: 'flex-start',
             }}>
               <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>ℹ</span>
-              <span style={{ color: '#fbbf24' }}>
+              <span style={{ color: '#3dd6ba' }}>
                 These are community estimates — live data from MTGTop8 is unavailable right now (their site blocks automated requests).
                 Hit <strong>Refresh</strong> to try again, or{' '}
-                <a href="https://www.mtgtop8.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f59e0b' }}>
+                <a href="https://www.mtgtop8.com" target="_blank" rel="noopener noreferrer" style={{ color: '#1ec4a6' }}>
                   visit MTGTop8 directly ↗
                 </a>
               </span>

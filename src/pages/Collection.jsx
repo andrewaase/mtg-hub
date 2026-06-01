@@ -42,7 +42,7 @@ function ChipRow({ options, value, onChange, multi = false, labelFn }) {
               padding: '5px 12px',
               borderRadius: '99px',
               border: `1.5px solid ${isActive(id) ? 'var(--accent-teal)' : 'var(--border)'}`,
-              background: isActive(id) ? 'rgba(245,158,11,.15)' : 'var(--bg-secondary)',
+              background: isActive(id) ? 'rgba(30,196,166,.15)' : 'var(--bg-secondary)',
               color: isActive(id) ? 'var(--accent-teal)' : 'var(--text-secondary)',
               fontSize: '.72rem', fontWeight: isActive(id) ? 700 : 400,
               cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
@@ -1076,7 +1076,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '6px 12px', borderRadius: '99px',
                 border: `1.5px solid ${activeFilterCount > 0 ? 'var(--accent-teal)' : 'var(--border)'}`,
-                background: activeFilterCount > 0 ? 'rgba(245,158,11,.1)' : 'var(--bg-secondary)',
+                background: activeFilterCount > 0 ? 'rgba(30,196,166,.1)' : 'var(--bg-secondary)',
                 color: activeFilterCount > 0 ? 'var(--accent-teal)' : 'var(--text-secondary)',
                 cursor: 'pointer', fontSize: '.75rem', fontWeight: 600,
               }}
@@ -1282,8 +1282,8 @@ export default function Collection({ collection, setCollection, user, openAddCar
       {view === 'sell' && membership?.loaded && !membership?.isPro && (
         <div style={{
           margin: '32px 0', padding: '36px 24px', borderRadius: 16, textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(201,168,76,.08), rgba(99,102,241,.08))',
-          border: '1px solid rgba(201,168,76,.25)',
+          background: 'linear-gradient(135deg, rgba(30,196,166,.08), rgba(99,102,241,.08))',
+          border: '1px solid rgba(30,196,166,.25)',
         }}>
           <div style={{ fontSize: '2.4rem', marginBottom: 12 }}></div>
           <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--accent-gold)', marginBottom: 8 }}>
@@ -1296,7 +1296,7 @@ export default function Collection({ collection, setCollection, user, openAddCar
             onClick={() => setPage?.('membership')}
             style={{
               padding: '10px 26px', borderRadius: 99, fontWeight: 700, fontSize: '.88rem',
-              background: 'linear-gradient(135deg, #c9a84c, #f59e0b)',
+              background: 'linear-gradient(135deg, #16a389, #1ec4a6)',
               color: '#0d0d12', border: 'none', cursor: 'pointer',
             }}
           >
@@ -1581,7 +1581,7 @@ function InsuranceModal({ collection, onClose }) {
         <div id="insurance-report">
           {/* Header */}
           <div style={{ borderBottom: '2px solid var(--accent-gold)', paddingBottom: '14px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-gold)' }}>Vaulted Singles — Collection Insurance Report</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-gold)' }}>Mana Mint — Collection Insurance Report</div>
             <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Generated on {today}</div>
           </div>
 

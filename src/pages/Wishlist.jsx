@@ -138,7 +138,7 @@ export default function Wishlist({ user, showToast, openStoreSearch }) {
 
       {/* Sign-in nudge for guests */}
       {!user && (
-        <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#fbbf24' }}>
+        <div style={{ background: 'rgba(61,214,186,.08)', border: '1px solid rgba(61,214,186,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.8rem', color: '#3dd6ba' }}>
            Sign in to sync your watchlist across devices. Items added as a guest won't carry over.
         </div>
       )}
@@ -265,7 +265,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
       .catch(() => {})
   }, [item.name])
 
-  // Check if this card is available in the Vaulted Singles store
+  // Check if this card is available in the Mana Mint store
   useEffect(() => {
     if (!hasSupabase) return
     supabase.from('store_listings')
@@ -395,7 +395,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
 
           {sparkData.length >= 2 && (
             <div style={{ marginTop: '10px', height: '40px' }}>
-              <SparklineChart data={sparkData} labels={sparkLabels} height={40} color={atTarget ? '#3ecfb2' : '#c9a84c'} showArea showDot />
+              <SparklineChart data={sparkData} labels={sparkLabels} height={40} color={atTarget ? '#3ecfb2' : '#16a389'} showArea showDot />
             </div>
           )}
 
@@ -405,12 +405,12 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
                 onClick={() => onStoreSearch?.(item.name)}
                 style={{
                   padding: '6px 14px',
-                  background: 'linear-gradient(135deg, #c9a84c, #f0c060)',
+                  background: 'linear-gradient(135deg, #16a389, #f0c060)',
                   color: '#000', border: 'none', borderRadius: '8px',
                   fontSize: '.75rem', fontWeight: 800, cursor: 'pointer',
                 }}
               >
-                 Buy from Vaulted Singles · ${storeListing.price?.toFixed(2)}
+                 Buy from Mana Mint · ${storeListing.price?.toFixed(2)}
                 {storeListing.is_foil ? ' ' : ''}
                 {storeListing.condition && storeListing.condition !== 'NM' ? ` (${storeListing.condition})` : ''}
               </button>
@@ -461,7 +461,7 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
 
           {/* Price badge */}
           {item.currentPrice != null && (
-            <div style={{ background: 'rgba(201,168,76,.18)', border: '1px solid rgba(201,168,76,.4)', borderRadius: 8, padding: '6px 16px', color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1rem' }}>
+            <div style={{ background: 'rgba(30,196,166,.18)', border: '1px solid rgba(30,196,166,.4)', borderRadius: 8, padding: '6px 16px', color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1rem' }}>
               Market {fmt(item.currentPrice)}
             </div>
           )}
@@ -473,12 +473,12 @@ function WishlistItem({ item, onRemove, onSetTarget, onStoreSearch }) {
                 onClick={() => { setShowPreview(false); onStoreSearch?.(item.name) }}
                 style={{
                   flex: 1, minWidth: 140, padding: '9px 14px',
-                  background: 'linear-gradient(135deg,#c9a84c,#f0c060)',
+                  background: 'linear-gradient(135deg,#16a389,#f0c060)',
                   color: '#000', border: 'none', borderRadius: 10,
                   fontSize: '.78rem', fontWeight: 800, cursor: 'pointer', textAlign: 'center',
                 }}
               >
-                 Buy from Vaulted Singles · ${storeListing.price?.toFixed(2)}
+                 Buy from Mana Mint · ${storeListing.price?.toFixed(2)}
               </button>
             )}
             <a

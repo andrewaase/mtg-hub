@@ -118,8 +118,8 @@ function FeatureCard({ icon, title, desc, to, onNavigate }) {
         cursor: clickable ? 'pointer' : undefined,
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(201,168,76,.45)'
-        e.currentTarget.style.boxShadow = '0 4px 20px rgba(201,168,76,.08)'
+        e.currentTarget.style.borderColor = 'rgba(30,196,166,.45)'
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(30,196,166,.08)'
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = 'var(--border)'
@@ -131,14 +131,14 @@ function FeatureCard({ icon, title, desc, to, onNavigate }) {
       }}>
         <div style={{
           width: 44, height: 44, borderRadius: 10,
-          background: 'linear-gradient(135deg,#c9a84c,#f0c060)',
+          background: 'linear-gradient(135deg,#16a389,#3dd6ba)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '1.25rem', flexShrink: 0,
         }}>
           {icon}
         </div>
         {clickable && (
-          <span style={{ color: 'rgba(201,168,76,.5)', fontSize: '.75rem', marginTop: 2 }}>→</span>
+          <span style={{ color: 'rgba(30,196,166,.5)', fontSize: '.75rem', marginTop: 2 }}>→</span>
         )}
       </div>
 
@@ -162,8 +162,8 @@ export default function About({ setPage }) {
       <div style={{
         background: 'linear-gradient(135deg,#0f172a 0%,#1a1200 100%)',
         borderRadius: 16, padding: '40px 32px', marginBottom: 28,
-        border: '1px solid rgba(201,168,76,.2)',
-        boxShadow: '0 4px 24px rgba(201,168,76,.08)',
+        border: '1px solid rgba(30,196,166,.2)',
+        boxShadow: '0 4px 24px rgba(30,196,166,.08)',
         textAlign: 'center',
       }}>
         <div style={{
@@ -176,7 +176,7 @@ export default function About({ setPage }) {
           Built by an MTG player,<br />for MTG players.
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '.92rem', lineHeight: 1.75, maxWidth: 560, margin: '0 auto' }}>
-          Vaulted Singles started as a personal project to solve a real problem: keeping track of a growing
+          Mana Mint started as a personal project to solve a real problem: keeping track of a growing
           Magic: The Gathering collection and making it easy to buy and sell singles at fair prices.
         </p>
       </div>
@@ -197,7 +197,7 @@ export default function About({ setPage }) {
           </p>
           <p style={{ margin: 0, color: 'var(--text-muted)', fontStyle: 'italic' }}>
              <strong>Placeholder</strong> - add your real story here: how you got into Magic, when you started collecting,
-            what gap Vaulted Singles fills for you, and why you opened the shop.
+            what gap Mana Mint fills for you, and why you opened the shop.
           </p>
         </div>
       </div>
@@ -231,7 +231,7 @@ export default function About({ setPage }) {
         marginBottom: 16, border: '1px solid var(--border)',
       }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: '0 0 12px', color: 'var(--accent-gold)' }}>
-          Why Buy From Vaulted Singles?
+          Why Buy From Mana Mint?
         </h2>
         <ul style={{ color: 'var(--text-secondary)', fontSize: '.88rem', lineHeight: 1.9, paddingLeft: 20, margin: 0 }}>
           <li>Prices updated daily using live Scryfall market data</li>
@@ -258,16 +258,16 @@ export default function About({ setPage }) {
           We'd love to hear from you.
         </p>
         <a
-          href="mailto:mtgvaultedsingles@gmail.com"
+          href="mailto:hello@manamint.store"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
             padding: '10px 20px', borderRadius: 10,
-            background: 'rgba(201,168,76,.12)', color: 'var(--accent-gold)',
-            border: '1px solid rgba(201,168,76,.3)', fontWeight: 700, fontSize: '.85rem',
+            background: 'rgba(30,196,166,.12)', color: 'var(--accent-gold)',
+            border: '1px solid rgba(30,196,166,.3)', fontWeight: 700, fontSize: '.85rem',
             textDecoration: 'none',
           }}
         >
-           mtgvaultedsingles@gmail.com
+           hello@manamint.store
         </a>
       </div>
 

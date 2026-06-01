@@ -1,4 +1,4 @@
-// Terms of Service & Privacy Policy — Vaulted Singles
+// Terms of Service & Privacy Policy — Mana Mint
 // Last updated: 2025
 
 export default function Terms({ setPage }) {
@@ -42,16 +42,16 @@ export default function Terms({ setPage }) {
 
       <div style={{
         marginTop: 28, padding: '16px 20px',
-        background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)',
+        background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.2)',
         borderRadius: 10, fontSize: '.82rem', color: 'var(--text-muted)', lineHeight: 1.65,
       }}>
-        By creating an account or using Vaulted Singles (&ldquo;the Service&rdquo;), you agree to these Terms
+        By creating an account or using Mana Mint (&ldquo;the Service&rdquo;), you agree to these Terms
         of Service and Privacy Policy in full. If you do not agree, do not use the Service.
       </div>
 
       {/* 1 */}
       {section('1. Who We Are')}
-      {p('Vaulted Singles is an online retail and collection-management service specializing in Magic: The Gathering single cards and sealed product. We operate at vaultedsingles.com and related subdomains. References to "we," "us," or "our" mean Vaulted Singles.')}
+      {p('Mana Mint is an online retail and collection-management service specializing in Magic: The Gathering single cards and sealed product. We operate at manamint.store and related subdomains. References to "we," "us," or "our" mean Mana Mint.')}
 
       {/* 2 */}
       {section('2. Eligibility')}
@@ -59,7 +59,7 @@ export default function Terms({ setPage }) {
 
       {/* 3 */}
       {section('3. Accounts & Registration')}
-      {p('When you register you must provide accurate, current, and complete information — including your legal name, email address, and shipping address. You are responsible for maintaining the confidentiality of your password and for all activity under your account. Notify us immediately at support@vaultedsingles.com if you suspect unauthorized access.')}
+      {p('When you register you must provide accurate, current, and complete information — including your legal name, email address, and shipping address. You are responsible for maintaining the confidentiality of your password and for all activity under your account. Notify us immediately at support@manamint.store if you suspect unauthorized access.')}
       {p('We may suspend or terminate accounts that violate these Terms, provide false information, or engage in fraudulent or abusive behavior.')}
 
       {/* 4 */}
@@ -70,11 +70,11 @@ export default function Terms({ setPage }) {
       {/* 5 */}
       {section('5. Shipping & Returns')}
       {p('We ship to addresses in the United States. International shipping availability is noted at checkout. Orders are processed within 1–3 business days. Tracking information is emailed once your order ships. We are not responsible for carrier delays or losses once a package has been accepted by the carrier.')}
-      {p('Due to the collectible nature of our products, all sales are generally final. If you receive a damaged or incorrect item, contact us within 7 days of delivery at support@vaultedsingles.com and we will work to make it right.')}
+      {p('Due to the collectible nature of our products, all sales are generally final. If you receive a damaged or incorrect item, contact us within 7 days of delivery at support@manamint.store and we will work to make it right.')}
 
       {/* 6 */}
       {section('6. Intellectual Property')}
-      {p('The Vaulted Singles name, logo, website design, and original written content are our intellectual property. Magic: The Gathering card names, artwork, and related materials are the property of Wizards of the Coast LLC. Card images displayed through the Service are sourced from Scryfall (scryfall.com) under their non-commercial image use policy. We claim no ownership over third-party card imagery.')}
+      {p('The Mana Mint name, logo, website design, and original written content are our intellectual property. Magic: The Gathering card names, artwork, and related materials are the property of Wizards of the Coast LLC. Card images displayed through the Service are sourced from Scryfall (scryfall.com) under their non-commercial image use policy. We claim no ownership over third-party card imagery.')}
 
       {/* 7 */}
       {section('7. Prohibited Conduct')}
@@ -125,7 +125,7 @@ export default function Terms({ setPage }) {
         <li><strong style={{ color: 'var(--text-primary)' }}>Restriction / Objection:</strong> ask us to restrict or stop processing your data in certain circumstances.</li>
         <li><strong style={{ color: 'var(--text-primary)' }}>California residents (CCPA):</strong> you have the right to know what personal data we collect, the right to delete it, and the right to opt out of its sale (we do not sell personal data).</li>
       </ul>
-      {p('To exercise any of these rights, email us at support@vaultedsingles.com with the subject "Privacy Request." We will respond within 30 days. We may need to verify your identity before processing your request.')}
+      {p('To exercise any of these rights, email us at support@manamint.store with the subject "Privacy Request." We will respond within 30 days. We may need to verify your identity before processing your request.')}
 
       {/* 13 */}
       {section('13. Cookies & Local Storage')}
@@ -137,7 +137,7 @@ export default function Terms({ setPage }) {
 
       {/* 15 */}
       {section('15. Limitation of Liability')}
-      {p('To the fullest extent permitted by law, Vaulted Singles shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of your use of the Service or these Terms. Our total liability for any claim related to the Service shall not exceed the amount you paid us in the 12 months preceding the claim.')}
+      {p('To the fullest extent permitted by law, Mana Mint shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of your use of the Service or these Terms. Our total liability for any claim related to the Service shall not exceed the amount you paid us in the 12 months preceding the claim.')}
 
       {/* 16 */}
       {section('16. Disclaimer of Warranties')}
@@ -155,8 +155,8 @@ export default function Terms({ setPage }) {
       {section('19. Contact Us')}
       {p('Questions about these Terms or your data? Contact us at:')}
       <p style={{ fontSize: '.88rem', color: 'var(--text-muted)', lineHeight: 1.75, margin: '0 0 12px' }}>
-        Vaulted Singles<br />
-        Email: <a href="mailto:support@vaultedsingles.com" style={{ color: 'var(--accent-gold)' }}>support@vaultedsingles.com</a>
+        Mana Mint<br />
+        Email: <a href="mailto:support@manamint.store" style={{ color: 'var(--accent-gold)' }}>support@manamint.store</a>
       </p>
 
       <div style={{ marginTop: 48, paddingTop: 32, borderTop: '1px solid var(--border)', fontSize: '.75rem', color: 'var(--text-muted)' }}>

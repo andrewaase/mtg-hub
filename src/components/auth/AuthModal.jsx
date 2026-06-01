@@ -159,7 +159,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
       <div className="modal-box" style={{ maxWidth: '440px' }}>
         {prompt && (
           <div style={{
-            background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)',
+            background: 'rgba(30,196,166,.08)', border: '1px solid rgba(30,196,166,.25)',
             borderRadius: '10px', padding: '14px 16px', marginBottom: '20px',
             textAlign: 'center',
           }}>

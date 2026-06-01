@@ -25,7 +25,7 @@ function fmtRelative(iso) {
 
 //  Stat card 
 
-function StatCard({ icon, label, value, sub, color = '#f59e0b' }) {
+function StatCard({ icon, label, value, sub, color = '#1ec4a6' }) {
   return (
     <div style={{
       background: 'rgba(255,255,255,0.03)',
@@ -113,9 +113,9 @@ function TierBadge({ tier }) {
   return (
     <span style={{
       fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6,
-      background: isPro ? 'rgba(201,168,76,.2)' : 'rgba(148,163,184,.1)',
-      color:      isPro ? '#f59e0b'             : '#64748b',
-      border:     `1px solid ${isPro ? 'rgba(201,168,76,.35)' : 'rgba(148,163,184,.2)'}`,
+      background: isPro ? 'rgba(30,196,166,.2)' : 'rgba(148,163,184,.1)',
+      color:      isPro ? '#1ec4a6'             : '#64748b',
+      border:     `1px solid ${isPro ? 'rgba(30,196,166,.35)' : 'rgba(148,163,184,.2)'}`,
     }}>
       {isPro ? ' PRO' : 'FREE'}
     </span>
@@ -153,7 +153,7 @@ function UserTable({ users, onTierChange, onBan }) {
       style={{
         padding: '10px 12px', textAlign: 'left',
         fontSize: '0.68rem', fontWeight: 700,
-        color: sortKey === k ? '#f59e0b' : '#475569',
+        color: sortKey === k ? '#1ec4a6' : '#475569',
         textTransform: 'uppercase', letterSpacing: '0.08em',
         cursor: 'pointer', whiteSpace: 'nowrap',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -229,7 +229,7 @@ function UserTable({ users, onTierChange, onBan }) {
                       {u.email}
                     </span>
                     {u.is_admin && (
-                      <span style={{ fontSize: '0.6rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.6rem', background: 'rgba(30,196,166,0.2)', color: '#1ec4a6', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>
                         ADMIN
                       </span>
                     )}
@@ -252,9 +252,9 @@ function UserTable({ users, onTierChange, onBan }) {
                         }
                       }}
                       style={{
-                        background: u.tier === 'pro' ? 'rgba(201,168,76,.15)' : 'rgba(255,255,255,.06)',
-                        border: `1px solid ${u.tier === 'pro' ? 'rgba(201,168,76,.35)' : 'rgba(255,255,255,.1)'}`,
-                        color: u.tier === 'pro' ? '#f59e0b' : '#94a3b8',
+                        background: u.tier === 'pro' ? 'rgba(30,196,166,.15)' : 'rgba(255,255,255,.06)',
+                        border: `1px solid ${u.tier === 'pro' ? 'rgba(30,196,166,.35)' : 'rgba(255,255,255,.1)'}`,
+                        color: u.tier === 'pro' ? '#1ec4a6' : '#94a3b8',
                         borderRadius: 6, padding: '3px 6px', fontSize: '0.72rem',
                         fontWeight: 700, cursor: 'pointer', outline: 'none',
                         opacity: changing === u.id ? 0.5 : 1,
@@ -461,9 +461,9 @@ function CreateListingModal({ onClose, onSaved }) {
             { id: 'resealed', label: ' Resealed' },
           ].map(t => (
             <button key={t.id} type="button" onClick={() => setForm(f => ({ ...f, product_type: t.id }))} style={{
-              flex: 1, padding: '8px 0', borderRadius: 8, border: `1px solid ${form.product_type === t.id ? '#c9a84c' : 'rgba(255,255,255,.12)'}`,
-              background: form.product_type === t.id ? 'rgba(201,168,76,.15)' : 'transparent',
-              color: form.product_type === t.id ? '#c9a84c' : '#64748b',
+              flex: 1, padding: '8px 0', borderRadius: 8, border: `1px solid ${form.product_type === t.id ? '#16a389' : 'rgba(255,255,255,.12)'}`,
+              background: form.product_type === t.id ? 'rgba(30,196,166,.15)' : 'transparent',
+              color: form.product_type === t.id ? '#16a389' : '#64748b',
               fontWeight: form.product_type === t.id ? 700 : 400, fontSize: '.78rem', cursor: 'pointer',
             }}>{t.label}</button>
           ))}
@@ -630,7 +630,7 @@ function CreateListingModal({ onClose, onSaved }) {
 
           {err && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>{err}</div>}
 
-          <button type="submit" disabled={saving} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer', marginTop: 4 }}>
+          <button type="submit" disabled={saving} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#16a389', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer', marginTop: 4 }}>
             {saving ? 'Saving…' : 'Create Listing'}
           </button>
         </form>
@@ -721,7 +721,7 @@ function EditListingModal({ listing, onClose, onSaved }) {
 
         {/* Product type badge (read-only) */}
         <div style={{ marginBottom: 14, fontSize: '.72rem', color: '#64748b' }}>
-          Type: <span style={{ fontWeight: 700, color: '#c9a84c' }}>{form.product_type}</span>
+          Type: <span style={{ fontWeight: 700, color: '#16a389' }}>{form.product_type}</span>
         </div>
 
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -819,7 +819,7 @@ function EditListingModal({ listing, onClose, onSaved }) {
 
           {err && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>{err}</div>}
 
-          <button type="submit" disabled={saving} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer', marginTop: 4 }}>
+          <button type="submit" disabled={saving} style={{ padding: '12px', borderRadius: 10, border: 'none', background: '#16a389', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer', marginTop: 4 }}>
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </form>
@@ -898,7 +898,7 @@ Mox Pearl,Beta,LP,1250.00,1,false`
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ fontSize: '.72rem', color: '#64748b', marginBottom: 14 }}>
-          Paste a CSV with columns: <code style={{ color: '#94a3b8' }}>name</code>, <code style={{ color: '#94a3b8' }}>set_name</code>, <code style={{ color: '#94a3b8' }}>condition</code>, <code style={{ color: '#94a3b8' }}>price</code>, <code style={{ color: '#94a3b8' }}>qty_available</code>, <code style={{ color: '#94a3b8' }}>is_foil</code>. Only <code style={{ color: '#c9a84c' }}>name</code> and <code style={{ color: '#c9a84c' }}>price</code> are required.
+          Paste a CSV with columns: <code style={{ color: '#94a3b8' }}>name</code>, <code style={{ color: '#94a3b8' }}>set_name</code>, <code style={{ color: '#94a3b8' }}>condition</code>, <code style={{ color: '#94a3b8' }}>price</code>, <code style={{ color: '#94a3b8' }}>qty_available</code>, <code style={{ color: '#94a3b8' }}>is_foil</code>. Only <code style={{ color: '#16a389' }}>name</code> and <code style={{ color: '#16a389' }}>price</code> are required.
         </div>
 
         <button onClick={() => setCsv(TEMPLATE)} style={{ fontSize: '.7rem', padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#94a3b8', cursor: 'pointer', marginBottom: 8 }}>
@@ -937,7 +937,7 @@ Mox Pearl,Beta,LP,1250.00,1,false`
                       <td style={{ padding: '6px 10px', color: '#e2e8f0', fontWeight: 600 }}>{r.name}</td>
                       <td style={{ padding: '6px 10px', color: '#64748b' }}>{r.set_name || '—'}</td>
                       <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{r.condition}</td>
-                      <td style={{ padding: '6px 10px', color: '#c9a84c', fontWeight: 700 }}>${r.price.toFixed(2)}</td>
+                      <td style={{ padding: '6px 10px', color: '#16a389', fontWeight: 700 }}>${r.price.toFixed(2)}</td>
                       <td style={{ padding: '6px 10px', color: '#94a3b8' }}>{r.qty_available}</td>
                       <td style={{ padding: '6px 10px', color: r.is_foil ? '#c084fc' : '#334155' }}>{r.is_foil ? '' : '—'}</td>
                     </tr>
@@ -962,7 +962,7 @@ Mox Pearl,Beta,LP,1250.00,1,false`
           <button
             onClick={handleImport}
             disabled={!rows || rows.length === 0 || saving}
-            style={{ flex: 1, padding: 11, borderRadius: 10, border: 'none', background: (!rows || rows.length === 0) ? 'rgba(201,168,76,.3)' : '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: (!rows || rows.length === 0 || saving) ? 'not-allowed' : 'pointer' }}
+            style={{ flex: 1, padding: 11, borderRadius: 10, border: 'none', background: (!rows || rows.length === 0) ? 'rgba(30,196,166,.3)' : '#16a389', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: (!rows || rows.length === 0 || saving) ? 'not-allowed' : 'pointer' }}
           >
             {saving ? 'Importing…' : rows && rows.length > 0 ? `Import ${rows.length} listing${rows.length !== 1 ? 's' : ''}` : 'Paste CSV above'}
           </button>
@@ -1142,7 +1142,7 @@ function ListingsTab() {
         </button>
         <button
           onClick={() => setShowCreate(true)}
-          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#c9a84c', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer', flexShrink: 0 }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#16a389', color: '#000', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer', flexShrink: 0 }}
         >
           + New Listing
         </button>
@@ -1153,14 +1153,14 @@ function ListingsTab() {
         <div style={{
           display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12,
           padding: '10px 14px', borderRadius: 10,
-          background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.15)',
+          background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.15)',
         }}>
           <div style={{ fontSize: '.72rem', color: '#94a3b8' }}>
-            <span style={{ fontWeight: 700, color: '#c9a84c', fontSize: '.88rem' }}>{stats.liveCount}</span> live listings
+            <span style={{ fontWeight: 700, color: '#16a389', fontSize: '.88rem' }}>{stats.liveCount}</span> live listings
           </div>
           <div style={{ color: 'rgba(255,255,255,.15)' }}>·</div>
           <div style={{ fontSize: '.72rem', color: '#94a3b8' }}>
-            <span style={{ fontWeight: 700, color: '#c9a84c', fontSize: '.88rem' }}>{stats.totalUnits}</span> units in stock
+            <span style={{ fontWeight: 700, color: '#16a389', fontSize: '.88rem' }}>{stats.totalUnits}</span> units in stock
           </div>
           <div style={{ color: 'rgba(255,255,255,.15)' }}>·</div>
           <div style={{ fontSize: '.72rem', color: '#94a3b8' }}>
@@ -1190,9 +1190,9 @@ function ListingsTab() {
         </select>
         {['all','live','hidden'].map(f => (
           <button key={f} onClick={() => setFilterActive(f)} style={{
-            padding: '5px 12px', borderRadius: 7, border: `1px solid ${filterActive === f ? 'rgba(201,168,76,.4)' : 'rgba(255,255,255,.1)'}`,
-            background: filterActive === f ? 'rgba(201,168,76,.12)' : 'transparent',
-            color: filterActive === f ? '#c9a84c' : '#64748b',
+            padding: '5px 12px', borderRadius: 7, border: `1px solid ${filterActive === f ? 'rgba(30,196,166,.4)' : 'rgba(255,255,255,.1)'}`,
+            background: filterActive === f ? 'rgba(30,196,166,.12)' : 'transparent',
+            color: filterActive === f ? '#16a389' : '#64748b',
             fontSize: '.72rem', fontWeight: filterActive === f ? 700 : 400, cursor: 'pointer',
           }}>
             {f === 'all' ? 'All' : f === 'live' ? ' Live' : ' Hidden'}
@@ -1249,13 +1249,13 @@ function ListingsTab() {
       {!loading && filtered.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(l => (
-            <div key={l.id} style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${l.active ? 'rgba(201,168,76,.2)' : 'rgba(255,255,255,.06)'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div key={l.id} style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${l.active ? 'rgba(30,196,166,.2)' : 'rgba(255,255,255,.06)'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {l.img_url && <img src={l.img_url} alt="" style={{ width: 36, borderRadius: 4, flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 140 }}>
                 <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0' }}>{l.name} {l.is_foil && ''}</div>
                 <div style={{ fontSize: '.68rem', color: '#64748b' }}>{l.set_name} · {l.condition}</div>
               </div>
-              <div style={{ fontWeight: 800, color: '#c9a84c', fontSize: '.88rem', flexShrink: 0 }}>${parseFloat(l.price).toFixed(2)}</div>
+              <div style={{ fontWeight: 800, color: '#16a389', fontSize: '.88rem', flexShrink: 0 }}>${parseFloat(l.price).toFixed(2)}</div>
               <div style={{ fontSize: '.75rem', color: l.qty_available > 0 ? '#4ade80' : '#f87171', flexShrink: 0 }}>
                 {l.qty_available} left
               </div>
@@ -1263,7 +1263,7 @@ function ListingsTab() {
                 {l.active ? 'Live' : 'Hidden'}
               </span>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                <button onClick={() => setEditListing(l)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'none', color: '#c9a84c', cursor: 'pointer', fontSize: '.7rem', fontWeight: 600 }}>
+                <button onClick={() => setEditListing(l)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(30,196,166,.3)', background: 'none', color: '#16a389', cursor: 'pointer', fontSize: '.7rem', fontWeight: 600 }}>
                   Edit
                 </button>
                 <button onClick={() => toggleActive(l.id, l.active)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '.7rem', fontWeight: 600 }}>
@@ -1352,7 +1352,7 @@ function OrdersTab() {
                 <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#e2e8f0' }}>{order.customer_name}</div>
                 <div style={{ fontSize: '.68rem', color: '#64748b' }}>{order.customer_email} · {fmtDate(order.created_at)}</div>
               </div>
-              <div style={{ fontWeight: 800, color: '#c9a84c', fontSize: '.9rem' }}>${parseFloat(order.total || 0).toFixed(2)}</div>
+              <div style={{ fontWeight: 800, color: '#16a389', fontSize: '.9rem' }}>${parseFloat(order.total || 0).toFixed(2)}</div>
               <span style={{ fontSize: '.65rem', fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: sc.bg, color: sc.color, textTransform: 'capitalize' }}>
                 {order.status}
               </span>
@@ -1373,7 +1373,7 @@ function OrdersTab() {
                     <div key={item.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '.78rem' }}>
                       {item.img_url && <img src={item.img_url} style={{ width: 28, borderRadius: 3 }} alt="" />}
                       <span style={{ flex: 1, color: '#cbd5e1' }}>{item.name} ×{item.qty}</span>
-                      <span style={{ color: '#c9a84c', fontWeight: 700 }}>${parseFloat(item.price * item.qty).toFixed(2)}</span>
+                      <span style={{ color: '#16a389', fontWeight: 700 }}>${parseFloat(item.price * item.qty).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -1523,11 +1523,11 @@ function SettingsTab() {
             </div>
 
             {/* Live preview */}
-            <div style={{ marginTop: 18, padding: '12px 14px', background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.15)', borderRadius: 10 }}>
+            <div style={{ marginTop: 18, padding: '12px 14px', background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.15)', borderRadius: 10 }}>
               <div style={{ fontSize: '.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Live preview — what customers see</div>
               <div style={{ display: 'flex', gap: 16, fontSize: '.82rem' }}>
-                <div style={{ color: '#94a3b8' }}>Shipping: <span style={{ color: '#c9a84c', fontWeight: 700 }}>${(parseFloat(shipping) || 0).toFixed(2)}</span></div>
-                <div style={{ color: '#94a3b8' }}>Handling: <span style={{ color: '#c9a84c', fontWeight: 700 }}>${(parseFloat(handling) || 0).toFixed(2)}</span></div>
+                <div style={{ color: '#94a3b8' }}>Shipping: <span style={{ color: '#16a389', fontWeight: 700 }}>${(parseFloat(shipping) || 0).toFixed(2)}</span></div>
+                <div style={{ color: '#94a3b8' }}>Handling: <span style={{ color: '#16a389', fontWeight: 700 }}>${(parseFloat(handling) || 0).toFixed(2)}</span></div>
                 <div style={{ color: '#94a3b8' }}>Total added: <span style={{ color: '#4ade80', fontWeight: 800 }}>${((parseFloat(shipping) || 0) + (parseFloat(handling) || 0)).toFixed(2)}</span></div>
               </div>
             </div>
@@ -1539,7 +1539,7 @@ function SettingsTab() {
             </div>
           )}
 
-          <button type="submit" disabled={saving} style={{ alignSelf: 'flex-start', padding: '11px 28px', borderRadius: 10, border: 'none', background: saving ? 'rgba(201,168,76,.4)' : '#c9a84c', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer' }}>
+          <button type="submit" disabled={saving} style={{ alignSelf: 'flex-start', padding: '11px 28px', borderRadius: 10, border: 'none', background: saving ? 'rgba(30,196,166,.4)' : '#16a389', color: '#000', fontWeight: 800, fontSize: '.88rem', cursor: saving ? 'not-allowed' : 'pointer' }}>
             {saving ? 'Saving…' : 'Save Settings'}
           </button>
         </form>
@@ -1942,8 +1942,8 @@ function MetaTab() {
           disabled={moversRunning}
           style={{
             padding: '9px 18px', borderRadius: 8,
-            border: '1px solid rgba(251,191,36,.3)',
-            background: 'rgba(251,191,36,.1)', color: '#fbbf24',
+            border: '1px solid rgba(61,214,186,.3)',
+            background: 'rgba(61,214,186,.1)', color: '#3dd6ba',
             fontWeight: 700, fontSize: '.82rem',
             cursor: moversRunning ? 'not-allowed' : 'pointer',
             opacity: moversRunning ? 0.7 : 1,
@@ -2009,7 +2009,7 @@ function MetaTab() {
         <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#94a3b8' }}>{decks.length} entries</div>
         <button
           onClick={() => { setEditId(null); setForm(BLANK_DECK); setErr(null); setArtPickerOpen(false); setArtQuery(''); setArtResults([]); setModalOpen(true) }}
-          style={{ padding: '7px 14px', borderRadius: 8, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.35)', color: '#f59e0b', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+          style={{ padding: '7px 14px', borderRadius: 8, background: 'rgba(30,196,166,.15)', border: '1px solid rgba(30,196,166,.35)', color: '#1ec4a6', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
         >
            Add Deck
         </button>
@@ -2023,9 +2023,9 @@ function MetaTab() {
             {formats.map(f => (
               <button key={f} onClick={() => setAdminFormatFilter(f)} style={{
                 padding: '4px 11px', borderRadius: 99, fontSize: '.7rem', fontWeight: 600,
-                background: adminFormatFilter === f ? 'rgba(245,158,11,.18)' : 'transparent',
-                border: `1px solid ${adminFormatFilter === f ? 'rgba(245,158,11,.5)' : 'rgba(255,255,255,.1)'}`,
-                color: adminFormatFilter === f ? '#f59e0b' : '#64748b',
+                background: adminFormatFilter === f ? 'rgba(30,196,166,.18)' : 'transparent',
+                border: `1px solid ${adminFormatFilter === f ? 'rgba(30,196,166,.5)' : 'rgba(255,255,255,.1)'}`,
+                color: adminFormatFilter === f ? '#1ec4a6' : '#64748b',
                 cursor: 'pointer', transition: 'all .15s',
               }}>{f}</button>
             ))}
@@ -2050,7 +2050,7 @@ function MetaTab() {
                   {d.format}{d.archetype ? ` · ${d.archetype}` : ''}{d.meta_share != null ? ` · ${d.meta_share}% meta` : ''}{d.avg_price != null ? ` · $${d.avg_price}` : ''}{d.decklist_link ? ' · ' : ''}
                 </div>
               </div>
-              <button onClick={() => handleEdit(d)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.25)', color: '#f59e0b', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+              <button onClick={() => handleEdit(d)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(30,196,166,.12)', border: '1px solid rgba(30,196,166,.25)', color: '#1ec4a6', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
               <button onClick={() => handleDelete(d.id)} style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#f87171', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
             </div>
           ))}
@@ -2141,9 +2141,9 @@ function MetaTab() {
                       onClick={() => { setArtPickerOpen(o => !o); setArtQuery(''); setArtResults([]) }}
                       style={{
                         padding: '8px 12px', borderRadius: 8, flexShrink: 0,
-                        border: `1px solid ${artPickerOpen ? '#f59e0b' : 'rgba(255,255,255,.15)'}`,
-                        background: artPickerOpen ? 'rgba(245,158,11,.12)' : 'rgba(255,255,255,.05)',
-                        color: artPickerOpen ? '#f59e0b' : '#e2e8f0',
+                        border: `1px solid ${artPickerOpen ? '#1ec4a6' : 'rgba(255,255,255,.15)'}`,
+                        background: artPickerOpen ? 'rgba(30,196,166,.12)' : 'rgba(255,255,255,.05)',
+                        color: artPickerOpen ? '#1ec4a6' : '#e2e8f0',
                         cursor: 'pointer', fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap',
                         transition: 'all .15s',
                       }}
@@ -2190,7 +2190,7 @@ function MetaTab() {
                                 border: '2px solid transparent', transition: 'border-color .12s',
                                 aspectRatio: '4/3', background: '#111',
                               }}
-                              onMouseEnter={e => e.currentTarget.style.borderColor = '#f59e0b'}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = '#1ec4a6'}
                               onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
                             >
                               {card.img
@@ -2266,7 +2266,7 @@ function MetaTab() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                style={{ padding: '9px 22px', borderRadius: 8, background: saving ? 'rgba(245,158,11,.4)' : '#f59e0b', border: 'none', color: '#000', fontWeight: 700, fontSize: '.85rem', cursor: saving ? 'not-allowed' : 'pointer' }}
+                style={{ padding: '9px 22px', borderRadius: 8, background: saving ? 'rgba(30,196,166,.4)' : '#1ec4a6', border: 'none', color: '#000', fontWeight: 700, fontSize: '.85rem', cursor: saving ? 'not-allowed' : 'pointer' }}
               >
                 {saving ? 'Saving…' : editId ? 'Update Deck' : 'Add Deck'}
               </button>
@@ -2346,7 +2346,7 @@ export default function AdminPanel({ user, isAdmin }) {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `vaulted-singles-backup-${date}.json`
+      a.download = `mana-mint-backup-${date}.json`
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {
@@ -2438,7 +2438,7 @@ export default function AdminPanel({ user, isAdmin }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12, marginBottom: 20 }}>
               <StatCard icon="" label="Total Users"        value={totals.users}                                  color="#6366f1" />
               <StatCard icon="" label="New This Week"      value={totals.newLast7d}                              color="#22c55e" sub={`${totals.newLast30d} this month`} />
-              <StatCard icon="" label="Pro Members"        value={totals.proUsers ?? '—'}                        color="#f59e0b" sub={totals.users ? `${Math.round((totals.proUsers / totals.users) * 100)}% of users` : ''} />
+              <StatCard icon="" label="Pro Members"        value={totals.proUsers ?? '—'}                        color="#1ec4a6" sub={totals.users ? `${Math.round((totals.proUsers / totals.users) * 100)}% of users` : ''} />
               <StatCard icon="" label="Free Accounts"      value={totals.freeUsers ?? '—'}                       color="#64748b" />
               <StatCard icon="" label="Active Collections" value={totals.usersWithCollection}                   color="#3b82f6" sub={`${engagementRate}% of users`} />
               <StatCard icon="" label="Cards Tracked"      value={totals.totalCards?.toLocaleString()}          color="#a78bfa" sub={`${totals.totalUniqueCards} unique`} />

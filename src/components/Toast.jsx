@@ -14,7 +14,7 @@ function detectType(msg) {
 const TYPE_STYLES = {
   success: { accent: '#4ade80', bg: 'rgba(74,222,128,.1)',  border: 'rgba(74,222,128,.3)',  icon: '✓'  },
   error:   { accent: '#f87171', bg: 'rgba(248,113,113,.1)', border: 'rgba(248,113,113,.3)', icon: '✕'  },
-  warning: { accent: '#fbbf24', bg: 'rgba(251,191,36,.1)',  border: 'rgba(251,191,36,.3)',  icon: ''  },
+  warning: { accent: '#3dd6ba', bg: 'rgba(61,214,186,.1)',  border: 'rgba(61,214,186,.3)',  icon: ''  },
   target:  { accent: '#3ecfb2', bg: 'rgba(62,207,178,.1)',  border: 'rgba(62,207,178,.3)',  icon: '' },
   info:    { accent: '#94a3b8', bg: 'rgba(148,163,184,.08)', border: 'rgba(148,163,184,.2)', icon: 'ℹ'  },
 }

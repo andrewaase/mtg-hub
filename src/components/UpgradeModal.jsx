@@ -24,7 +24,7 @@ export default function UpgradeModal({ reason = 'feature', onClose, setPage }) {
     generic: {
       icon:  '',
       title: 'This is a Pro feature',
-      body:  "Upgrade to Vaulted Singles Pro for unlimited scans, unlimited decks, hand simulator, and more.",
+      body:  "Upgrade to Mana Mint Pro for unlimited scans, unlimited decks, hand simulator, and more.",
       cta:   'View Pro Plans',
     },
   }
@@ -51,7 +51,7 @@ export default function UpgradeModal({ reason = 'feature', onClose, setPage }) {
 
         {/* Pro feature highlights */}
         <div style={{
-          background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.2)',
+          background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.2)',
           borderRadius: '10px', padding: '14px 16px', marginBottom: '20px',
         }}>
           {[

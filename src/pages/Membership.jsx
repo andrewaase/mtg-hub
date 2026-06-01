@@ -98,7 +98,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
       {/*  Page header  */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)', marginBottom: '6px' }}>
-           Vaulted Singles Pro
+           Mana Mint Pro
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '.9rem', lineHeight: 1.6 }}>
           Upgrade to unlock unlimited scans, unlimited decks, and the hand simulator.
@@ -108,15 +108,15 @@ export default function Membership({ user, showToast, membership, onMembershipCh
       {/*  Current status card  */}
       {user && (
         <div style={{
-          background: 'var(--card-bg)', border: `1px solid ${isPro ? 'rgba(201,168,76,.4)' : 'var(--border)'}`,
+          background: 'var(--card-bg)', border: `1px solid ${isPro ? 'rgba(30,196,166,.4)' : 'var(--border)'}`,
           borderRadius: '12px', padding: '20px', marginBottom: '28px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <div style={{
               padding: '4px 12px', borderRadius: '99px', fontWeight: 700, fontSize: '.75rem',
-              background: isPro ? 'rgba(201,168,76,.15)' : 'rgba(148,163,184,.1)',
+              background: isPro ? 'rgba(30,196,166,.15)' : 'rgba(148,163,184,.1)',
               color: isPro ? 'var(--accent-gold)' : 'var(--text-muted)',
-              border: `1px solid ${isPro ? 'rgba(201,168,76,.3)' : 'rgba(148,163,184,.2)'}`,
+              border: `1px solid ${isPro ? 'rgba(30,196,166,.3)' : 'rgba(148,163,184,.2)'}`,
             }}>
               {isPro ? ' PRO' : 'FREE'}
             </div>
@@ -220,12 +220,12 @@ export default function Membership({ user, showToast, membership, onMembershipCh
 
           {/* Plan card */}
           <div style={{
-            background: 'var(--card-bg)', border: '1px solid rgba(201,168,76,.35)',
+            background: 'var(--card-bg)', border: '1px solid rgba(30,196,166,.35)',
             borderRadius: '16px', padding: '32px', marginBottom: '24px', position: 'relative', overflow: 'hidden',
           }}>
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-              background: 'linear-gradient(90deg, var(--accent-gold), #f59e0b)',
+              background: 'linear-gradient(90deg, var(--accent-gold), #1ec4a6)',
             }} />
 
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
@@ -336,7 +336,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
       {/*  Store promo  */}
       <div style={{
         marginTop: '20px', padding: '16px 20px', borderRadius: '12px',
-        background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.2)',
+        background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.2)',
         display: 'flex', alignItems: 'center', gap: '14px',
       }}>
         <span style={{ fontSize: '1.6rem' }}></span>
@@ -345,7 +345,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
             Earn free Pro months from store orders
           </div>
           <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Every $20 you spend in the Vaulted Singles store earns you one free month of Pro — automatically credited to your account after purchase. They stack!
+            Every $20 you spend in the Mana Mint store earns you one free month of Pro — automatically credited to your account after purchase. They stack!
           </div>
         </div>
       </div>

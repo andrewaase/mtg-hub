@@ -1,5 +1,5 @@
 import { useId, useState, useEffect } from 'react'
-import logoPng from '../assets/vaulted_singles_logo.png'
+const logoPng = '/Mana-Mint-Logo-With-Box.png'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
@@ -31,8 +31,8 @@ function DonutChart({ total, delta, deltaPercent, cardCount }) {
       <svg width="180" height="180" viewBox="0 0 180 180">
         <defs>
           <linearGradient id={`dg-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: '#f59e0b', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#fbbf24', stopOpacity: 1 }} />
+            <stop offset="0%" style={{ stopColor: '#1ec4a6', stopOpacity: 1 }} />
+            <stop offset="100%" style={{ stopColor: '#3dd6ba', stopOpacity: 1 }} />
           </linearGradient>
         </defs>
         {/* Track */}
@@ -250,12 +250,12 @@ function TournamentWidget({ collection, setPage }) {
                     padding: '8px 12px',
                     borderBottom: i < visibleCards.length - 1 ? '1px solid var(--border)' : 'none',
                     borderLeft: owned ? '3px solid var(--accent-gold)' : '3px solid transparent',
-                    background: owned ? 'rgba(201,168,76,.04)' : 'transparent',
+                    background: owned ? 'rgba(30,196,166,.04)' : 'transparent',
                     cursor: 'pointer',
                     transition: 'background .12s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = owned ? 'rgba(201,168,76,.09)' : 'var(--bg-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = owned ? 'rgba(201,168,76,.04)' : 'transparent'}
+                  onMouseEnter={e => e.currentTarget.style.background = owned ? 'rgba(30,196,166,.09)' : 'var(--bg-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = owned ? 'rgba(30,196,166,.04)' : 'transparent'}
                 >
                   <span style={{ fontSize: '.68rem', color: 'var(--text-muted)', width: '16px', textAlign: 'right', flexShrink: 0 }}>
                     {i + 1}
@@ -265,7 +265,7 @@ function TournamentWidget({ collection, setPage }) {
                   </span>
                   {owned && (
                     <span style={{
-                      background: 'rgba(201,168,76,.18)', color: 'var(--accent-gold)',
+                      background: 'rgba(30,196,166,.18)', color: 'var(--accent-gold)',
                       borderRadius: '4px', padding: '1px 6px',
                       fontSize: '.6rem', fontWeight: 800, flexShrink: 0,
                     }}>
@@ -274,7 +274,7 @@ function TournamentWidget({ collection, setPage }) {
                   )}
                   {card.price != null && (
                     <span style={{
-                      background: 'rgba(245,158,11,.12)', color: '#f59e0b',
+                      background: 'rgba(30,196,166,.12)', color: '#1ec4a6',
                       borderRadius: '4px', padding: '2px 7px',
                       fontSize: '.7rem', fontWeight: 800, flexShrink: 0,
                     }}>
@@ -371,7 +371,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
     return { chg: Math.round(chg * 100) / 100, pct: Math.round(pct * 10) / 10 }
   })()
 
-  const chartColor = delta30d == null || delta30d.chg >= 0 ? '#f59e0b' : '#f87171'
+  const chartColor = delta30d == null || delta30d.chg >= 0 ? '#1ec4a6' : '#f87171'
   const hasTrend   = snapshots.length >= 2
 
   //  Market movers state 
@@ -411,19 +411,18 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
       {collection.length === 0 && matches.length === 0 && (
         <div style={{
           margin: '12px 16px 0',
-          background: 'linear-gradient(135deg, rgba(201,168,76,0.07) 0%, rgba(139,94,164,0.07) 100%)',
-          border: '1px solid rgba(201,168,76,0.18)',
+          background: 'linear-gradient(135deg, rgba(30,196,166,0.07) 0%, rgba(139,94,164,0.07) 100%)',
+          border: '1px solid rgba(30,196,166,0.18)',
           borderRadius: '12px',
           padding: '12px 16px',
           display: 'flex', alignItems: 'center', gap: '12px',
         }}>
           <img
             src={logoPng}
-            alt="Vaulted Singles"
+            alt="Mana Mint"
             style={{
-              width: '72px', height: 'auto', flexShrink: 0,
-              filter: 'invert(1) sepia(0.6) saturate(4) hue-rotate(10deg)',
-              mixBlendMode: 'screen',
+              width: '52px', height: 'auto', flexShrink: 0,
+              borderRadius: '12px',
             }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -880,7 +879,7 @@ function MoverCardModal({ name, onClose, setPage }) {
               {/* Prices */}
               <div style={{ display: 'flex', gap: 10 }}>
                 {usd ? (
-                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(201,168,76,.1)', border: '1px solid rgba(201,168,76,.25)' }}>
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(30,196,166,.1)', border: '1px solid rgba(30,196,166,.25)' }}>
                     <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>MARKET</div>
                     <div style={{ fontSize: '.95rem', fontWeight: 800, color: 'var(--accent-gold)' }}>${usd}</div>
                   </div>
@@ -891,7 +890,7 @@ function MoverCardModal({ name, onClose, setPage }) {
                   </div>
                 )}
                 {usdFoil && (
-                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.15)' }}>
+                  <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.15)' }}>
                     <div style={{ fontSize: '.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>FOIL</div>
                     <div style={{ fontSize: '.95rem', fontWeight: 800, color: 'var(--accent-gold)', opacity: .8 }}>${usdFoil}</div>
                   </div>
