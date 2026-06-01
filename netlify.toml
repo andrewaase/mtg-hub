@@ -20,6 +20,18 @@
   schedule = "0 9 * * *"
 
 [[redirects]]
+  from = "https://vaultedsingles.com/*"
+  to = "https://www.manamint.store/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.vaultedsingles.com/*"
+  to = "https://www.manamint.store/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
