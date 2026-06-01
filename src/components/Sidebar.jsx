@@ -41,6 +41,9 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
           alt="Mana Mint"
           style={{
             width: '160px', height: 'auto',
+            backgroundColor: '#111113',
+            borderRadius: '8px',
+            padding: '6px 10px',
           }}
         />
       </div>
