@@ -67,8 +67,8 @@ exports.handler = async (event) => {
       fetch(`${SUPABASE_URL}/rest/v1/collection?select=user_id,qty`, { headers: adminHeaders }),
       // All match rows — user_id + result + date
       fetch(`${SUPABASE_URL}/rest/v1/matches?select=user_id,result,created_at`, { headers: adminHeaders }),
-      // All profiles — membership info
-      fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,membership_tier,membership_end`, { headers: adminHeaders }),
+      // All profiles — membership info + admin flag
+      fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,membership_tier,membership_end,is_admin`, { headers: adminHeaders }),
     ])
 
     const [usersJson, collectionRaw, matchRaw, profilesRaw] = await Promise.all([
@@ -135,7 +135,7 @@ exports.handler = async (event) => {
         uniqueCards:     collectionByUser[u.id] || 0,
         totalCards:      cardQtyByUser[u.id]    || 0,
         matchCount:      matchesByUser[u.id]    || 0,
-        is_admin:        u.email === ADMIN_EMAIL,
+        is_admin:        u.email === ADMIN_EMAIL || Boolean(profile.is_admin),
         tier,
         membershipEnd:   profile.membership_end || null,
         bannedUntil:     u.banned_until || null,

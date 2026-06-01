@@ -1,101 +1,101 @@
 const FEATURES = [
   {
-    icon: '',
+    icon: '🛒',
     title: 'Card Shop',
     desc: 'Browse singles, sealed product, and curated resealed packs, all in one store. Filter by price range, condition, or foil status. Share any listing with a direct link.',
     to: 'store',
   },
   {
-    icon: '',
+    icon: '📦',
     title: 'Sealed & Resealed Products',
-    desc: 'Pick up booster boxes, collector packs, and our exclusive resealed packs like Vaulted Rarities and Relics Awakened. Hand-curated surprises at every price point.',
+    desc: 'Pick up booster boxes, collector packs, and our exclusive resealed packs. Hand-curated surprises at every price point.',
     to: 'store',
   },
   {
-    icon: '',
+    icon: '🔒',
     title: 'Secure Checkout',
     desc: 'Stripe-powered payments with flat-rate shipping. Inventory auto-decrements on purchase and a full itemized confirmation email goes out the moment your order is placed.',
   },
   {
-    icon: '',
+    icon: '🔔',
     title: 'Restock Waitlist',
     desc: 'Sold out on something you want? Hit "Notify Me" and we\'ll email you the second it\'s back in stock. No account required.',
     to: 'store',
   },
   {
-    icon: '',
+    icon: '📋',
     title: 'Collection Tracker',
     desc: 'Add cards by search or camera scan. Tap any card for full oracle text, type line, mana cost, flavor text, and live market value, all from one view.',
     to: 'collection',
   },
   {
-    icon: '',
+    icon: '📈',
     title: 'Price History',
     desc: 'Every card in the store shows a 90-day price chart with 7-day change, all-time high, and all-time low. Your collection value is always up to date.',
     to: 'cards',
   },
   {
-    icon: '',
+    icon: '🃏',
     title: 'Deck Builder',
     desc: 'Import Arena decklists, browse cards by type, and track the market value of every deck you own.',
     to: 'decks',
   },
   {
-    icon: '',
+    icon: '⚔️',
     title: 'Match Log',
     desc: 'Log your games and track win rates by deck, format, and opponent. Know what\'s working.',
     to: 'log',
   },
   {
-    icon: '',
+    icon: '⭐',
     title: 'Wishlist & Previews',
     desc: 'Save cards you\'re hunting. Click any thumbnail for a full-size card preview with live market price. Great for quick buy decisions.',
     to: 'wishlist',
   },
   {
-    icon: '',
+    icon: '🔍',
     title: 'Card Lookup',
     desc: 'Search any card for rulings, format legality, set printings, and live prices. One click sends it straight to the shop to buy from us.',
     to: 'cards',
   },
   {
-    icon: '',
+    icon: '📸',
     title: 'Camera Scanning',
     desc: 'Point your phone at a card and it\'s added to your collection instantly. No typing required.',
     to: 'collection',
   },
   {
-    icon: '',
+    icon: '💰',
     title: 'Multiple Price Sources',
     desc: 'Compare prices across TCGPlayer, CardMarket, Card Kingdom, and Cardhoarder side by side.',
     to: 'cards',
   },
   {
-    icon: '',
+    icon: '🤝',
     title: 'Friends & Trades',
     desc: 'Add friends, browse each other\'s collections, and coordinate trades directly in the app.',
     to: 'friends',
   },
   {
-    icon: '',
+    icon: '📅',
     title: 'Set Releases',
     desc: 'Stay ahead of the curve with upcoming set release dates and spoiler tracking.',
     to: 'releases',
   },
   {
-    icon: '',
+    icon: '📰',
     title: 'MTG News Feed',
     desc: 'The latest Magic news, announcements, and tournament results pulled in one place.',
     to: 'news',
   },
   {
-    icon: '',
+    icon: '📊',
     title: 'Stats & Analytics',
     desc: 'Deep win-rate charts, color matchup breakdowns, and performance trends over any time range.',
     to: 'stats',
   },
   {
-    icon: '',
+    icon: '🔄',
     title: 'Cross-Device Sync',
     desc: 'Sign in once and your collection, decks, wishlist, and match history follow you everywhere.',
   },
@@ -143,7 +143,7 @@ function FeatureCard({ icon, title, desc, to, onNavigate }) {
       </div>
 
       <div>
-        <div style={{ fontWeight: 700, fontSize: '.9rem', marginBottom: 5, color: '#f1f5f9' }}>
+        <div style={{ fontWeight: 700, fontSize: '.9rem', marginBottom: 5, color: 'var(--text-primary)' }}>
           {title}
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: '.78rem', lineHeight: 1.65 }}>
@@ -172,7 +172,7 @@ export default function About({ setPage }) {
         }}>
           Our Story
         </div>
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, margin: '0 0 14px', lineHeight: 1.2, color: '#f1f5f9' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, margin: '0 0 14px', lineHeight: 1.2, color: 'var(--text-primary)' }}>
           Built by an MTG player,<br />for MTG players.
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '.92rem', lineHeight: 1.75, maxWidth: 560, margin: '0 auto' }}>
@@ -211,7 +211,7 @@ export default function About({ setPage }) {
           }}>
             Everything you need
           </div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#f1f5f9' }}>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
             All your MTG tools, in one place.
           </h2>
         </div>

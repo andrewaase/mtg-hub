@@ -124,12 +124,13 @@ function TierBadge({ tier }) {
 
 //  User table 
 
-function UserTable({ users, onTierChange, onBan }) {
+function UserTable({ users, onTierChange, onBan, onAdminToggle }) {
   const [search,  setSearch]  = useState('')
   const [sortKey, setSortKey] = useState('createdAt')
   const [sortDir, setSortDir] = useState('desc')
-  const [changing, setChanging] = useState(null) // userId currently being updated
-  const [banning,  setBanning]  = useState(null)  // userId currently being banned/unbanned
+  const [changing,  setChanging]  = useState(null) // userId currently being updated
+  const [banning,   setBanning]   = useState(null)  // userId currently being banned/unbanned
+  const [toggling,  setToggling]  = useState(null)  // userId currently toggling admin
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -204,7 +205,8 @@ function UserTable({ users, onTierChange, onBan }) {
               <SortHeader label="Last Seen"    k="lastSignIn"  />
               <SortHeader label="Cards"        k="totalCards"  />
               <SortHeader label="Matches"      k="matchCount"  />
-              <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>Actions</th>
+              <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>Ban</th>
+              <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>Admin</th>
             </tr>
           </thead>
           <tbody>
@@ -309,6 +311,27 @@ function UserTable({ users, onTierChange, onBan }) {
                       )
                     })()
                   )}
+                </td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                  <button
+                    disabled={toggling === u.id}
+                    onClick={async () => {
+                      const action = u.is_admin ? `Remove admin from ${u.email}?` : `Make ${u.email} an admin? They will have full control panel access.`
+                      if (!confirm(action)) return
+                      setToggling(u.id)
+                      try { await onAdminToggle(u.id, !u.is_admin) } finally { setToggling(null) }
+                    }}
+                    style={{
+                      padding: '3px 10px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 700,
+                      cursor: toggling === u.id ? 'wait' : 'pointer',
+                      opacity: toggling === u.id ? 0.5 : 1,
+                      background: u.is_admin ? 'rgba(30,196,166,.12)' : 'rgba(30,196,166,.06)',
+                      border:     u.is_admin ? '1px solid rgba(30,196,166,.4)' : '1px solid rgba(30,196,166,.2)',
+                      color:      '#1ec4a6',
+                    }}
+                  >
+                    {u.is_admin ? '− Admin' : '+ Admin'}
+                  </button>
                 </td>
               </tr>
             ))}
@@ -2465,6 +2488,17 @@ export default function AdminPanel({ user, isAdmin }) {
                 const json = await res.json()
                 if (json.ok) await fetchStats()
                 else alert('Ban failed: ' + (json.error || 'Unknown error'))
+              }}
+              onAdminToggle={async (userId, makeAdmin) => {
+                const { data: { session } } = await supabase.auth.getSession()
+                const res = await fetch('/.netlify/functions/set-admin', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                  body: JSON.stringify({ userId, makeAdmin }),
+                })
+                const json = await res.json()
+                if (json.success) await fetchStats()
+                else alert('Failed: ' + (json.error || 'Unknown error'))
               }}
             />
           )}

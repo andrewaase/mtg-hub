@@ -27,6 +27,7 @@ async function fetchAllCardPrices() {
   let url =
     'https://api.scryfall.com/cards/search' +
     '?q=usd%3E%3D0.5+game%3Apaper+not%3Aextra+not%3Abasic+not%3Aart_series+lang%3Aen' +
+    '+-frame%3Ashowcase+-frame%3Aextendedart+-border%3Aborderless+-is%3Apromo+-is%3Aoversized' +
     '&order=name&unique=cards&page=1'
 
   let pageCount = 0

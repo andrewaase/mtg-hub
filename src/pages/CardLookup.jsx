@@ -10,21 +10,21 @@ const RARITY_ORDER  = { mythic: 0, rare: 1, uncommon: 2, common: 3, special: 4, 
 const RARITY_COLOR  = { mythic: '#f97316', rare: '#16a389', uncommon: '#94a3b8', common: '#6b7280' }
 const RARITY_LABEL  = { mythic: 'Mythic Rare', rare: 'Rare', uncommon: 'Uncommon', common: 'Common', special: 'Special', bonus: 'Bonus' }
 
-//  Tiny helpers 
-const BG    = '#000'
-const ROW   = '#111'
-const DIVID = '#1a1a1a'
-const MUTED = '#555'
-const WHITE = '#f0f0f0'
+//  Tiny helpers
+const BG    = 'var(--bg-primary)'
+const ROW   = 'var(--bg-hover)'
+const DIVID = 'var(--border)'
+const MUTED = 'var(--text-muted)'
+const WHITE = 'var(--text-primary)'
 
 function SortChip({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
       padding: '5px 14px', borderRadius: '99px', fontSize: '.74rem', fontWeight: 600,
       cursor: 'pointer', border: '1px solid',
-      background: active ? '#fff' : 'transparent',
-      color:      active ? '#000' : '#888',
-      borderColor: active ? '#fff' : '#2a2a2a',
+      background: active ? 'var(--accent-gold)' : 'transparent',
+      color:      active ? '#fff' : 'var(--text-secondary)',
+      borderColor: active ? 'var(--accent-gold)' : 'var(--border)',
     }}>
       {label}
     </button>
@@ -32,8 +32,8 @@ function SortChip({ label, active, onClick }) {
 }
 
 function SetIcon({ uri, size = 22 }) {
-  if (!uri) return <div style={{ width: size, height: size, background: '#1a1a1a', borderRadius: '4px', flexShrink: 0 }} />
-  return <img src={uri} alt="" style={{ width: size, height: size, filter: 'invert(1) opacity(0.6)', flexShrink: 0 }} />
+  if (!uri) return <div style={{ width: size, height: size, background: 'var(--bg-card)', borderRadius: '4px', flexShrink: 0 }} />
+  return <img src={uri} alt="" style={{ width: size, height: size, filter: 'opacity(0.6)', flexShrink: 0 }} />
 }
 
 //  Wishlist helper 
@@ -77,7 +77,7 @@ function PrintingCard({ printing, isSelected, onSelect }) {
         flexShrink: 0, width: 136, cursor: 'pointer',
         borderRadius: '8px', overflow: 'hidden',
         border: isSelected ? '2px solid var(--accent-gold)' : '2px solid transparent',
-        background: '#111',
+        background: 'var(--bg-card)',
         transition: 'border-color .15s, opacity .15s',
         opacity: isSelected ? 1 : 0.75,
       }}
@@ -87,7 +87,7 @@ function PrintingCard({ printing, isSelected, onSelect }) {
       {/* Card image */}
       {img
         ? <img src={img} alt="" style={{ width: '100%', display: 'block', borderRadius: '6px 6px 0 0' }} />
-        : <div style={{ width: '100%', aspectRatio: '0.716', background: '#1a1a1a', borderRadius: '6px 6px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}></div>
+        : <div style={{ width: '100%', aspectRatio: '0.716', background: 'var(--bg-card)', borderRadius: '6px 6px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}></div>
       }
 
       {/* Info below image */}
@@ -97,10 +97,10 @@ function PrintingCard({ printing, isSelected, onSelect }) {
           <img
             src={`https://svgs.scryfall.io/sets/${printing.set}.svg`}
             alt=""
-            style={{ width: '11px', height: '11px', filter: 'invert(1) opacity(0.4)', flexShrink: 0 }}
+            style={{ width: '11px', height: '11px', filter: 'opacity(0.5)', flexShrink: 0 }}
             onError={e => { e.target.style.display = 'none' }}
           />
-          <span style={{ fontSize: '.62rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <span style={{ fontSize: '.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {printing.set?.toUpperCase()} #{printing.collector_number}
           </span>
         </div>
@@ -123,12 +123,12 @@ function PrintingCard({ printing, isSelected, onSelect }) {
             {foil && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <span style={{ fontSize: '.6rem' }}></span>
-                <span style={{ fontSize: '.72rem', fontWeight: 600, color: '#7dd3fc' }}>${foil}</span>
+                <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--accent-blue)' }}>${foil}</span>
               </div>
             )}
           </div>
         ) : (
-          <div style={{ fontSize: '.72rem', color: '#2a2a2a' }}>—</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>—</div>
         )}
       </div>
     </div>
@@ -170,7 +170,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         </button>
         <div style={{ flex: 1, fontWeight: 700, color: WHITE, fontSize: '.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
         {setIconUrl && (
-          <img src={setIconUrl} alt="" style={{ width: '22px', height: '22px', filter: 'invert(1) opacity(0.55)', flexShrink: 0 }}
+          <img src={setIconUrl} alt="" style={{ width: '22px', height: '22px', filter: 'opacity(0.5)', flexShrink: 0 }}
             onError={e => { e.target.style.display = 'none' }} />
         )}
       </div>
@@ -184,7 +184,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         {/* Legality table */}
         {card.legalities && (
           <div style={{ flexShrink: 0, minWidth: 168 }}>
-            <div style={{ fontSize: '.6rem', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10 }}>Format Legality</div>
+            <div style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10 }}>Format Legality</div>
             {[
               ['Standard',  'standard'],
               ['Pioneer',   'pioneer'],
@@ -201,7 +201,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
               const isRestricted = status === 'restricted'
               return (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '5px 0', borderBottom: '1px solid #111' }}>
-                  <span style={{ fontSize: '.76rem', color: '#888' }}>{label}</span>
+                  <span style={{ fontSize: '.76rem', color: 'var(--text-secondary)' }}>{label}</span>
                   <span style={{
                     fontSize: '.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap',
                     background: isLegal ? 'rgba(74,222,128,.1)' : isBanned ? 'rgba(239,68,68,.1)' : isRestricted ? 'rgba(61,214,186,.1)' : 'rgba(255,255,255,.03)',
@@ -219,14 +219,14 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
 
       {/* Core info */}
       <div style={{ padding: '8px 16px 8px' }}>
-        <div style={{ fontSize: '.8rem', color: '#888', marginBottom: '5px' }}>{card.type_line}</div>
+        <div style={{ fontSize: '.8rem', color: 'var(--text-secondary)', marginBottom: '5px' }}>{card.type_line}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '.72rem', color: rc }}>{RARITY_LABEL[card.rarity] || card.rarity}</span>
           {card.set && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '.72rem', color: MUTED }}>
               ·
               {setIconUrl && (
-                <img src={setIconUrl} alt="" style={{ width: '13px', height: '13px', filter: 'invert(1) opacity(0.45)', verticalAlign: 'middle' }}
+                <img src={setIconUrl} alt="" style={{ width: '13px', height: '13px', filter: 'opacity(0.5)', verticalAlign: 'middle' }}
                   onError={e => { e.target.style.display = 'none' }} />
               )}
               {card.set.toUpperCase()} #{card.collector_number}
@@ -238,7 +238,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
       {/* Price strip */}
       <div style={{ display: 'flex', gap: '1px', margin: '12px 16px', borderRadius: '12px', overflow: 'hidden' }}>
         {[['Normal', card.prices?.usd], ['Foil', card.prices?.usd_foil], ['EUR', card.prices?.eur]].map(([label, val]) => (
-          <div key={label} style={{ flex: 1, background: '#111', padding: '12px 8px', textAlign: 'center' }}>
+          <div key={label} style={{ flex: 1, background: 'var(--bg-card)', padding: '12px 8px', textAlign: 'center' }}>
             <div style={{ fontSize: '.58rem', color: MUTED, textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
             <div style={{ fontSize: '.95rem', fontWeight: 700, color: val ? 'var(--accent-gold)' : '#2a2a2a', marginTop: '4px' }}>
               {val ? `$${val}` : '—'}
@@ -249,7 +249,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
 
       {/* Oracle text */}
       {card.oracle_text && (
-        <div style={{ margin: '0 16px 16px', background: '#0d0d0d', border: `1px solid ${DIVID}`, borderRadius: '10px', padding: '12px 14px', fontSize: '.82rem', color: '#888', lineHeight: 1.7 }}>
+        <div style={{ margin: '0 16px 16px', background: 'var(--bg-secondary)', border: `1px solid ${DIVID}`, borderRadius: '10px', padding: '12px 14px', fontSize: '.82rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
           {card.oracle_text}
         </div>
       )}
@@ -263,7 +263,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
             onClick={() => onStoreSearch?.(card.name)}
             style={{
               width: '100%', padding: '13px',
-              background: 'linear-gradient(135deg, #16a389, #f0c060)',
+              background: 'linear-gradient(135deg, #16a389, #1ec4a6)',
               color: '#000', border: 'none', borderRadius: '12px',
               fontWeight: 800, fontSize: '.9rem', cursor: 'pointer', letterSpacing: '.3px',
             }}
@@ -275,15 +275,15 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
         )}
 
         <button onClick={() => openAddCard(card)} style={{
-          width: '100%', padding: '13px', background: 'var(--accent-gold)', color: '#000',
+          width: '100%', padding: '13px', background: 'var(--accent-gold)', color: '#fff',
           border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer',
           letterSpacing: '.3px',
         }}>
           + Add to Collection
         </button>
         <button onClick={() => addCardToWishlist(card, showToast, user)} style={{
-          width: '100%', padding: '13px', background: 'transparent', color: '#aaa',
-          border: `1px solid #2a2a2a`, borderRadius: '12px', fontWeight: 700, fontSize: '.9rem', cursor: 'pointer',
+          width: '100%', padding: '13px', background: 'transparent', color: 'var(--text-secondary)',
+          border: `1px solid var(--border)`, borderRadius: '12px', fontWeight: 700, fontSize: '.9rem', cursor: 'pointer',
         }}>
            Add to Wishlist
         </button>
@@ -327,7 +327,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
           {/* Section header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px 12px' }}>
             <div style={{ flex: 1, height: '1px', background: DIVID }} />
-            <div style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#333', flexShrink: 0 }}>
+            <div style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)', flexShrink: 0 }}>
               {printings.length} printing{printings.length !== 1 ? 's' : ''} · tap to switch
             </div>
             <div style={{ flex: 1, height: '1px', background: DIVID }} />
@@ -356,7 +356,7 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
               href={card.scryfall_uri || `https://scryfall.com/card/${card.set}/${card.collector_number}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: '.7rem', color: '#333', textDecoration: 'none' }}
+              style={{ fontSize: '.7rem', color: 'var(--text-secondary)', textDecoration: 'none' }}
             >
               View on Scryfall ↗
             </a>
@@ -448,12 +448,12 @@ function SetView({ set, onBack, onCardSelect }) {
             <div
               key={card.id}
               onClick={() => onCardSelect(card)}
-              style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', borderBottom: `1px solid #0f0f0f`, cursor: 'pointer', transition: 'background .1s' }}
+              style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', borderBottom: `1px solid var(--border)`, cursor: 'pointer', transition: 'background .1s' }}
               onMouseEnter={e => e.currentTarget.style.background = ROW}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: '#e8e8e8', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {card.name}
                 </div>
                 <div style={{ fontSize: '.7rem', color: RARITY_COLOR[card.rarity] || MUTED, marginTop: '2px' }}>
@@ -470,7 +470,7 @@ function SetView({ set, onBack, onCardSelect }) {
           {hasMore && (
             <div style={{ padding: '16px', textAlign: 'center' }}>
               <button onClick={loadMore} disabled={loadingMore} style={{
-                background: 'transparent', border: `1px solid #2a2a2a`, color: '#888',
+                background: 'transparent', border: `1px solid var(--border)`, color: 'var(--text-secondary)',
                 padding: '8px 24px', borderRadius: '99px', fontSize: '.78rem', cursor: 'pointer',
               }}>
                 {loadingMore ? 'Loading…' : 'Load more'}
@@ -531,7 +531,7 @@ function SearchView({ onBack, onCardSelect }) {
             onKeyDown={handleKey}
             onFocus={() => suggestions.length > 0 && setShowDrop(true)}
             style={{
-              width: '100%', background: '#111', border: `1px solid #222`,
+              width: '100%', background: 'var(--bg-card)', border: `1px solid var(--border)`,
               borderRadius: '8px', padding: '9px 14px', color: WHITE,
               fontSize: '.9rem', outline: 'none', boxSizing: 'border-box',
             }}
@@ -540,14 +540,14 @@ function SearchView({ onBack, onCardSelect }) {
           {showDrop && suggestions.length > 0 && (
             <div style={{
               position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-              background: '#111', border: `1px solid #222`, borderRadius: '10px',
+              background: 'var(--bg-card)', border: `1px solid var(--border)`, borderRadius: '10px',
               zIndex: 200, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.8)',
             }}>
               {suggestions.map((s, i) => (
                 <div
                   key={s}
                   onClick={() => pick(s)}
-                  style={{ padding: '11px 16px', cursor: 'pointer', color: '#ddd', fontSize: '.88rem', borderBottom: i < suggestions.length - 1 ? `1px solid #1a1a1a` : 'none', transition: 'background .1s' }}
+                  style={{ padding: '11px 16px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '.88rem', borderBottom: i < suggestions.length - 1 ? `1px solid #1a1a1a` : 'none', transition: 'background .1s' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#1a1a1a'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -775,13 +775,13 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
       {/* Search all cards row */}
       <div
         onClick={() => setView('search')}
-        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: '#0d0d0d', borderTop: `1px solid ${DIVID}`, borderBottom: `1px solid ${DIVID}`, cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: 'var(--bg-secondary)', borderTop: `1px solid ${DIVID}`, borderBottom: `1px solid ${DIVID}`, cursor: 'pointer' }}
         onMouseEnter={e => e.currentTarget.style.background = ROW}
-        onMouseLeave={e => e.currentTarget.style.background = '#0d0d0d'}
+        onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
       >
         <span style={{ fontSize: '1rem' }}></span>
-        <span style={{ flex: 1, color: '#ccc', fontSize: '.92rem' }}>Search All Cards</span>
-        <span style={{ color: '#444', fontSize: '1.1rem', lineHeight: 1 }}>›</span>
+        <span style={{ flex: 1, color: 'var(--text-secondary)', fontSize: '.92rem' }}>Search All Cards</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1 }}>›</span>
       </div>
 
       {/* Random card row */}
@@ -792,13 +792,13 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
             if (res.ok) openCardDetail(await res.json())
           } catch { showToast('Could not load random card') }
         }}
-        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: '#0d0d0d', borderBottom: `1px solid ${DIVID}`, cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: 'var(--bg-secondary)', borderBottom: `1px solid ${DIVID}`, cursor: 'pointer' }}
         onMouseEnter={e => e.currentTarget.style.background = ROW}
-        onMouseLeave={e => e.currentTarget.style.background = '#0d0d0d'}
+        onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
       >
         <span style={{ fontSize: '1rem' }}></span>
-        <span style={{ flex: 1, color: '#ccc', fontSize: '.92rem' }}>Random Card</span>
-        <span style={{ color: '#444', fontSize: '1.1rem', lineHeight: 1 }}>›</span>
+        <span style={{ flex: 1, color: 'var(--text-secondary)', fontSize: '.92rem' }}>Random Card</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1 }}>›</span>
       </div>
 
       {/* Recently Viewed */}
@@ -810,7 +810,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
             </div>
             <button
               onClick={() => { localStorage.removeItem(RV_KEY); setRecentCards([]) }}
-              style={{ background: 'none', border: 'none', color: '#333', fontSize: '.65rem', cursor: 'pointer', padding: '2px 4px' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '.65rem', cursor: 'pointer', padding: '2px 4px' }}
             >
               Clear
             </button>
@@ -832,9 +832,9 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                     />
-                  : <div style={{ width: '80px', height: '112px', background: '#111', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}></div>
+                  : <div style={{ width: '80px', height: '112px', background: 'var(--bg-card)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}></div>
                 }
-                <div style={{ marginTop: '4px', fontSize: '.6rem', color: '#888', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ marginTop: '4px', fontSize: '.6rem', color: 'var(--text-secondary)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {rc.price ? `$${parseFloat(rc.price).toFixed(2)}` : '—'}
                 </div>
               </div>
@@ -853,8 +853,8 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
               <div style={{
                 position: 'fixed', left, top,
                 width: PREVIEW_W,
-                background: '#111',
-                border: '1px solid #2a2a2a',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 overflow: 'hidden',
                 zIndex: 1000,
@@ -864,11 +864,11 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
               }}>
                 {hoverInfo.img
                   ? <img src={hoverInfo.img} alt={hoverInfo.name} style={{ width: '100%', display: 'block' }} />
-                  : <div style={{ width: '100%', aspectRatio: '0.716', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}></div>
+                  : <div style={{ width: '100%', aspectRatio: '0.716', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}></div>
                 }
                 <div style={{ padding: '10px 12px 12px' }}>
-                  <div style={{ color: '#e8e8e8', fontWeight: 700, fontSize: '.82rem', marginBottom: '2px', lineHeight: 1.3 }}>{hoverInfo.name}</div>
-                  {hoverInfo.set && <div style={{ fontSize: '.64rem', color: '#555', marginBottom: '5px' }}>{hoverInfo.set}</div>}
+                  <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '.82rem', marginBottom: '2px', lineHeight: 1.3 }}>{hoverInfo.name}</div>
+                  {hoverInfo.set && <div style={{ fontSize: '.64rem', color: 'var(--text-muted)', marginBottom: '5px' }}>{hoverInfo.set}</div>}
                   <div style={{ fontSize: '.88rem', fontWeight: 700, color: 'var(--accent-gold)' }}>
                     {hoverInfo.price ? `$${parseFloat(hoverInfo.price).toFixed(2)}` : '—'}
                   </div>
@@ -891,7 +891,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
             placeholder="Search sets…"
             style={{
               width: '100%', boxSizing: 'border-box',
-              background: '#111', border: '1px solid #222',
+              background: 'var(--bg-card)', border: '1px solid #222',
               borderRadius: '8px', padding: '9px 14px',
               color: '#e0e0e0', fontSize: '.85rem', outline: 'none',
             }}
@@ -939,7 +939,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
             return (
               <div
                 onClick={() => openSet(set)}
-                style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', borderBottom: `1px solid #0f0f0f`, cursor: 'pointer', transition: 'background .1s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', borderBottom: `1px solid var(--border)`, cursor: 'pointer', transition: 'background .1s' }}
                 onMouseEnter={e => e.currentTarget.style.background = ROW}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
@@ -952,7 +952,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
                     {set.card_count} cards{typeLabel ? ` · ${typeLabel}` : ''}
                   </div>
                 </div>
-                <span style={{ color: '#333', fontSize: '1.1rem', lineHeight: 1, flexShrink: 0 }}>›</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1, flexShrink: 0 }}>›</span>
               </div>
             )
           }
@@ -969,7 +969,7 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
                     borderTop: `1px solid #0a0a0a`,
                   }}>
                     <span>{year}</span>
-                    <span style={{ color: '#2a2a2a' }}>{byYear[year].length}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{byYear[year].length}</span>
                   </div>
                   {byYear[year].map(set => <SetRow key={set.code} set={set} />)}
                 </div>
