@@ -661,81 +661,54 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
   }
 
   return (
+    // Outer wrapper — background matches the image edges so contain looks seamless
     <div style={{
-      position: 'relative', userSelect: 'none', overflow: 'hidden',
-      height: 'calc(100dvh - 56px)',
+      position: 'relative', userSelect: 'none',
+      background: '#e8f0f7',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: 'calc(100dvh - 56px)',
     }}>
-      {/* Background fills container */}
-      <img
-        src="/mana-mint-resealed-background.png"
-        alt="Mana Mint Premium Repacks"
-        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
-        draggable={false}
-      />
+      {/* Use a positioned inner wrapper that preserves the image's exact aspect ratio.
+          This makes % zones always map correctly regardless of screen size. */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '100%',
+        // 941/1672 = 56.28% — locks the container to the image's natural ratio
+        paddingTop: 'min(56.28%, calc(100dvh - 56px))',
+      }}>
+        <img
+          src="/mana-mint-resealed-background.png"
+          alt="Mana Mint Premium Repacks"
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'fill', display: 'block',
+          }}
+          draggable={false}
+        />
 
-      {/* Two tight hit zones per bag */}
-      {RESEALED_HIT_ZONES.map(({ slot, bag, button }) => {
-        const listing  = slotListings[slot]
-        const isHovered = hoveredSlot === slot
-        const color    = SHOWCASE_SLOTS[slot].color
-        const inCart   = listing && cartIds?.has(listing.id)
-        const zoneProps = {
-          onClick:      () => handleClick(slot),
-          onMouseEnter: () => handleEnter(slot),
-          onMouseLeave: handleLeave,
-          style: {
-            position: 'absolute',
-            cursor: listing ? 'pointer' : 'default',
-            borderRadius: 12,
-            border: isHovered ? `2px solid ${color}cc` : '2px solid transparent',
-            boxShadow: isHovered ? `0 0 28px ${color}55, inset 0 0 16px ${color}18` : 'none',
-            transition: 'border-color .18s, box-shadow .18s',
-          },
-        }
+        {/* Invisible hit zones — cursor only, zero visual noise */}
+        {RESEALED_HIT_ZONES.map(({ slot, bag, button }) => {
+          const listing = slotListings[slot]
+          const clickZone = { onClick: () => handleClick(slot), style: { position: 'absolute', cursor: listing ? 'pointer' : 'default' } }
 
-        return (
-          <React.Fragment key={slot}>
-            {/* Bag body zone */}
-            <div
-              {...zoneProps}
-              style={{ ...zoneProps.style, left: bag.left, top: bag.top, width: bag.width, height: bag.height }}
-            >
-              {/* Glow pulse on hover */}
-              {isHovered && listing && (
-                <div style={{
-                  position: 'absolute', inset: 0, borderRadius: 12,
-                  background: `radial-gradient(ellipse at 50% 60%, ${color}18 0%, transparent 70%)`,
-                  pointerEvents: 'none',
-                }} />
-              )}
-            </div>
-
-            {/* "Tap to Explore" button zone */}
-            <div
-              {...zoneProps}
-              style={{
-                ...zoneProps.style,
-                left: button.left, top: button.top,
-                width: button.width, height: button.height,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: 99,
-                background: isHovered && listing ? `${color}22` : 'transparent',
-              }}
-            >
-              {inCart && isHovered && (
-                <span style={{
-                  background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)',
-                  color: '#fff', fontSize: '.62rem', fontWeight: 700,
-                  padding: '3px 10px', borderRadius: 99, pointerEvents: 'none',
-                  whiteSpace: 'nowrap',
-                }}>✓ In Cart</span>
-              )}
-            </div>
-          </React.Fragment>
-        )
-      })}
-
-      <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }`}</style>
+          return (
+            <React.Fragment key={slot}>
+              {/* Bag body */}
+              <div
+                {...clickZone}
+                style={{ ...clickZone.style, left: bag.left, top: bag.top, width: bag.width, height: bag.height }}
+              />
+              {/* "Tap to Explore" button */}
+              <div
+                {...clickZone}
+                style={{ ...clickZone.style, left: button.left, top: button.top, width: button.width, height: button.height, borderRadius: 99 }}
+              />
+            </React.Fragment>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1785,21 +1758,6 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             onView={setSelectedListing}
           />
 
-          {/* Infographics — full-bleed, zero gap, scroll in order below the showcase */}
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 0 }}>
-            <img
-              src="/infographic-1.png"
-              alt="What Every Repack Includes"
-              style={{ width: '100%', display: 'block' }}
-              draggable={false}
-            />
-            <img
-              src="/infographic-2.png"
-              alt="Compare the 3 Repacks"
-              style={{ width: '100%', display: 'block' }}
-              draggable={false}
-            />
-          </div>
 
           {/* Overflow products beyond the 3 arch slots */}
           {!loading && filtered.length > 3 && (
