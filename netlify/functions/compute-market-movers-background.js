@@ -62,6 +62,10 @@ async function fetchAllCardPrices() {
           pauper:    leg.pauper    || 'not_legal',
           premodern: leg.premodern || 'not_legal',
         }
+        // Only keep the LOWEST price seen for this card name.
+        // This ensures a cheap base printing always wins over an expensive alt art
+        // or special treatment that Scryfall's unique=cards might otherwise return.
+        if (priceMap[card.name] && priceMap[card.name].price <= price) continue
         priceMap[card.name] = { price, img, legalities }
       }
 

@@ -19,8 +19,25 @@ const rowStyle = {
   display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
 }
 
+function useDarkMode() {
+  const [dark, setDark] = useState(() => document.documentElement.getAttribute('data-theme') === 'dark')
+  const toggle = () => {
+    const next = !dark
+    setDark(next)
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark')
+      localStorage.setItem('mm-theme', 'dark')
+    } else {
+      document.documentElement.removeAttribute('data-theme')
+      localStorage.setItem('mm-theme', 'light')
+    }
+  }
+  return [dark, toggle]
+}
+
 export default function AuthModal({ onClose, showToast, user, prompt, defaultTab, setPage }) {
   const [tab, setTab] = useState(defaultTab || 'signin')
+  const [dark, toggleDark] = useDarkMode()
 
   // Sign-in fields
   const [email,    setEmail]    = useState('')
@@ -134,6 +151,34 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
               Signed in
             </div>
           </div>
+          {/* Dark mode toggle */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 8,
+          }}>
+            <div>
+              <div style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {dark ? '🌙 Dark Mode' : '☀️ Light Mode'}
+              </div>
+              <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: 2 }}>Tap to switch theme</div>
+            </div>
+            <button
+              onClick={toggleDark}
+              style={{
+                width: 48, height: 26, borderRadius: 99, border: 'none', cursor: 'pointer',
+                background: dark ? 'var(--accent-gold)' : 'var(--border)',
+                position: 'relative', transition: 'background .2s', flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 3, left: dark ? 25 : 3,
+                width: 20, height: 20, borderRadius: '50%',
+                background: '#fff', transition: 'left .2s',
+                boxShadow: '0 1px 4px rgba(0,0,0,.25)',
+              }} />
+            </button>
+          </div>
+
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               Close
@@ -170,8 +215,8 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
         )}
 
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.2rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>
-            VAULTED SINGLES
+          <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>
+            MANA MINT
           </div>
           <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             {tab === 'signin' ? 'Sign in to sync your collection across devices' : 'Create your account'}

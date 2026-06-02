@@ -41,6 +41,23 @@
 }
 
 /* ============================================================
+   DARK MODE — applied when <html data-theme="dark">
+   ============================================================ */
+:root[data-theme="dark"] {
+  --bg-primary:    #0d0d0f;
+  --bg-secondary:  #111113;
+  --bg-card:       #1a1a1c;
+  --bg-hover:      #222226;
+  --border:        #252528;
+  --border-subtle: #1c1c1f;
+  --text-primary:  #f5f5f5;
+  --text-secondary:#888888;
+  --text-muted:    #444448;
+  --shadow:        0 4px 24px rgba(0,0,0,.5);
+  --shadow-lg:     0 8px 40px rgba(0,0,0,.6);
+}
+
+/* ============================================================
    RESET
    ============================================================ */
 * { box-sizing: border-box; margin: 0; padding: 0; }

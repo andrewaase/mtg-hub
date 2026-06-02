@@ -708,7 +708,8 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
     }
 
     setCardDetail(card)
-    prevView.current = view
+    // Never set prevView to 'card' — that would make Back loop to itself
+    prevView.current = view === 'card' ? 'home' : view
     setView('card')
     setRecentCards(saveRecentlyViewed(card))
     getAllPrintings(card.name)

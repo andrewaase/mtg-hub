@@ -201,6 +201,7 @@ function TournamentWidget({ collection, setPage }) {
 
   const handleCardClick = (cardName) => {
     window.__lookupCardName = cardName
+    window.dispatchEvent(new CustomEvent('vaulted:lookup-card', { detail: { name: cardName } }))
     setPage?.('cards')
   }
 
@@ -473,7 +474,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
           {/* Main value */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)', marginBottom: 4 }}>Collection Value</div>
-            <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#f5f5f5', lineHeight: 1, letterSpacing: '-.5px' }}>${fmt(totalMid)}</div>
+            <div style={{ fontSize: '1.9rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-.5px' }}>${fmt(totalMid)}</div>
             <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: 5 }}>{totalCards} card{totalCards !== 1 ? 's' : ''}</div>
           </div>
           {/* Deltas + link */}
