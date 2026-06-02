@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -622,20 +622,50 @@ const SHOWCASE_SLOTS = [
   },
 ]
 
-function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
-  const [hoveredIdx, setHoveredIdx] = useState(null)
+// Pixel-calibrated hit zones for mana-mint-resealed-background.png (1672×941)
+// Two zones per product: bag body + "Tap to Explore" button
+// All values are % of the rendered image dimensions.
+const RESEALED_HIT_ZONES = [
+  // ── Entry Level (left, navy blue bag) ──────────────────────────────────
+  {
+    slot: 0,
+    bag:    { left: '12.3%', top: '31.7%', width: '17.2%', height: '49.3%' }, // x:205-494, y:298-762
+    button: { left: '10%',   top: '85%',   width: '13%',   height: '8%'    }, // "Tap to Explore" pill
+  },
+  // ── Rare Reserve (center, green bag) ───────────────────────────────────
+  {
+    slot: 1,
+    bag:    { left: '39.9%', top: '3.9%',  width: '18.8%', height: '77.2%' }, // x:667-981, y:37-763
+    button: { left: '38%',   top: '93%',   width: '13%',   height: '6%'    },
+  },
+  // ── Mythic Cache (right, white bag) ────────────────────────────────────
+  {
+    slot: 2,
+    bag:    { left: '68.7%', top: '31.7%', width: '21.6%', height: '56.8%' }, // x:1149-1509, y:298-833
+    button: { left: '67%',   top: '85%',   width: '14%',   height: '8%'    },
+  },
+]
 
-  // Match each slot to a listing by name substring
+function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
+  const [hoveredSlot, setHoveredSlot] = useState(null)
+
   const slotListings = SHOWCASE_SLOTS.map(slot =>
     listings.find(l => l.name?.toLowerCase().includes(slot.key)) || null
   )
+
+  const handleEnter = (slotIdx) => setHoveredSlot(slotIdx)
+  const handleLeave = () => setHoveredSlot(null)
+  const handleClick = (slotIdx) => {
+    const listing = slotListings[slotIdx]
+    if (listing) onView(listing)
+  }
 
   return (
     <div style={{
       position: 'relative', userSelect: 'none', overflow: 'hidden',
       height: 'calc(100dvh - 56px)',
     }}>
-      {/* Background image */}
+      {/* Background fills container */}
       <img
         src="/mana-mint-resealed-background.png"
         alt="Mana Mint Premium Repacks"
@@ -643,59 +673,69 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
         draggable={false}
       />
 
-      {/* Clickable zones over each bag */}
-      {SHOWCASE_SLOTS.map((slot, i) => {
-        const listing = slotListings[i]
-        const isHovered = hoveredIdx === i
-        const inCart = listing && cartIds?.has(listing.id)
-        const { zone, color, label } = slot
+      {/* Two tight hit zones per bag */}
+      {RESEALED_HIT_ZONES.map(({ slot, bag, button }) => {
+        const listing  = slotListings[slot]
+        const isHovered = hoveredSlot === slot
+        const color    = SHOWCASE_SLOTS[slot].color
+        const inCart   = listing && cartIds?.has(listing.id)
+        const zoneProps = {
+          onClick:      () => handleClick(slot),
+          onMouseEnter: () => handleEnter(slot),
+          onMouseLeave: handleLeave,
+          style: {
+            position: 'absolute',
+            cursor: listing ? 'pointer' : 'default',
+            borderRadius: 12,
+            border: isHovered ? `2px solid ${color}cc` : '2px solid transparent',
+            boxShadow: isHovered ? `0 0 28px ${color}55, inset 0 0 16px ${color}18` : 'none',
+            transition: 'border-color .18s, box-shadow .18s',
+          },
+        }
 
         return (
-          <div
-            key={slot.key}
-            onClick={() => listing && onView(listing)}
-            onMouseEnter={() => setHoveredIdx(i)}
-            onMouseLeave={() => setHoveredIdx(null)}
-            style={{
-              position: 'absolute',
-              left: zone.left, top: zone.top,
-              width: zone.width, bottom: zone.bottom,
-              cursor: listing ? 'pointer' : 'default',
-              borderRadius: 16,
-              border: isHovered ? `2px solid ${color}` : '2px solid transparent',
-              boxShadow: isHovered ? `0 0 32px ${color}44, inset 0 0 24px ${color}11` : 'none',
-              transition: 'border-color .2s, box-shadow .2s',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              paddingBottom: '12%',
-            }}
-          >
-            {/* Hover label */}
-            {isHovered && listing && (
-              <div style={{
-                background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(10px)',
-                border: `1px solid ${color}66`,
-                borderRadius: 99, padding: '6px 18px',
-                fontSize: '.72rem', fontWeight: 700, color: '#fff',
-                letterSpacing: '.04em', whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-                animation: 'fadeInUp .15s ease',
-              }}>
-                {inCart ? '✓ In Cart — click to view' : `Tap to Explore ${label}`}
-              </div>
-            )}
-          </div>
+          <React.Fragment key={slot}>
+            {/* Bag body zone */}
+            <div
+              {...zoneProps}
+              style={{ ...zoneProps.style, left: bag.left, top: bag.top, width: bag.width, height: bag.height }}
+            >
+              {/* Glow pulse on hover */}
+              {isHovered && listing && (
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: 12,
+                  background: `radial-gradient(ellipse at 50% 60%, ${color}18 0%, transparent 70%)`,
+                  pointerEvents: 'none',
+                }} />
+              )}
+            </div>
+
+            {/* "Tap to Explore" button zone */}
+            <div
+              {...zoneProps}
+              style={{
+                ...zoneProps.style,
+                left: button.left, top: button.top,
+                width: button.width, height: button.height,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 99,
+                background: isHovered && listing ? `${color}22` : 'transparent',
+              }}
+            >
+              {inCart && isHovered && (
+                <span style={{
+                  background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)',
+                  color: '#fff', fontSize: '.62rem', fontWeight: 700,
+                  padding: '3px 10px', borderRadius: 99, pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                }}>✓ In Cart</span>
+              )}
+            </div>
+          </React.Fragment>
         )
       })}
 
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }`}</style>
     </div>
   )
 }
