@@ -333,7 +333,7 @@ function CardDetailModal({ listing, onClose, onAdd, inCart }) {
                   padding: '9px 22px', borderRadius: 10, border: 'none',
                   cursor: inCart ? 'default' : 'pointer',
                   background: inCart ? 'rgba(30,196,166,.15)' : 'var(--accent-gold)',
-                  color: inCart ? 'var(--accent-gold)' : '#000',
+                  color: inCart ? 'var(--accent-gold)' : '#fff',
                   fontWeight: 800, fontSize: '.88rem', transition: 'all .15s',
                 }}
               >{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
@@ -434,7 +434,7 @@ function ListingCard({ listing, onAdd, inCart, onView }) {
               padding: '5px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
               fontSize: '.72rem', fontWeight: 700,
               background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
-              color: inCart ? 'var(--accent-gold)' : '#000',
+              color: inCart ? 'var(--accent-gold)' : '#fff',
               transition: 'all .15s',
             }}
           >
@@ -449,49 +449,13 @@ function ListingCard({ listing, onAdd, inCart, onView }) {
 //  Pack art placeholders (shown when no img_url is set) 
 
 function VaultedRaritiesArt() {
-  return (
-    <div style={{
-      width: '100%', aspectRatio: '3/4',
-      background: 'linear-gradient(160deg,#0d0618 0%,#1a0f35 40%,#0f1a2e 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 40%, rgba(30,196,166,.12) 0%, transparent 65%)' }} />
-      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
-      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
-      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
-      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.55rem', color: 'rgba(30,196,166,.55)' }}></div>
-      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(30,196,166,.5))' }}></div>
-      <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.22em', color: '#16a389', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(30,196,166,.6)' }}>
-        Vaulted<br />Rarities
-      </div>
-      <div style={{ width: 44, height: 1, background: 'linear-gradient(90deg,transparent,#16a389,transparent)', margin: '9px 0' }} />
-      <div style={{ fontSize: '.5rem', color: 'rgba(30,196,166,.55)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Premium Singles</div>
-    </div>
-  )
+  // Legacy — show the Entry Level bag as fallback
+  return <img src="/Mana-mint-blue-bag-front.png" alt="Repack" style={{ width: '100%', display: 'block', aspectRatio: '3/4', objectFit: 'contain' }} />
 }
 
 function RelicsAwakenedArt() {
-  return (
-    <div style={{
-      width: '100%', aspectRatio: '3/4',
-      background: 'linear-gradient(160deg,#1a0600 0%,#2d1200 40%,#1a1a00 75%,#001a0d 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 45%, rgba(180,110,30,.14) 0%, transparent 65%)' }} />
-      <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}></div>
-      <div style={{ position: 'absolute', top: 10, right: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}></div>
-      <div style={{ position: 'absolute', bottom: 10, left: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}></div>
-      <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: '.6rem', color: 'rgba(180,110,30,.7)', fontWeight: 900 }}></div>
-      <div style={{ fontSize: '2.8rem', marginBottom: 10, filter: 'drop-shadow(0 0 12px rgba(180,110,30,.5))' }}></div>
-      <div style={{ fontSize: '.68rem', fontWeight: 900, letterSpacing: '.2em', color: '#b46e1e', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.5, textShadow: '0 0 16px rgba(180,110,30,.55)' }}>
-        Relics<br />Awakened
-      </div>
-      <div style={{ width: 44, height: 1, background: 'linear-gradient(90deg,transparent,#b46e1e,transparent)', margin: '9px 0' }} />
-      <div style={{ fontSize: '.5rem', color: 'rgba(180,110,30,.55)', letterSpacing: '.12em', textTransform: 'uppercase' }}>Magic's History</div>
-    </div>
-  )
+  // Legacy — show the Rare Reserve bag as fallback
+  return <img src="/Mana-Mint-green-bag-front.png" alt="Repack" style={{ width: '100%', display: 'block', aspectRatio: '3/4', objectFit: 'contain' }} />
 }
 
 function GenericResealedArt({ name }) {
@@ -559,7 +523,7 @@ function SealedCard({ listing, onAdd, inCart, onView }) {
             padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
             fontSize: '.72rem', fontWeight: 700,
             background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
-            color: inCart ? 'var(--accent-gold)' : '#000', transition: 'all .15s',
+            color: inCart ? 'var(--accent-gold)' : '#fff', transition: 'all .15s',
           }}>{inCart ? '✓ In Cart' : '+ Cart'}</button>
         </div>
       </div>
@@ -612,7 +576,7 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
             padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
             fontSize: '.72rem', fontWeight: 700,
             background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
-            color: inCart ? 'var(--accent-gold)' : '#000', transition: 'all .15s',
+            color: inCart ? 'var(--accent-gold)' : '#fff', transition: 'all .15s',
           }}>{inCart ? '✓ In Cart' : '+ Cart'}</button>
         </div>
       </div>
@@ -621,53 +585,117 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
 }
 
 // ─── Resealed Showcase ────────────────────────────────────────────────────────
+//
+// mana-mint-resealed-background.png (1672×941) shows three bags side by side:
+//   Left   — Entry Level   (blue bag,  $35)
+//   Center — Rare Reserve  (green bag, $75)  ← MOST POPULAR
+//   Right  — Mythic Cache  (white bag, $125)
+//
+// We match listings by name substring and layer click zones over each bag.
+// Hovering shows a glowing ring + label; clicking opens the product modal.
 
-// resealed-background.png has products baked into the artwork.
-// We layer invisible clickable zones over each arch so tapping anywhere
-// on a product or its "CLICK TO ADD TO CART" area opens the detail modal.
+const SHOWCASE_SLOTS = [
+  {
+    key:    'entry',
+    label:  'Entry Level',
+    tier:   '$35',
+    // click zone — left column
+    zone:   { left: '2%', top: '13%', width: '30%', bottom: '8%' },
+    color:  '#3b82f6',   // blue accent matching the bag
+  },
+  {
+    key:    'rare',
+    label:  'Rare Reserve',
+    tier:   '$75',
+    badge:  'Most Popular',
+    // click zone — center column, taller (most popular badge pushes it up)
+    zone:   { left: '34%', top: '8%', width: '32%', bottom: '8%' },
+    color:  '#1ec4a6',   // mint accent matching the bag
+  },
+  {
+    key:    'mythic',
+    label:  'Mythic Cache',
+    tier:   '$125',
+    // click zone — right column
+    zone:   { left: '68%', top: '13%', width: '30%', bottom: '8%' },
+    color:  '#a78bfa',   // purple accent matching the white/premium bag
+  },
+]
+
 function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
-  const slots = [listings[0] || null, listings[1] || null, listings[2] || null]
+  const [hoveredIdx, setHoveredIdx] = useState(null)
 
-  // Click-zone coordinates as % of image dimensions, calibrated to resealed-background.png.
-  const zones = [
-    { left: '1%',  top: '14%', width: '32%', bottom: '3%' }, // Treasure Vault (left arch)
-    { left: '34%', top: '11%', width: '32%', bottom: '3%' }, // Legendary Cache (center arch)
-    { left: '67%', top: '14%', width: '32%', bottom: '3%' }, // Vault Hunter (right arch)
-  ]
+  // Match each slot to a listing by name substring
+  const slotListings = SHOWCASE_SLOTS.map(slot =>
+    listings.find(l => l.name?.toLowerCase().includes(slot.key)) || null
+  )
 
   return (
-    // Tabs are in the topbar, so image fills 100dvh minus just the topbar (56px).
     <div style={{
       position: 'relative', userSelect: 'none', overflow: 'hidden',
       height: 'calc(100dvh - 56px)',
     }}>
+      {/* Background image */}
       <img
-        src="/resealed-background.png"
-        alt="Premium Repacks"
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        src="/mana-mint-resealed-background.png"
+        alt="Mana Mint Premium Repacks"
+        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
         draggable={false}
       />
 
-      {zones.map((zone, i) => {
-        const listing = slots[i]
-        if (!listing) return null
+      {/* Clickable zones over each bag */}
+      {SHOWCASE_SLOTS.map((slot, i) => {
+        const listing = slotListings[i]
+        const isHovered = hoveredIdx === i
+        const inCart = listing && cartIds?.has(listing.id)
+        const { zone, color, label } = slot
+
         return (
           <div
-            key={i}
-            onClick={() => onView(listing)}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(30,196,166,0.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
+            key={slot.key}
+            onClick={() => listing && onView(listing)}
+            onMouseEnter={() => setHoveredIdx(i)}
+            onMouseLeave={() => setHoveredIdx(null)}
             style={{
               position: 'absolute',
               left: zone.left, top: zone.top,
               width: zone.width, bottom: zone.bottom,
-              cursor: 'pointer',
-              borderRadius: 8,
-              transition: 'background-color .18s',
+              cursor: listing ? 'pointer' : 'default',
+              borderRadius: 16,
+              border: isHovered ? `2px solid ${color}` : '2px solid transparent',
+              boxShadow: isHovered ? `0 0 32px ${color}44, inset 0 0 24px ${color}11` : 'none',
+              transition: 'border-color .2s, box-shadow .2s',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              paddingBottom: '12%',
             }}
-          />
+          >
+            {/* Hover label */}
+            {isHovered && listing && (
+              <div style={{
+                background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(10px)',
+                border: `1px solid ${color}66`,
+                borderRadius: 99, padding: '6px 18px',
+                fontSize: '.72rem', fontWeight: 700, color: '#fff',
+                letterSpacing: '.04em', whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                animation: 'fadeInUp .15s ease',
+              }}>
+                {inCart ? '✓ In Cart — click to view' : `Tap to Explore ${label}`}
+              </div>
+            )}
+          </div>
         )
       })}
+
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }
@@ -675,11 +703,15 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
 // ─── End Resealed Showcase ────────────────────────────────────────────────────
 
 // Front + back image map — keyed by substring of listing.name (lowercase).
-// Images live in /public/ and are served as static assets.
+// Matches: "entry" → blue bag, "rare" → green bag, "mythic" → white bag
 const RESEALED_IMAGES = {
-  'legendary cache': { front: '/legendary-cache-front.png', back: '/legendary-cache-back.png' },
-  'treasure vault':  { front: '/treasure-vault-front.png',  back: '/treasure-vault-back.png'  },
-  'vault hunter':    { front: '/vault-hunter-front.png',    back: '/vault-hunter-back.png'    },
+  'entry':           { front: '/Mana-mint-blue-bag-front.png',    back: '/Mana-mint-blue-bag-back.png'    },
+  'rare':            { front: '/Mana-Mint-green-bag-front.png',   back: '/Mana-mint-green-bag-back.png'   },
+  'mythic':          { front: '/Mana-Mint-White-bag-front.png',   back: '/Mana-Mint-White-bag-back.png'   },
+  // Legacy fallbacks for any old listings still in the DB
+  'legendary cache': { front: '/Mana-Mint-White-bag-front.png',   back: '/Mana-Mint-White-bag-back.png'   },
+  'treasure vault':  { front: '/Mana-mint-blue-bag-front.png',    back: '/Mana-mint-blue-bag-back.png'    },
+  'vault hunter':    { front: '/Mana-Mint-green-bag-front.png',   back: '/Mana-mint-green-bag-back.png'   },
 }
 
 function getResealedImages(name = '') {
@@ -784,7 +816,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
               <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
                 padding: '11px 28px', borderRadius: 12, border: 'none', cursor: inCart ? 'default' : 'pointer',
                 background: inCart ? 'rgba(30,196,166,.2)' : 'var(--accent-gold)',
-                color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 900, fontSize: '.95rem',
+                color: inCart ? 'var(--accent-gold)' : '#fff', fontWeight: 900, fontSize: '.95rem',
                 letterSpacing: '.01em', whiteSpace: 'nowrap',
               }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
             </div>
@@ -818,7 +850,7 @@ function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
                 <button onClick={() => { if (!inCart) onAdd(listing); onClose() }} style={{
                   padding: '10px 22px', borderRadius: 10, border: 'none', cursor: inCart ? 'default' : 'pointer',
                   background: inCart ? 'rgba(30,196,166,.15)' : 'var(--accent-gold)',
-                  color: inCart ? 'var(--accent-gold)' : '#000', fontWeight: 800, fontSize: '.88rem',
+                  color: inCart ? 'var(--accent-gold)' : '#fff', fontWeight: 800, fontSize: '.88rem',
                 }}>{inCart ? '✓ In Cart' : '+ Add to Cart'}</button>
               </div>
             </div>
