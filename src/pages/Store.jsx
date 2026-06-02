@@ -1736,6 +1736,11 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
             onView={setSelectedListing}
           />
 
+          {/* Infographics — full-bleed, zero gap below the showcase */}
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 0 }}>
+            <img src="/mana-mint-info-1.png" alt="What's Inside" style={{ width: '100%', display: 'block' }} draggable={false} />
+            <img src="/mana-mint-info-2.png" alt="Compare the Repacks" style={{ width: '100%', display: 'block' }} draggable={false} />
+          </div>
 
           {/* Overflow products beyond the 3 arch slots */}
           {!loading && filtered.length > 3 && (
