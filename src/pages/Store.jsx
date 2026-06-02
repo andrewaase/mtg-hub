@@ -586,63 +586,41 @@ function ResealedCard({ listing, onAdd, inCart, onView }) {
 
 // ─── Resealed Showcase ────────────────────────────────────────────────────────
 //
-// mana-mint-resealed-background.png (1672×941) shows three bags side by side:
-//   Left   — Entry Level   (blue bag,  $35)
-//   Center — Rare Reserve  (green bag, $75)  ← MOST POPULAR
-//   Right  — Mythic Cache  (white bag, $125)
+// mana-mint-resealed-background-v2.png (1672×941):
+//   Left   — Mint Starter  (navy blue bag, $35)
+//   Center — Rare Reserve  (green bag,     $75)  ← MOST POPULAR
+//   Right  — Mythic Cache  (white bag,     $125)
 //
-// We match listings by name substring and layer click zones over each bag.
-// Hovering shows a glowing ring + label; clicking opens the product modal.
+// Zones pixel-calibrated from image analysis. Completely invisible — cursor only.
+
+const RESEALED_BG = '/mana-mint-resealed-background-v2.png'
 
 const SHOWCASE_SLOTS = [
-  {
-    key:    'entry',
-    label:  'Entry Level',
-    tier:   '$35',
-    // click zone — left column
-    zone:   { left: '2%', top: '13%', width: '30%', bottom: '8%' },
-    color:  '#3b82f6',   // blue accent matching the bag
-  },
-  {
-    key:    'rare',
-    label:  'Rare Reserve',
-    tier:   '$75',
-    badge:  'Most Popular',
-    // click zone — center column, taller (most popular badge pushes it up)
-    zone:   { left: '34%', top: '8%', width: '32%', bottom: '8%' },
-    color:  '#1ec4a6',   // mint accent matching the bag
-  },
-  {
-    key:    'mythic',
-    label:  'Mythic Cache',
-    tier:   '$125',
-    // click zone — right column
-    zone:   { left: '68%', top: '13%', width: '30%', bottom: '8%' },
-    color:  '#a78bfa',   // purple accent matching the white/premium bag
-  },
+  { key: 'mint starter', label: 'Mint Starter'  },
+  { key: 'rare',         label: 'Rare Reserve'  },
+  { key: 'mythic',       label: 'Mythic Cache'  },
 ]
 
-// Pixel-calibrated hit zones for mana-mint-resealed-background.png (1672×941)
-// Two zones per product: bag body + "Tap to Explore" button
-// All values are % of the rendered image dimensions.
+// Pixel-exact hit zones (% of 1672×941 image)
+// Each product: bag body zone + "Tap to Explore" button zone
 const RESEALED_HIT_ZONES = [
-  // ── Entry Level (left, navy blue bag) ──────────────────────────────────
+  // ── Mint Starter (left, navy blue bag) — x:205-495, y:332-802
   {
     slot: 0,
-    bag:    { left: '12.3%', top: '31.7%', width: '17.2%', height: '49.3%' }, // x:205-494, y:298-762
-    button: { left: '10%',   top: '85%',   width: '13%',   height: '8%'    }, // "Tap to Explore" pill
+    bag:    { left: '12.3%', top: '35.3%', width: '17.3%', height: '49.9%' },
+    button: { left: '10.2%', top: '85.1%', width: '12.8%', height: '7.5%'  },
   },
-  // ── Rare Reserve (center, green bag) ───────────────────────────────────
+  // ── Rare Reserve (center, green bag) — x:667-980, y:36-763
   {
     slot: 1,
-    bag:    { left: '39.9%', top: '3.9%',  width: '18.8%', height: '77.2%' }, // x:667-981, y:37-763
-    button: { left: '38%',   top: '93%',   width: '13%',   height: '6%'    },
+    bag:    { left: '39.9%', top: '3.8%',  width: '18.7%', height: '77.3%' },
+    button: { left: '38.2%', top: '93.2%', width: '12.8%', height: '6%'    },
   },
-  // ── Mythic Cache (right, white bag) ────────────────────────────────────
+  // ── Mythic Cache (right, white bag) — x:1149-1509, y:332-802
   {
     slot: 2,
-    bag:    { left: '68.7%', top: '31.7%', width: '21.6%', height: '56.8%' }, // x:1149-1509, y:298-833
-    button: { left: '67%',   top: '85%',   width: '14%',   height: '8%'    },
+    bag:    { left: '68.7%', top: '35.3%', width: '21.5%', height: '49.9%' },
+    button: { left: '67.0%', top: '85.1%', width: '14.0%', height: '7.5%'  },
   },
 ]
 
@@ -678,7 +656,7 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
         paddingTop: 'min(56.28%, calc(100dvh - 56px))',
       }}>
         <img
-          src="/mana-mint-resealed-background.png"
+          src={RESEALED_BG}
           alt="Mana Mint Premium Repacks"
           style={{
             position: 'absolute', inset: 0,
@@ -718,13 +696,13 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
 // Front + back image map — keyed by substring of listing.name (lowercase).
 // Matches: "entry" → blue bag, "rare" → green bag, "mythic" → white bag
 const RESEALED_IMAGES = {
-  'entry':           { front: '/Mana-mint-blue-bag-front.png',    back: '/Mana-mint-blue-bag-back.png'    },
+  'mint starter':    { front: '/Mana-mint-blue-bag-front.png',    back: '/Mana-mint-blue-bag-back.png'    },
+  'rare reserve':    { front: '/Mana-Mint-green-bag-front.png',   back: '/Mana-mint-green-bag-back.png'   },
+  'mythic cache':    { front: '/Mana-Mint-White-bag-front.png',   back: '/Mana-Mint-White-bag-back.png'   },
+  // Shorter fallback matches
+  'mint':            { front: '/Mana-mint-blue-bag-front.png',    back: '/Mana-mint-blue-bag-back.png'    },
   'rare':            { front: '/Mana-Mint-green-bag-front.png',   back: '/Mana-mint-green-bag-back.png'   },
   'mythic':          { front: '/Mana-Mint-White-bag-front.png',   back: '/Mana-Mint-White-bag-back.png'   },
-  // Legacy fallbacks for any old listings still in the DB
-  'legendary cache': { front: '/Mana-Mint-White-bag-front.png',   back: '/Mana-Mint-White-bag-back.png'   },
-  'treasure vault':  { front: '/Mana-mint-blue-bag-front.png',    back: '/Mana-mint-blue-bag-back.png'    },
-  'vault hunter':    { front: '/Mana-Mint-green-bag-front.png',   back: '/Mana-mint-green-bag-back.png'   },
 }
 
 function getResealedImages(name = '') {
