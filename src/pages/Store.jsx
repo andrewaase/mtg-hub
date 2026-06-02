@@ -1244,7 +1244,7 @@ function WaitlistModal({ listing, user, onClose }) {
 }
 
 //  Main Store page 
-export default function Store({ initialSearch = '', onSearchUsed, user }) {
+export default function Store({ initialSearch = '', onSearchUsed, user, isActive = true }) {
   const [listings,        setListings]        = useState([])
   const [loading,         setLoading]         = useState(true)
   const [search,          setSearch]          = useState(initialSearch)
@@ -1543,7 +1543,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user }) {
           { id: 'sealed',   label: 'Sealed'   },
           { id: 'resealed', label: 'Resealed' },
         ]
-        if (category === 'resealed' && topbarEl) {
+        if (category === 'resealed' && topbarEl && isActive) {
           return createPortal(
             <div style={{
               position: 'absolute', left: '50%', top: '50%',

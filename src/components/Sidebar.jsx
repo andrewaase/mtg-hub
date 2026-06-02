@@ -39,8 +39,10 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
         <img
           src={logoPng}
           alt="Mana Mint"
+          onClick={() => { setPage('dashboard'); setSidebarOpen(false) }}
           style={{
             width: '160px', height: 'auto',
+            cursor: 'pointer',
           }}
         />
       </div>
