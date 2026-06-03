@@ -430,7 +430,10 @@ export async function createNotification(targetUserId, type, title, bodyText, da
 
 export async function searchUsers(query) {
   if (!hasSupabase) return []
-  const { data } = await supabase.from('profiles').select('id, username, avatar_color').ilike('username', `%${query}%`).limit(8)
+  // Uses the search_usernames() SECURITY DEFINER function instead of a direct
+  // table select, so friend-search returns only id/username/avatar_color and
+  // never exposes the PII columns (full_name, address) on the profiles table.
+  const { data } = await supabase.rpc('search_usernames', { q: query })
   return data || []
 }
 
