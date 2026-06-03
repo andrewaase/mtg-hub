@@ -2026,7 +2026,7 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
                   color: 'rgba(100,200,120,0.28)',
                 }}>
                   <div style={{ fontSize: '2.2rem' }}></div>
-                  <div style={{ fontSize: '.8rem' }}>Drag cards here — or click a hand card to play</div>
+                  <div style={{ fontSize: '.8rem' }}>Drag cards from your hand to play</div>
                 </div>
               ) : (() => {
                 const bfNonLands = battlefield.filter(c => !c.isLand)
@@ -2100,7 +2100,7 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
                    Hand ({hand.length})
                   {hand.length > 0 && (
                     <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6, opacity: .7 }}>
-                      click to play · drag to GY to discard
+                      drag to field to play · drag to GY to discard
                     </span>
                   )}
                 </div>
@@ -2120,12 +2120,11 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
                         onDragStart={e => handleDragStart(e, 'hand', card._id)}
                         onDragEnd={handleDragEnd}
                         style={{ flexShrink: 0, cursor: 'grab' }}
-                        title="Click to play to battlefield · drag to GY to discard"
+                        title="Drag to battlefield to play · drag to GY to discard"
                       >
                         <SimCardImage
                           name={card.name}
                           width={80}
-                          onClick={() => playCard(card._id)}
                         />
                       </div>
                     ))}
