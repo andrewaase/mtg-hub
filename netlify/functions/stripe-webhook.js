@@ -37,7 +37,7 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
       </td>
       <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:center;color:#94a3b8;font-size:13px;">${escHtml(item.condition || 'NM')}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:center;font-size:13px;color:#e2e8f0;">${escHtml(item.qty)}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:right;font-weight:700;font-size:14px;color:#c9a84c;">$${(item.price * item.qty).toFixed(2)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #1e293b;text-align:right;font-weight:700;font-size:14px;color:#1ec4a6;">$${(item.price * item.qty).toFixed(2)}</td>
     </tr>`).join('')
 
   const html = `<!DOCTYPE html>
@@ -50,8 +50,8 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
 
   <!-- Header -->
   <tr>
-    <td style="background:linear-gradient(135deg,#0f172a,#1a1200);padding:28px 36px;text-align:center;border-bottom:1px solid rgba(201,168,76,.3);">
-      <div style="color:#c9a84c;font-size:22px;font-weight:800;letter-spacing:3px;">⚡ VAULTED SINGLES</div>
+    <td style="background:linear-gradient(135deg,#021f4e,#0a3d2e);padding:28px 36px;text-align:center;border-bottom:1px solid rgba(30,196,166,.3);">
+      <div style="color:#1ec4a6;font-size:22px;font-weight:800;letter-spacing:3px;">🌿 MANA MINT</div>
       <div style="color:#94a3b8;font-size:13px;margin-top:6px;">Order Confirmed</div>
     </td>
   </tr>
@@ -86,7 +86,7 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
           </tr>` : ''}
           <tr style="background:#1e293b;">
             <td colspan="4" style="padding:12px 8px;font-weight:700;font-size:15px;color:#f1f5f9;">Order Total</td>
-            <td style="padding:12px 8px;text-align:right;font-weight:800;font-size:17px;color:#c9a84c;">$${total.toFixed(2)}</td>
+            <td style="padding:12px 8px;text-align:right;font-weight:800;font-size:17px;color:#1ec4a6;">$${total.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
@@ -111,8 +111,8 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
   <tr>
     <td style="padding:24px 36px;text-align:center;border-top:1px solid #1e293b;margin-top:8px;">
       <p style="color:#64748b;font-size:13px;margin:0 0 6px;">Questions about your order?</p>
-      <a href="mailto:mtgvaultedsingles@gmail.com" style="color:#c9a84c;font-size:14px;font-weight:600;text-decoration:none;">mtgvaultedsingles@gmail.com</a>
-      <p style="color:#475569;font-size:11px;margin:14px 0 0;">© ${new Date().getFullYear()} Vaulted Singles &nbsp;·&nbsp; <a href="https://www.vaultedsingles.com" style="color:#64748b;text-decoration:none;">vaultedsingles.com</a></p>
+      <a href="mailto:manamintmtg@gmail.com" style="color:#1ec4a6;font-size:14px;font-weight:600;text-decoration:none;">manamintmtg@gmail.com</a>
+      <p style="color:#475569;font-size:11px;margin:14px 0 0;">© ${new Date().getFullYear()} Mana Mint &nbsp;·&nbsp; <a href="https://www.manamint.store" style="color:#64748b;text-decoration:none;">manamint.store</a></p>
     </td>
   </tr>
 
@@ -126,9 +126,10 @@ async function sendOrderEmail({ to, firstName, name, items, subtotal, shippingCo
     method:  'POST',
     headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from:    'Vaulted Singles <orders@vaultedsingles.com>',
-      to:      [to],
-      subject: `🎴 Your Vaulted Singles order is confirmed!`,
+      from:     process.env.ORDER_FROM_EMAIL || 'Mana Mint <orders@manamint.store>',
+      reply_to: process.env.CONTACT_EMAIL    || 'manamintmtg@gmail.com',
+      to:       [to],
+      subject:  `🎴 Your Mana Mint order is confirmed!`,
       html,
     }),
   })
@@ -336,8 +337,8 @@ exports.handler = async (event) => {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${RESEND_KEY_ADMIN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from:    'Vaulted Singles <orders@vaultedsingles.com>',
-            to:      [process.env.ADMIN_EMAIL || 'mtgvaultedsingles@gmail.com'],
+            from:    process.env.ORDER_FROM_EMAIL || 'Mana Mint <orders@manamint.store>',
+            to:      [process.env.ADMIN_EMAIL || 'manamintmtg@gmail.com'],
             subject: `🛒 New Order — $${(pi.amount / 100).toFixed(2)} from ${meta.customer_name || meta.customer_email}`,
             text:    `New order received!\n\nCustomer: ${meta.customer_name} <${meta.customer_email}>\nShip to: ${meta.shipping_line1}, ${meta.shipping_city}, ${meta.shipping_state} ${meta.shipping_zip}\n\nItems:\n${adminItemList}\n\nTotal: $${(pi.amount / 100).toFixed(2)}\nOrder ID: ${order.id}`,
           }),

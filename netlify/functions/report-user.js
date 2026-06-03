@@ -83,16 +83,16 @@ exports.handler = async (event) => {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from:    `Vaulted Singles <${FROM_EMAIL}>`,
+        from:    process.env.ORDER_FROM_EMAIL || `Mana Mint <${FROM_EMAIL}>`,
         to:      [ADMIN_EMAIL],
         subject: `[Report] ${reportedEmail || reportedUserId || 'Unknown user'} reported`,
         html: `
-          <h2 style="color:#c9a84c">User Report Received</h2>
+          <h2 style="color:#1ec4a6">User Report Received</h2>
           <p><strong>Reported by:</strong> ${caller.email}</p>
           <p><strong>Reported user:</strong> ${reportedEmail || reportedUserId || 'Unknown'}</p>
           <p><strong>Reason:</strong></p>
-          <blockquote style="border-left:3px solid #c9a84c;padding-left:12px;color:#555">${reason.trim()}</blockquote>
-          <p style="color:#888;font-size:12px">Vaulted Singles Admin</p>
+          <blockquote style="border-left:3px solid #1ec4a6;padding-left:12px;color:#555">${reason.trim()}</blockquote>
+          <p style="color:#888;font-size:12px">Mana Mint Admin</p>
         `,
       }),
     }).catch(() => {})

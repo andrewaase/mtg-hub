@@ -59,7 +59,7 @@ export default function Terms({ setPage }) {
 
       {/* 3 */}
       {section('3. Accounts & Registration')}
-      {p('When you register you must provide accurate, current, and complete information — including your legal name, email address, and shipping address. You are responsible for maintaining the confidentiality of your password and for all activity under your account. Notify us immediately at support@manamint.store if you suspect unauthorized access.')}
+      {p('When you register you must provide accurate, current, and complete information — including your legal name, email address, and shipping address. You are responsible for maintaining the confidentiality of your password and for all activity under your account. Notify us immediately at manamintmtg@gmail.com if you suspect unauthorized access.')}
       {p('We may suspend or terminate accounts that violate these Terms, provide false information, or engage in fraudulent or abusive behavior.')}
 
       {/* 4 */}
@@ -70,7 +70,7 @@ export default function Terms({ setPage }) {
       {/* 5 */}
       {section('5. Shipping & Returns')}
       {p('We ship to addresses in the United States. International shipping availability is noted at checkout. Orders are processed within 1–3 business days. Tracking information is emailed once your order ships. We are not responsible for carrier delays or losses once a package has been accepted by the carrier.')}
-      {p('Due to the collectible nature of our products, all sales are generally final. If you receive a damaged or incorrect item, contact us within 7 days of delivery at support@manamint.store and we will work to make it right.')}
+      {p('Due to the collectible nature of our products, all sales are generally final. If you receive a damaged or incorrect item, contact us within 7 days of delivery at manamintmtg@gmail.com and we will work to make it right.')}
 
       {/* 6 */}
       {section('6. Intellectual Property')}
@@ -125,7 +125,7 @@ export default function Terms({ setPage }) {
         <li><strong style={{ color: 'var(--text-primary)' }}>Restriction / Objection:</strong> ask us to restrict or stop processing your data in certain circumstances.</li>
         <li><strong style={{ color: 'var(--text-primary)' }}>California residents (CCPA):</strong> you have the right to know what personal data we collect, the right to delete it, and the right to opt out of its sale (we do not sell personal data).</li>
       </ul>
-      {p('To exercise any of these rights, email us at support@manamint.store with the subject "Privacy Request." We will respond within 30 days. We may need to verify your identity before processing your request.')}
+      {p('To exercise any of these rights, email us at manamintmtg@gmail.com with the subject "Privacy Request." We will respond within 30 days. We may need to verify your identity before processing your request.')}
 
       {/* 13 */}
       {section('13. Cookies & Local Storage')}
@@ -156,7 +156,7 @@ export default function Terms({ setPage }) {
       {p('Questions about these Terms or your data? Contact us at:')}
       <p style={{ fontSize: '.88rem', color: 'var(--text-muted)', lineHeight: 1.75, margin: '0 0 12px' }}>
         Mana Mint<br />
-        Email: <a href="mailto:support@manamint.store" style={{ color: 'var(--accent-gold)' }}>support@manamint.store</a>
+        Email: <a href="mailto:manamintmtg@gmail.com" style={{ color: 'var(--accent-gold)' }}>manamintmtg@gmail.com</a>
       </p>
 
       <div style={{ marginTop: 48, paddingTop: 32, borderTop: '1px solid var(--border)', fontSize: '.75rem', color: 'var(--text-muted)' }}>

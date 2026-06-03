@@ -258,7 +258,7 @@ export default function About({ setPage }) {
           We'd love to hear from you.
         </p>
         <a
-          href="mailto:hello@manamint.store"
+          href="mailto:manamintmtg@gmail.com"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
             padding: '10px 20px', borderRadius: 10,
@@ -267,7 +267,7 @@ export default function About({ setPage }) {
             textDecoration: 'none',
           }}
         >
-           hello@manamint.store
+           manamintmtg@gmail.com
         </a>
       </div>
 
