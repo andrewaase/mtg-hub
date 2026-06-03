@@ -1696,15 +1696,15 @@ function BattlefieldCard({ card, onTap, onDiscard, onReturn, onDragStart, onDrag
   const [hovered, setHovered] = useState(false)
   return (
     <div
-      style={{ position: 'relative', width: 116, height: 116, flexShrink: 0 }}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      style={{ position: 'relative', width: 116, height: 116, flexShrink: 0, cursor: 'grab' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Rotating card */}
       <div
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
         onClick={onTap}
         title={card.tapped ? `${card.name} — click to untap` : `${card.name} — click to tap`}
         style={{
@@ -1783,16 +1783,31 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
   const [mode,          setMode]          = useState('hand')
   const [library,       setLibrary]       = useState([])
   const [hand,          setHand]          = useState([])
-  const [battlefield,   setBattlefield]   = useState([])  // { _id, name, tapped }
+  const [battlefield,   setBattlefield]   = useState([])  // { _id, name, tapped, zone, x, y }
   const [graveyard,     setGraveyard]     = useState([])
   const [mulliganCount, setMulliganCount] = useState(0)
   const [turn,          setTurn]          = useState(1)
   const [dragSource,    setDragSource]    = useState(null) // { zone, id }
   const [dragOverZone,  setDragOverZone]  = useState(null)
+  const dragOffsetRef   = useRef({ x: 37, y: 50 }) // cursor offset within card on dragStart
 
   // Determines if a card is a land based on the type data fetched by DeckDetail
   function isLandCard(name) {
     return /\bLand\b/.test(cardTypes[name] || '')
+  }
+
+  // Auto-assign a battlefield zone based on card type
+  function getAutoZone(name) {
+    const t = (cardTypes[name] || '').toLowerCase()
+    if (t.includes('land'))     return 'lands'
+    if (t.includes('creature')) return 'creatures'
+    return 'other' // instants, sorceries, enchantments, artifacts, planeswalkers
+  }
+
+  // Auto-position: cascade from top-left within the zone
+  function getAutoPos(zone, currentBattlefield) {
+    const n = currentBattlefield.filter(c => c.zone === zone).length
+    return { x: 10 + (n % 7) * 82, y: 10 + Math.floor(n / 7) * 92 }
   }
 
   useEffect(() => {
@@ -1843,12 +1858,16 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
     setTurn(t => t + 1)
   }
 
-  // Play a hand card to the battlefield
-  function playCard(id) {
+  // Play a hand card to the battlefield (drag-based — zone + position supplied by caller)
+  function playCard(id, zone, x, y) {
     const card = hand.find(c => c._id === id)
     if (!card) return
+    const targetZone = zone || getAutoZone(card.name)
+    setBattlefield(prev => {
+      const pos = (x != null && y != null) ? { x, y } : getAutoPos(targetZone, prev)
+      return [...prev, { ...card, tapped: false, zone: targetZone, x: pos.x, y: pos.y }]
+    })
     setHand(prev => prev.filter(c => c._id !== id))
-    setBattlefield(prev => [...prev, { ...card, tapped: false, isLand: isLandCard(card.name) }])
   }
 
   function toggleTap(id) {
@@ -1869,9 +1888,15 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
     setHand(prev => [...prev, card])
   }
 
-  //  Drag and drop 
-  function handleDragStart(e, zone, id) {
-    setDragSource({ zone, id })
+  //  Drag and drop
+  function handleDragStart(e, srcZone, id) {
+    // Capture where within the card the user grabbed it
+    const rect = e.currentTarget.getBoundingClientRect()
+    dragOffsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+    setDragSource({ zone: srcZone, id })
     e.dataTransfer.effectAllowed = 'move'
   }
 
@@ -1887,21 +1912,33 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
     if (!dragSource) return
     const { zone: srcZone, id } = dragSource
     setDragSource(null)
-    if (srcZone === targetZone) return
+
+    // Compute free position within the zone container
+    const containerRect = e.currentTarget.getBoundingClientRect()
+    const x = Math.max(0, e.clientX - containerRect.left - dragOffsetRef.current.x)
+    const y = Math.max(0, e.clientY - containerRect.top  - dragOffsetRef.current.y)
 
     let card = null
-    if (srcZone === 'hand')        card = hand.find(c => c._id === id)
+    if (srcZone === 'hand')            card = hand.find(c => c._id === id)
     else if (srcZone === 'battlefield') card = battlefield.find(c => c._id === id)
     else if (srcZone === 'graveyard')   card = graveyard.find(c => c._id === id)
     if (!card) return
 
-    if (srcZone === 'hand')        setHand(prev => prev.filter(c => c._id !== id))
+    // Remove from source zone
+    if (srcZone === 'hand')            setHand(prev => prev.filter(c => c._id !== id))
     else if (srcZone === 'battlefield') setBattlefield(prev => prev.filter(c => c._id !== id))
     else if (srcZone === 'graveyard')   setGraveyard(prev => prev.filter(c => c._id !== id))
 
-    if (targetZone === 'battlefield') setBattlefield(prev => [...prev, { ...card, tapped: false, isLand: isLandCard(card.name) }])
-    else if (targetZone === 'hand')   setHand(prev => [...prev, card])
-    else if (targetZone === 'graveyard') setGraveyard(prev => [card, ...prev])
+    // Add to target zone
+    const bfZones = ['creatures', 'lands', 'other']
+    if (bfZones.includes(targetZone)) {
+      // Dropping onto battlefield zone — position freely
+      setBattlefield(prev => [...prev, { ...card, tapped: false, zone: targetZone, x, y }])
+    } else if (targetZone === 'hand') {
+      setHand(prev => [...prev, card])
+    } else if (targetZone === 'graveyard') {
+      setGraveyard(prev => [card, ...prev])
+    }
   }
 
   function handleDragEnd() {
@@ -1988,54 +2025,61 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
           )}
         </div>
 
-        {/*  SOLITAIRE LAYOUT  */}
+        {/*  SOLITAIRE LAYOUT — 3 named zones + freeform drag positioning  */}
         {mode === 'solitaire' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', padding: '8px 12px 0' }}>
 
-            {/*  Battlefield drop zone  */}
-            <div
-              onDragOver={e => handleDragOver(e, 'battlefield')}
-              onDrop={e => handleDrop(e, 'battlefield')}
-              style={{
-                flex: 1, minHeight: 0,
-                background: dragOverZone === 'battlefield'
-                  ? 'rgba(0,110,45,0.45)'
-                  : 'rgba(0,45,20,0.38)',
-                border: `2px ${dragOverZone === 'battlefield'
-                  ? 'dashed rgba(74,222,128,0.75)'
-                  : 'solid rgba(0,70,25,0.55)'}`,
-                borderRadius: 12, margin: '10px 14px 6px',
-                padding: '28px 12px 10px',
-                overflowY: 'auto',
-                transition: 'background .15s, border-color .15s',
-                position: 'relative',
-              }}
-            >
-              <div style={{
-                position: 'absolute', top: 7, left: 13,
-                fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase',
-                letterSpacing: '1.2px', color: 'rgba(100,220,120,0.5)',
-                pointerEvents: 'none',
-              }}> Battlefield</div>
+            {/* ── Battlefield: 3 stacked named zones ─────────────────── */}
+            {[
+              { id: 'other',     label: '✦ Enchantments · Artifacts · Planeswalkers · Instants', flex: 2, borderColor: 'rgba(168,85,247,', bg: 'rgba(88,28,135,' },
+              { id: 'creatures', label: '⚔ Creatures',  flex: 3, borderColor: 'rgba(74,222,128,',  bg: 'rgba(5,46,22,'  },
+              { id: 'lands',     label: '🌲 Lands',      flex: 2, borderColor: 'rgba(251,191,36,',  bg: 'rgba(66,32,6,'  },
+            ].map((zone, zi) => {
+              const isOver  = dragOverZone === zone.id
+              const zCards  = battlefield.filter(c => c.zone === zone.id)
+              return (
+                <div
+                  key={zone.id}
+                  onDragOver={e => handleDragOver(e, zone.id)}
+                  onDrop={e => handleDrop(e, zone.id)}
+                  style={{
+                    flex: zone.flex, minHeight: 0, position: 'relative',
+                    background: isOver ? `${zone.bg}0.35)` : `${zone.bg}0.22)`,
+                    border: `1.5px ${isOver ? 'dashed' : 'solid'} ${zone.borderColor}${isOver ? '0.6)' : '0.25)'}`,
+                    borderRadius: 10,
+                    marginBottom: zi < 2 ? 5 : 0,
+                    transition: 'background .15s, border-color .15s',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Zone label */}
+                  <div style={{
+                    position: 'absolute', top: 5, left: 10,
+                    fontSize: '.54rem', fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '1px', color: `${zone.borderColor}0.45)`,
+                    pointerEvents: 'none', zIndex: 0,
+                  }}>{zone.label}</div>
 
-              {battlefield.length === 0 ? (
-                <div style={{
-                  height: '100%', minHeight: 110,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 8, pointerEvents: 'none',
-                  color: 'rgba(100,200,120,0.28)',
-                }}>
-                  <div style={{ fontSize: '2.2rem' }}></div>
-                  <div style={{ fontSize: '.8rem' }}>Drag cards from your hand to play</div>
-                </div>
-              ) : (() => {
-                const bfNonLands = battlefield.filter(c => !c.isLand)
-                const bfLands    = battlefield.filter(c => c.isLand)
-                const BfRow = ({ cards }) => (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {cards.map(card => (
+                  {/* Empty hint */}
+                  {zCards.length === 0 && (
+                    <div style={{
+                      position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', color: `${zone.borderColor}0.18)`,
+                      fontSize: '.7rem', pointerEvents: 'none',
+                    }}>drag here</div>
+                  )}
+
+                  {/* Freely positioned cards — stacking supported */}
+                  {zCards.map(card => (
+                    <div
+                      key={card._id}
+                      style={{
+                        position: 'absolute',
+                        left: card.x, top: card.y,
+                        zIndex: 2,
+                      }}
+                    >
                       <BattlefieldCard
-                        key={card._id}
                         card={card}
                         onTap={() => toggleTap(card._id)}
                         onDiscard={() => discardFromField(card._id)}
@@ -2043,45 +2087,16 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
                         onDragStart={e => handleDragStart(e, 'battlefield', card._id)}
                         onDragEnd={handleDragEnd}
                       />
-                    ))}
-                  </div>
-                )
-                const zoneLabel = (text) => (
-                  <div style={{
-                    fontSize: '.54rem', fontWeight: 700, textTransform: 'uppercase',
-                    letterSpacing: '1.2px', color: 'rgba(100,220,120,0.45)', marginBottom: 5,
-                  }}>{text}</div>
-                )
-                const emptyRow = (
-                  <div style={{
-                    minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'rgba(100,220,120,0.18)', fontSize: '.7rem',
-                    border: '1px dashed rgba(100,220,120,0.12)', borderRadius: 8,
-                  }}>— none —</div>
-                )
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {/* Non-lands: creatures, planeswalkers, enchantments, etc. */}
-                    <div>
-                      {zoneLabel(' Creatures & Spells')}
-                      {bfNonLands.length > 0 ? <BfRow cards={bfNonLands} /> : emptyRow}
                     </div>
-                    {/* Separator */}
-                    <div style={{ borderTop: '1px solid rgba(100,220,120,0.18)', margin: '2px 0' }} />
-                    {/* Lands */}
-                    <div>
-                      {zoneLabel(' Lands')}
-                      {bfLands.length > 0 ? <BfRow cards={bfLands} /> : emptyRow}
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
+                  ))}
+                </div>
+              )
+            })}
 
-            {/*  Bottom strip: Hand + Graveyard  */}
-            <div style={{ display: 'flex', gap: 8, padding: '0 14px 10px', flexShrink: 0 }}>
+            {/* ── Bottom strip: Hand + Graveyard ─────────────────────── */}
+            <div style={{ display: 'flex', gap: 8, padding: '6px 0 8px', flexShrink: 0 }}>
 
-              {/* Hand zone */}
+              {/* Hand */}
               <div
                 onDragOver={e => handleDragOver(e, 'hand')}
                 onDrop={e => handleDrop(e, 'hand')}
@@ -2089,82 +2104,66 @@ function HandSimulatorModal({ deck, cardTypes = {}, onClose }) {
                   flex: 1, minWidth: 0,
                   background: dragOverZone === 'hand' ? 'rgba(99,102,241,0.12)' : 'var(--bg-secondary)',
                   border: `1.5px ${dragOverZone === 'hand' ? 'dashed #818cf8' : 'solid var(--border)'}`,
-                  borderRadius: 10, padding: '8px 10px',
+                  borderRadius: 10, padding: '7px 10px',
                   transition: 'background .15s, border-color .15s',
                 }}
               >
-                <div style={{
-                  fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 6,
-                }}>
-                   Hand ({hand.length})
-                  {hand.length > 0 && (
-                    <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6, opacity: .7 }}>
-                      drag to field to play · drag to GY to discard
-                    </span>
-                  )}
+                <div style={{ fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 5 }}>
+                  ✋ Hand ({hand.length})
+                  {hand.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', marginLeft: 6, opacity: .65 }}>drag to a zone to play · drag to GY to discard</span>}
                 </div>
                 {hand.length === 0 ? (
-                  <div style={{
-                    height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--text-muted)', fontSize: '.78rem',
-                  }}>
+                  <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '.75rem' }}>
                     {library.length === 0 ? 'Library empty' : 'No cards — hit Next Turn to draw'}
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+                  <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 3 }}>
                     {hand.map(card => (
-                      <div
-                        key={card._id}
-                        draggable
+                      <div key={card._id} draggable
                         onDragStart={e => handleDragStart(e, 'hand', card._id)}
                         onDragEnd={handleDragEnd}
                         style={{ flexShrink: 0, cursor: 'grab' }}
-                        title="Drag to battlefield to play · drag to GY to discard"
+                        title="Drag to a battlefield zone to play · drag to GY to discard"
                       >
-                        <SimCardImage
-                          name={card.name}
-                          width={80}
-                        />
+                        <SimCardImage name={card.name} width={78} />
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Graveyard zone */}
+              {/* Graveyard */}
               <div
                 onDragOver={e => handleDragOver(e, 'graveyard')}
                 onDrop={e => handleDrop(e, 'graveyard')}
                 style={{
-                  width: 94, flexShrink: 0,
+                  width: 92, flexShrink: 0,
                   background: dragOverZone === 'graveyard' ? 'rgba(239,68,68,0.12)' : 'var(--bg-secondary)',
                   border: `1.5px ${dragOverZone === 'graveyard' ? 'dashed #f87171' : 'solid var(--border)'}`,
-                  borderRadius: 10, padding: '8px 8px',
+                  borderRadius: 10, padding: '7px 8px',
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   transition: 'background .15s, border-color .15s',
                 }}
               >
-                <div style={{
-                  fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 6, textAlign: 'center',
-                }}>
-                   GY ({graveyard.length})
+                <div style={{ fontSize: '.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 5, textAlign: 'center' }}>
+                  💀 GY ({graveyard.length})
                 </div>
                 {graveyard.length === 0 ? (
-                  <div style={{
-                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'rgba(248,113,113,0.22)', fontSize: '1.8rem',
-                  }}></div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(248,113,113,0.22)', fontSize: '1.6rem' }}>☠</div>
                 ) : (
-                  <div style={{ position: 'relative', width: 72 }}>
-                    <SimCardImage name={graveyard[0].name} width={72} dimmed />
+                  <div
+                    draggable
+                    onDragStart={e => handleDragStart(e, 'graveyard', graveyard[0]._id)}
+                    onDragEnd={handleDragEnd}
+                    style={{ position: 'relative', width: 70, cursor: 'grab' }}
+                    title="Drag to return a card from graveyard"
+                  >
+                    <SimCardImage name={graveyard[0].name} width={70} dimmed />
                     {graveyard.length > 1 && (
                       <div style={{
                         position: 'absolute', top: -7, right: -7,
                         background: '#ef4444', color: '#fff', borderRadius: '50%',
-                        width: 20, height: 20, display: 'flex',
-                        alignItems: 'center', justifyContent: 'center',
+                        width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '.65rem', fontWeight: 800,
                       }}>{graveyard.length}</div>
                     )}
