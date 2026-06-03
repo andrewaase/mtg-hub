@@ -7,10 +7,11 @@
 //   headers: { ...corsHeaders(event), 'Content-Type': 'application/json' }
 
 const ALLOWED_ORIGINS = [
-  'https://www.vaultedsingles.com',
-  'https://vaultedsingles.com',
+  'https://www.manamint.store',
+  'https://manamint.store',
   // Local dev
   'http://localhost:5173',
+  'http://localhost:5176',
   'http://localhost:5180',
 ]
 
@@ -23,7 +24,7 @@ function getAllowedOrigin(event) {
   const requestOrigin = event?.headers?.origin || event?.headers?.Origin || ''
   return ALLOWED_ORIGINS.includes(requestOrigin)
     ? requestOrigin
-    : 'https://www.vaultedsingles.com'
+    : 'https://www.manamint.store'
 }
 
 /**

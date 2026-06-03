@@ -22,7 +22,7 @@ exports.handler = async (event) => {
   const STRIPE_KEY   = process.env.STRIPE_SECRET_KEY
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
-  const SITE_URL     = process.env.SITE_URL || 'https://www.vaultedsingles.com'
+  const SITE_URL     = process.env.SITE_URL || 'https://www.manamint.store'
 
   if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) {
     return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'Server not configured' }) }
