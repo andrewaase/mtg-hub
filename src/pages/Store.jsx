@@ -644,7 +644,7 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
       position: 'relative', userSelect: 'none',
       background: '#e8f0f7',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: 'calc(100dvh - 56px)',
+      minHeight: 'calc(100dvh - var(--topbar-height, 56px) - var(--safe-top, 0px))',
     }}>
       {/* Use a positioned inner wrapper that preserves the image's exact aspect ratio.
           This makes % zones always map correctly regardless of screen size. */}
@@ -653,7 +653,7 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
         width: '100%',
         maxWidth: '100%',
         // 941/1672 = 56.28% — locks the container to the image's natural ratio
-        paddingTop: 'min(56.28%, calc(100dvh - 56px))',
+        paddingTop: 'min(56.28%, calc(100dvh - var(--topbar-height, 56px) - var(--safe-top, 0px)))',
       }}>
         <img
           src={RESEALED_BG}
@@ -1719,7 +1719,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user, isActive
 
       {/*  Loading skeletons  */}
       {loading && category !== 'resealed' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(120px,calc(50vw - 18px)),1fr))', gap: 12 }}>
           {[...Array(8)].map((_, i) => (
             <div key={i} style={{ aspectRatio: '63/120', borderRadius: 14, background: 'var(--bg-card)', animation: 'pulse 1.5s ease-in-out infinite' }} />
           ))}
@@ -1784,8 +1784,8 @@ export default function Store({ initialSearch = '', onSearchUsed, user, isActive
         <div style={{
           display: 'grid',
           gridTemplateColumns: category === 'single'
-            ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
-            : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
+            ? 'repeat(auto-fill,minmax(min(120px,calc(50vw - 18px)),1fr))'
+            : 'repeat(auto-fill,minmax(min(160px,calc(50vw - 18px)),1fr))',
           gap: 12,
         }}>
           {filtered.map(listing =>
@@ -1807,8 +1807,8 @@ export default function Store({ initialSearch = '', onSearchUsed, user, isActive
           <div style={{
             display: 'grid',
             gridTemplateColumns: category === 'single'
-              ? 'repeat(auto-fill,minmax(min(140px,calc(50vw - 20px)),1fr))'
-              : 'repeat(auto-fill,minmax(min(200px,calc(50vw - 20px)),1fr))',
+              ? 'repeat(auto-fill,minmax(min(120px,calc(50vw - 18px)),1fr))'
+              : 'repeat(auto-fill,minmax(min(160px,calc(50vw - 18px)),1fr))',
             gap: 12,
           }}>
             {outOfStock.map(listing => (
@@ -1880,7 +1880,7 @@ export default function Store({ initialSearch = '', onSearchUsed, user, isActive
       )}
 
       {/*  Floating cart bar  */}
-      <div style={{
+      <div className="store-cart-bar" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 150,
         transform: cartCount > 0 ? 'translateY(0)' : 'translateY(110%)',
         transition: 'transform .3s cubic-bezier(.34,1.56,.64,1)',

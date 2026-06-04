@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mana Mint</string>
+    <string name="title_activity_main">Mana Mint</string>
+    <string name="package_name">com.manamint.store</string>
+    <string name="custom_url_scheme">com.manamint.store</string>
+</resources>

@@ -66,10 +66,15 @@ html.capacitor #topbar {
 }
 
 /* Push bottom nav above home indicator */
-html.capacitor #bottom-nav,
-html.capacitor .mobile-nav {
+html.capacitor #mobile-nav,
+html.capacitor #mobile-nav .mobile-nav-items {
   padding-bottom: var(--safe-bottom);
   height: calc(var(--bottom-nav-height) + var(--safe-bottom));
+}
+
+/* Store cart bar clears home indicator on native */
+html.capacitor .store-cart-bar {
+  padding-bottom: var(--safe-bottom);
 }
 
 /* Content area accounts for taller topbar on native */
