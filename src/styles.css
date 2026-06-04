@@ -41,6 +41,43 @@
 }
 
 /* ============================================================
+   NATIVE APP — safe areas, notch, home indicator
+   ============================================================ */
+
+/* Expose iOS safe-area insets as CSS vars */
+:root {
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+}
+
+/* Prevent content jumping / rubber-banding on native */
+html.capacitor {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  user-select: none;          /* prevent accidental text selection while scrolling */
+}
+
+/* Push topbar down below status bar on native */
+html.capacitor #topbar {
+  padding-top: var(--safe-top);
+  height: calc(var(--topbar-height) + var(--safe-top));
+}
+
+/* Push bottom nav above home indicator */
+html.capacitor #bottom-nav,
+html.capacitor .mobile-nav {
+  padding-bottom: var(--safe-bottom);
+  height: calc(var(--bottom-nav-height) + var(--safe-bottom));
+}
+
+/* Content area accounts for taller topbar on native */
+html.capacitor #main {
+  padding-top: var(--safe-top);
+}
+
+/* ============================================================
    DARK MODE — applied when <html data-theme="dark">
    ============================================================ */
 :root[data-theme="dark"] {

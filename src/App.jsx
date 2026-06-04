@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { onAndroidBack, isNative } from './lib/native'
 import { supabase, hasSupabase } from './lib/supabase'
 import { getMatches, getCollection, addCard, addMatch, getWishlist } from './lib/db'
 import { takeSnapshot } from './lib/priceHistory'
@@ -114,6 +115,22 @@ export default function App() {
       return next
     })
   }, [page])
+
+  // Android hardware back button — navigate back or minimize app
+  useEffect(() => {
+    return onAndroidBack(({ canGoBack }) => {
+      // If a modal is open, close it
+      if (showAuth)      { setShowAuth(false);      return }
+      if (showLogMatch)  { setShowLogMatch(false);   return }
+      if (showAddCard)   { setShowAddCard(false);    return }
+      if (showCamera)    { setShowCamera(false);     return }
+      if (sidebarOpen)   { setSidebarOpen(false);    return }
+      // If not on dashboard, go back to dashboard
+      if (page !== 'dashboard') { setPage('dashboard'); return }
+      // On dashboard — let the OS minimize the app (default back behavior)
+      import('@capacitor/app').then(({ App }) => App.minimizeApp())
+    })
+  }, [page, showAuth, showLogMatch, showAddCard, showCamera, sidebarOpen])
 
   // Deck modal nav-block: prevents accidental navigation while deck editor is open
   const deckModalOpenRef = useRef(false)
