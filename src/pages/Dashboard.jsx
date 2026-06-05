@@ -783,7 +783,7 @@ function MoverRow({ item, type, sort = 'dollar', onClick }) {
       }
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-        <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>${item.oldPrice.toFixed(2)} → ${item.newPrice.toFixed(2)}</div>
+        <div style={{ fontSize: '.65rem', color: 'var(--text-muted)', marginTop: '1px' }}>${Math.round(item.oldPrice)} → ${Math.round(item.newPrice)}</div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         <div style={{ fontSize: '.82rem', fontWeight: 800, color }}>{primary}</div>

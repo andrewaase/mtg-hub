@@ -89,22 +89,34 @@ export default function NativeScanner({ onCard, onClose }) {
     scanningRef.current = true
 
     try {
-      // Capture current frame to canvas → base64
+      // Capture full frame at reduced quality — card can be anywhere in frame
       const ctx = canvas.getContext('2d')
       canvas.width  = video.videoWidth
       canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0)
+      const base64 = canvas.toDataURL('image/jpeg', 0.65).split(',')[1]
 
-      // Crop top 35% of frame — card name is always in the top third of the card
-      const cropH = Math.floor(canvas.height * 0.35)
-      const cropCanvas = document.createElement('canvas')
-      cropCanvas.width  = canvas.width
-      cropCanvas.height = cropH
-      cropCanvas.getContext('2d').drawImage(canvas, 0, 0, canvas.width, cropH, 0, 0, canvas.width, cropH)
-      const base64 = cropCanvas.toDataURL('image/jpeg', 0.8).split(',')[1]
+      // Vision OCR with 3s timeout so we know if plugin call hangs
+      let ocr = null
+      try {
+        ocr = await Promise.race([
+          scanImageNative(base64),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout')), 3000))
+        ])
+      } catch (e) {
+        // Show timeout/error so user knows scanner is active but OCR failed
+        setHint(e.message === 'OCR timeout'
+          ? 'Scanner active — move closer to the card'
+          : `OCR error: ${e.message}`)
+        scanningRef.current = false
+        return
+      }
 
-      // Vision OCR
-      const ocr  = await scanImageNative(base64)
+      // Debug: show raw text so we can tune parsing
+      if (ocr && ocr.lines && ocr.lines.length > 0) {
+        setHint(`Saw: ${ocr.lines.slice(0, 2).join(' | ')}`)
+      }
+
       const name = parseCardName(ocr)
 
       if (!name) {

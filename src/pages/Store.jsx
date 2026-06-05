@@ -1541,36 +1541,28 @@ export default function Store({ initialSearch = '', onSearchUsed, user, isActive
           { id: 'sealed',   label: 'Sealed'   },
           { id: 'resealed', label: 'Resealed' },
         ]
-        if (category === 'resealed' && topbarEl && isActive) {
-          return createPortal(
-            <div style={{
-              position: 'absolute', left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              display: 'flex', gap: 4,
-            }}>
-              {TABS.map(t => (
-                <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
-                  padding: '6px 16px', borderRadius: 99, border: 'none', cursor: 'pointer',
-                  background: category === t.id ? 'rgba(30,196,166,.15)' : 'transparent',
-                  color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
-                  fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem',
-                  outline: category === t.id ? '1.5px solid rgba(30,196,166,.4)' : 'none',
-                  transition: 'all .15s',
-                }}>{t.label}</button>
-              ))}
-            </div>,
-            topbarEl
-          )
-        }
+        // Always render inline — portaling into the topbar causes overlap with
+        // the logo and hamburger menu on mobile. Tabs sit just below the topbar.
         return (
-          <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+          <div style={{
+            display: 'flex', gap: 2,
+            borderBottom: category !== 'resealed' ? '1px solid var(--border)' : 'none',
+            marginBottom: category !== 'resealed' ? 20 : 0,
+            padding: category === 'resealed' ? '8px 0 0' : 0,
+          }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => { setCategory(t.id); setSearch('') }} style={{
-                padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
-                background: category === t.id ? 'rgba(30,196,166,.1)' : 'transparent',
+                flex: 1, padding: '9px 4px', borderRadius: category === 'resealed' ? 99 : '8px 8px 0 0',
+                border: 'none', cursor: 'pointer', fontSize: '.83rem',
+                background: category === t.id
+                  ? (category === 'resealed' ? 'rgba(30,196,166,.15)' : 'rgba(30,196,166,.1)')
+                  : 'transparent',
                 color: category === t.id ? 'var(--accent-gold)' : 'var(--text-muted)',
-                fontWeight: category === t.id ? 700 : 400, fontSize: '.83rem', cursor: 'pointer',
-                borderBottom: `2px solid ${category === t.id ? 'var(--accent-gold)' : 'transparent'}`,
+                fontWeight: category === t.id ? 700 : 400,
+                outline: (category === t.id && t.id === 'resealed') ? '1.5px solid rgba(30,196,166,.4)' : 'none',
+                borderBottom: category !== 'resealed'
+                  ? `2px solid ${category === t.id ? 'var(--accent-gold)' : 'transparent'}`
+                  : 'none',
                 transition: 'all .15s',
               }}>{t.label}</button>
             ))}
