@@ -12,6 +12,7 @@ import LogMatchModal from './modals/LogMatchModal'
 import AddCardModal from './modals/AddCardModal'
 import DecklistModal from './modals/DecklistModal'
 import CameraModal from './modals/CameraModal'
+import NativeScanner from './modals/NativeScanner'
 import Dashboard from './pages/Dashboard'
 import MatchLog from './pages/MatchLog'
 import Stats from './pages/Stats'
@@ -505,7 +506,13 @@ export default function App() {
       {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} setPage={setPage} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
-      {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}
+      {showCamera   && (isNative
+        ? <NativeScanner
+            onClose={() => setShowCamera(false)}
+            onCard={card => { setShowCamera(false); setShowAddCard(true); setPrefillCard(card) }}
+          />
+        : <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />
+      )}
       {decklistDeck && <DecklistModal deck={decklistDeck} onClose={() => setDecklistDeck(null)} setPage={setPage} />}
       {toast && <Toast msg={toast} />}
       {showOnboarding && (
