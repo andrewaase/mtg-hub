@@ -47,5 +47,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Mana Mint uses your camera to scan Magic: The Gathering cards and add them to your collection instantly.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Mana Mint can save card images to your photo library.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Mana Mint can save card images to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mana Mint does not use the microphone. This permission is required by the camera framework.</string>
 </dict>
 </plist>
