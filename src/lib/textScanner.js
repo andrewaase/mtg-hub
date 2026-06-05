@@ -27,12 +27,9 @@ async function getPlugin() {
 export async function scanImageNative(base64) {
   const plugin = await getPlugin()
   if (!plugin) return null
-  try {
-    return await plugin.scanBase64({ base64 })
-  } catch (e) {
-    console.warn('[textScanner] native OCR failed:', e)
-    return null
-  }
+  // Let errors propagate so the scanner UI can surface a real failure
+  // (e.g. plugin not registered) instead of silently showing nothing.
+  return await plugin.scanBase64({ base64 })
 }
 
 /**
