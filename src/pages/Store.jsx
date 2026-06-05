@@ -643,8 +643,6 @@ function ResealedShowcase({ listings, cartIds, onAdd, onView }) {
     <div style={{
       position: 'relative', userSelect: 'none',
       background: '#e8f0f7',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: 'calc(100dvh - var(--topbar-height, 56px) - var(--safe-top, 0px))',
     }}>
       {/* Use a positioned inner wrapper that preserves the image's exact aspect ratio.
           This makes % zones always map correctly regardless of screen size. */}

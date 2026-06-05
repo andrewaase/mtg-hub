@@ -457,7 +457,7 @@ export default function App() {
       <Sidebar page={page} setPage={setPage} user={user} isAdmin={isAdmin} onAuthClick={() => setShowAuth(true)} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div id="overlay" className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
       <div id="main">
-        <TopBar page={page} user={user} setPage={setPage} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} />
+        <TopBar page={page} user={user} setPage={setPage} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} hideLogMatch={page === 'store'} />
         <div id="content">
           {loading ? (
             /* Show a contextual skeleton while data loads */

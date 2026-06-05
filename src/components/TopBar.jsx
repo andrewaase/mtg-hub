@@ -2,7 +2,7 @@ import { hasSupabase } from '../lib/supabase'
 const logoPng = '/Mana-Mint-Logo-With-Box.png'
 import NotificationBell from './NotificationBell'
 
-export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, onMenuClick, onLogoClick }) {
+export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, onMenuClick, onLogoClick, hideLogMatch = false }) {
   return (
     <div id="topbar">
       <div className="topbar-left">
@@ -46,7 +46,7 @@ export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, o
 
       {/* Right: actions */}
       <div className="topbar-actions">
-        {page !== 'friends' && (
+        {page !== 'friends' && !hideLogMatch && (
           <button
             className="btn btn-primary btn-sm topbar-log-btn"
             onClick={onLogMatch}

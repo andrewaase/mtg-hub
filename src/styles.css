@@ -413,10 +413,9 @@ body {
   border-radius: var(--radius);
   padding: 18px;
   box-shadow: var(--shadow);
-  /* Prevent cards from ever being wider than their container */
   max-width: 100%;
   box-sizing: border-box;
-  overflow: hidden;
+  /* Do NOT add overflow:hidden here — it clips flex children like mover values */
 }
 
 /* ============================================================
