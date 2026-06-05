@@ -1,3 +1,4 @@
+/* global __BUILD_HASH__, __BUILD_TIME__ */
 import { hasSupabase } from '../lib/supabase'
 const logoPng = '/Horizontal-Mana-Mint-logo-transparent.png'
 
@@ -94,6 +95,11 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
             Sign In
           </button>
         )}
+
+        {/* Build stamp — confirms the running app matches your latest build */}
+        <div style={{ marginTop: 12, fontSize: '.62rem', color: 'var(--text-muted)', letterSpacing: '.3px', textAlign: 'center' }}>
+          build {__BUILD_HASH__} · {new Date(__BUILD_TIME__).toLocaleString()}
+        </div>
       </div>
     </div>
   )

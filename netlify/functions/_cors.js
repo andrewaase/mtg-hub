@@ -9,6 +9,10 @@
 const ALLOWED_ORIGINS = [
   'https://www.manamint.store',
   'https://manamint.store',
+  // Native Capacitor app webview origins (iOS / Android)
+  'capacitor://localhost',
+  'https://localhost',
+  'http://localhost',
   // Local dev
   'http://localhost:5173',
   'http://localhost:5176',

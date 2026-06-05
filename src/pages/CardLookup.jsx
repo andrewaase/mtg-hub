@@ -377,6 +377,19 @@ function SetView({ set, onBack, onCardSelect }) {
   const [loadingMore, setLoadingMore] = useState(false)
 
   useEffect(() => {
+    const cacheKey = `vs-setcards-${set.code}`
+    // Serve the first page instantly from session cache if we've loaded it before
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null')
+      if (cached?.cards?.length) {
+        setCards(cached.cards)
+        setHasMore(cached.hasMore || false)
+        setNextPage(cached.nextPage || null)
+        setLoad(false)
+        return
+      }
+    } catch {}
+
     setLoad(true)
     setCards([])
     fetch(`https://api.scryfall.com/cards/search?q=set:${set.code}&order=usd&unique=cards&dir=desc`)
@@ -386,6 +399,11 @@ function SetView({ set, onBack, onCardSelect }) {
           setCards(data.data)
           setHasMore(data.has_more || false)
           setNextPage(data.next_page || null)
+          try {
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              cards: data.data, hasMore: data.has_more || false, nextPage: data.next_page || null,
+            }))
+          } catch {}
         }
       })
       .catch(() => {})
@@ -667,34 +685,58 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
     }
   }, [initialSearch]) // eslint-disable-line
 
-  // Load MTG paper sets — all of them
+  // Load MTG paper sets — all of them.
+  // The set list barely changes, so cache the processed result in localStorage
+  // (24h TTL) and render instantly on revisit instead of re-fetching ~900 sets.
   useEffect(() => {
-    setSetsLoad(true)
+    const SETS_CACHE_KEY = 'vs-sets-cache-v1'
+    const SETS_TTL = 24 * 60 * 60 * 1000 // 24h
+
+    function process(all) {
+      // Main paper sets: broad type list covers every physical product line
+      const MAIN_TYPES = new Set([
+        'expansion', 'core', 'masters', 'draft_innovation',
+        'commander', 'duel_deck', 'funny', 'starter', 'box',
+        'from_the_vault', 'spellbook', 'planechase', 'archenemy',
+        'masterpiece',
+      ])
+      const mainSets = all.filter(s =>
+        MAIN_TYPES.has(s.set_type) && !s.digital && s.card_count >= 1
+      )
+      // Secret Lairs: parent set code 'sld' or the SLD set itself
+      const slSets = all.filter(s =>
+        !s.digital && (s.code === 'sld' || s.parent_set_code === 'sld')
+      ).sort((a, b) => (b.released_at || '').localeCompare(a.released_at || ''))
+      return { mainSets, slSets }
+    }
+
+    // Try cache first for an instant render
+    let servedFromCache = false
+    try {
+      const cached = JSON.parse(localStorage.getItem(SETS_CACHE_KEY) || 'null')
+      if (cached && Date.now() - cached.ts < SETS_TTL && cached.mainSets?.length) {
+        setSets(cached.mainSets)
+        setSecretLairs(cached.slSets || [])
+        setSetsLoad(false)
+        servedFromCache = true
+      }
+    } catch {}
+
+    if (!servedFromCache) setSetsLoad(true)
+
+    // Refresh from network (updates cache; only flips loading if we had no cache)
     fetch('https://api.scryfall.com/sets')
       .then(r => r.json())
       .then(data => {
-        const all = data.data || []
-
-        // Main paper sets: broad type list covers every physical product line
-        const MAIN_TYPES = new Set([
-          'expansion', 'core', 'masters', 'draft_innovation',
-          'commander', 'duel_deck', 'funny', 'starter', 'box',
-          'from_the_vault', 'spellbook', 'planechase', 'archenemy',
-          'masterpiece',
-        ])
-        const mainSets = all.filter(s =>
-          MAIN_TYPES.has(s.set_type) && !s.digital && s.card_count >= 1
-        )
+        const { mainSets, slSets } = process(data.data || [])
         setSets(mainSets)
-
-        // Secret Lairs: parent set code 'sld' or the SLD set itself
-        const slSets = all.filter(s =>
-          !s.digital && (s.code === 'sld' || s.parent_set_code === 'sld')
-        ).sort((a, b) => (b.released_at || '').localeCompare(a.released_at || ''))
         setSecretLairs(slSets)
+        try {
+          localStorage.setItem(SETS_CACHE_KEY, JSON.stringify({ ts: Date.now(), mainSets, slSets }))
+        } catch {}
       })
       .catch(() => {})
-      .finally(() => setSetsLoad(false))
+      .finally(() => { if (!servedFromCache) setSetsLoad(false) })
   }, [])
 
   const openCardDetail = async (cardOrName) => {

@@ -422,6 +422,10 @@ body {
    GRIDS (mobile-first)
    ============================================================ */
 .grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+/* Grid items default to min-width:auto and refuse to shrink below their content,
+   which blows the card out past its track (clipping mover deltas off-screen).
+   Forcing min-width:0 makes items respect the column so inner text can ellipsize. */
+.grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }
 @media (min-width: 480px) {
   .grid-2 { grid-template-columns: 1fr 1fr; }
 }
@@ -1109,10 +1113,10 @@ body {
 
 .mobile-nav-items {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-around;
   height: var(--bottom-nav-height);
-  padding: 0 4px;
+  padding: 0 12px;
   position: relative;
 }
 
