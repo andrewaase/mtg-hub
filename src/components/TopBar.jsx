@@ -6,8 +6,27 @@ export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, o
   return (
     <div id="topbar">
       <div className="topbar-left">
-        <button className="btn-icon" onClick={onMenuClick} id="menu-btn" aria-label="Open menu">
-          
+        <button
+          onClick={onMenuClick}
+          id="menu-btn"
+          aria-label="Open menu"
+          style={{
+            background: 'var(--bg-hover)',
+            border: '1.5px solid var(--border)',
+            borderRadius: 8,
+            padding: '7px 10px',
+            cursor: 'pointer',
+            fontSize: '1.1rem',
+            lineHeight: 1,
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 38,
+            minHeight: 38,
+          }}
+        >
+          ☰
         </button>
         {/* Logo + wordmark — tapping goes to dashboard */}
         <div

@@ -104,18 +104,23 @@ html.capacitor #main {
    ============================================================ */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  /* Hard-clamp to the viewport — prevents native WebView from ever rendering wider */
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#root { display: flex; min-height: 100vh; }
-#app  { display: flex; min-height: 100vh; width: 100%; }
+#root { display: flex; min-height: 100vh; max-width: 100vw; overflow-x: hidden; }
+#app  { display: flex; min-height: 100vh; width: 100%; max-width: 100%; overflow-x: hidden; }
 
 /* ============================================================
    SIDEBAR
@@ -1079,10 +1084,13 @@ body {
   display: block;
   position: fixed;
   bottom: 0; left: 0; right: 0;
+  width: 100%;
+  max-width: 100vw;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   z-index: 100;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
 }
 
 @media (min-width: 900px) {
