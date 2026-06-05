@@ -236,8 +236,8 @@ export default function NativeScanner({ onCard, onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{
-            width: '80%', maxWidth: 300,
-            aspectRatio: '1.4',
+            width: '65%', maxWidth: 240,
+            aspectRatio: '0.716', /* standard MTG card ratio 63mm × 88mm */
             position: 'relative',
           }}>
             {/* Corner brackets */}

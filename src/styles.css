@@ -65,11 +65,12 @@ html.capacitor #topbar {
   height: calc(var(--topbar-height) + var(--safe-top));
 }
 
-/* Push bottom nav above home indicator */
-html.capacitor #mobile-nav,
-html.capacitor #mobile-nav .mobile-nav-items {
-  padding-bottom: var(--safe-bottom);
-  height: calc(var(--bottom-nav-height) + var(--safe-bottom));
+/* Push bottom nav above home indicator.
+   Only set padding on the nav container — items stay fixed height.
+   The base #mobile-nav already has padding-bottom:env(safe-area-inset-bottom)
+   so we just override to use our pre-computed var which works at startup. */
+html.capacitor #mobile-nav {
+  padding-bottom: var(--safe-bottom) !important;
 }
 
 /* Store cart bar clears home indicator on native */
@@ -217,6 +218,8 @@ body {
   flex-direction: column;
   min-height: 100vh;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 @media (min-width: 900px) {
@@ -368,6 +371,10 @@ body {
 #content {
   padding: 16px 16px calc(var(--bottom-nav-height) + 24px);
   flex: 1;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 @media (min-width: 900px) {
@@ -406,6 +413,10 @@ body {
   border-radius: var(--radius);
   padding: 18px;
   box-shadow: var(--shadow);
+  /* Prevent cards from ever being wider than their container */
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* ============================================================
