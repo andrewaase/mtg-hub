@@ -20,15 +20,22 @@ function delay(ms) {
 }
 
 // ── Scryfall pagination ────────────────────────────────────────────────────────
-// Fetches every paper card with USD price >= $0.50.
+// Fetches every paper card and records its CHEAPEST (base) printing price.
+//
+// Why no usd>=0.5 filter in the query: that floor would exclude a card's cheap
+// base printing (e.g. Animist's Awakening base = $0.43) and leave only an
+// expensive reprint/alt-art ($4.92), producing fake price swings. Instead we
+// order by usd ascending + unique=cards so Scryfall returns the cheapest
+// printing as the representative, then apply the $0.50 floor below on that
+// base price (so sub-$0.50 cards are dropped entirely, not mis-priced).
 // Returns a map of { [cardName]: { price: number, img: string|null } }
 async function fetchAllCardPrices() {
   const priceMap = {}
   let url =
     'https://api.scryfall.com/cards/search' +
-    '?q=usd%3E%3D0.5+game%3Apaper+not%3Aextra+not%3Abasic+not%3Aart_series+lang%3Aen' +
+    '?q=game%3Apaper+not%3Aextra+not%3Abasic+not%3Aart_series+lang%3Aen' +
     '+-frame%3Ashowcase+-frame%3Aextendedart+-border%3Aborderless+-is%3Apromo+-is%3Aoversized' +
-    '&order=name&unique=cards&page=1'
+    '&order=usd&dir=asc&unique=cards&page=1'
 
   let pageCount = 0
 
@@ -62,9 +69,10 @@ async function fetchAllCardPrices() {
           pauper:    leg.pauper    || 'not_legal',
           premodern: leg.premodern || 'not_legal',
         }
-        // Only keep the LOWEST price seen for this card name.
-        // This ensures a cheap base printing always wins over an expensive alt art
-        // or special treatment that Scryfall's unique=cards might otherwise return.
+        // Backstop: keep the LOWEST price seen for this card name. With
+        // order=usd&dir=asc + unique=cards Scryfall already returns the cheapest
+        // printing first, but this guarantees the base price wins even if an
+        // expensive alt art slips through the frame filters.
         if (priceMap[card.name] && priceMap[card.name].price <= price) continue
         priceMap[card.name] = { price, img, legalities }
       }
