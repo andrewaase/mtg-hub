@@ -523,8 +523,8 @@ function CollectionCardModal({ card, onClose, onRemove, onUpdateCard }) {
       }}>
         <button onClick={onClose} style={{
           position: 'absolute', top: 14, right: 14,
-          background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%',
-          width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem',
+          background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: '50%',
+          width: 32, height: 32, cursor: 'pointer', color: 'var(--text-primary)', fontSize: '.9rem',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>✕</button>
 
