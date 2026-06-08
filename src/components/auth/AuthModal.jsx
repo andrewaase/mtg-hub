@@ -54,6 +54,8 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
 
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting,       setDeleting]      = useState(false)
 
   const handleSignOut = async () => {
     setLoading(true)
@@ -61,6 +63,31 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
     showToast('Signed out successfully')
     setLoading(false)
     onClose()
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || 'Could not delete account')
+      }
+      await supabase.auth.signOut()
+      showToast('Your account and data have been deleted')
+      onClose()
+    } catch (err) {
+      showToast(err.message || 'Could not delete account — try again')
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
   }
 
   const handleSignIn = async (e) => {
@@ -192,6 +219,50 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
             >
               {loading ? 'Signing out…' : 'Sign Out'}
             </button>
+          </div>
+
+          {/* Danger zone: permanent account deletion (App Store requirement) */}
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+            {!confirmDelete ? (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                style={{
+                  width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', fontSize: '.72rem', padding: '4px',
+                  textDecoration: 'underline',
+                }}
+              >
+                Delete account
+              </button>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '.74rem', color: '#f87171', fontWeight: 700, marginBottom: 4 }}>
+                  Permanently delete your account?
+                </div>
+                <div style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                  This erases your collection, decks, wishlist, matches, and profile. This cannot be undone.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={deleting}
+                    style={{ flex: 1, padding: '9px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontSize: '.8rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: '#c94040', color: '#fff', cursor: deleting ? 'wait' : 'pointer', fontWeight: 700, fontSize: '.8rem' }}
+                  >
+                    {deleting ? 'Deleting…' : 'Delete forever'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

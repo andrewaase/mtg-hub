@@ -30,7 +30,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -53,7 +53,5 @@
 	<string>Mana Mint can save card images to your photo library.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Mana Mint can save card images to your photo library.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Mana Mint does not use the microphone. This permission is required by the camera framework.</string>
 </dict>
 </plist>
