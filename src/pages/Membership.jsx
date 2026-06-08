@@ -3,19 +3,34 @@
 // subscribe, manage their billing, or redeem free months from store purchases.
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { iapAvailable, purchasePro, restorePro, isUserCancelled, manageAppleSubscription } from '../lib/revenuecat'
 
 const MONTHLY_PRICE_ID = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_1TW5PM3vsGfrYNehY1OmZnFZ'
 const ANNUAL_PRICE_ID  = import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID  || 'price_1TW5PM3vsGfrYNehCP3u9HTL'
 
 export default function Membership({ user, showToast, membership, onMembershipChange }) {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'annual'
-  const [loading, setLoading] = useState('')        // '' | 'subscribe' | 'portal' | 'redeem'
+  const [loading, setLoading] = useState('')        // '' | 'subscribe' | 'portal' | 'redeem' | 'restore'
 
-  //  Subscribe (Stripe Checkout) 
+  // Refresh membership a couple of times — the RevenueCat webhook updates
+  // Supabase a beat after purchase, so re-poll to reflect Pro promptly.
+  const refreshSoon = () => {
+    onMembershipChange?.()
+    setTimeout(() => onMembershipChange?.(), 3000)
+  }
+
+  //  Subscribe — Apple IAP in the iOS app, Stripe Checkout on the web
   const handleSubscribe = async () => {
     if (!user) { showToast('Sign in first to subscribe'); return }
     setLoading('subscribe')
     try {
+      if (iapAvailable) {
+        // iOS: Apple In-App Purchase via RevenueCat (Apple requires IAP, not Stripe)
+        const { active } = await purchasePro(billing)
+        if (active) { showToast('Welcome to Pro! 🎉'); refreshSoon() }
+        return
+      }
+      // Web: Stripe Checkout
       const { data: { session } } = await supabase.auth.getSession()
       const priceId = billing === 'annual' ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID
       const res     = await fetch('/.netlify/functions/create-checkout-session', {
@@ -30,14 +45,29 @@ export default function Membership({ user, showToast, membership, onMembershipCh
         throw new Error(data.error || 'Could not create checkout session')
       }
     } catch (err) {
-      showToast(`Error: ${err.message}`)
+      if (!(await isUserCancelled(err))) showToast(`Error: ${err.message}`)
     } finally {
       setLoading('')
     }
   }
 
-  //  Manage billing (Stripe Customer Portal) 
+  //  Restore purchases (iOS — required by App Review)
+  const handleRestore = async () => {
+    setLoading('restore')
+    try {
+      const { active } = await restorePro()
+      if (active) { showToast('Purchases restored ✓'); refreshSoon() }
+      else showToast('No previous purchase found')
+    } catch (err) {
+      showToast(`Could not restore: ${err.message}`)
+    } finally {
+      setLoading('')
+    }
+  }
+
+  //  Manage billing — Apple subscriptions on iOS, Stripe portal on web
   const handleManageBilling = async () => {
+    if (iapAvailable) { manageAppleSubscription(); return }
     setLoading('portal')
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -276,8 +306,24 @@ export default function Membership({ user, showToast, membership, onMembershipCh
             )}
 
             <p style={{ textAlign: 'center', fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '12px', marginBottom: 0 }}>
-              Cancel anytime · Powered by Stripe · No hidden fees
+              {iapAvailable
+                ? 'Cancel anytime in Settings · Billed through your Apple ID'
+                : 'Cancel anytime · Powered by Stripe · No hidden fees'}
             </p>
+
+            {/* Restore purchases — required by App Review for IAP */}
+            {iapAvailable && (
+              <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: '.78rem' }}
+                  onClick={handleRestore}
+                  disabled={loading === 'restore'}
+                >
+                  {loading === 'restore' ? 'Restoring…' : 'Restore purchases'}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
