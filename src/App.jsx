@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { onAndroidBack, isNative } from './lib/native'
+import { initRevenueCat, logoutRevenueCat } from './lib/revenuecat'
 import { supabase, hasSupabase } from './lib/supabase'
 import { getMatches, getCollection, addCard, addMatch, getWishlist } from './lib/db'
 import { takeSnapshot } from './lib/priceHistory'
@@ -94,6 +95,13 @@ export default function App() {
   const [authPrompt, setAuthPrompt] = useState(null)
   // Membership status
   const membership = useMembership(user)
+
+  // RevenueCat (Apple IAP): identify the customer by Supabase user id so the
+  // webhook can mirror purchases to the right account. No-op off native-iOS.
+  useEffect(() => {
+    if (user?.id) initRevenueCat(user.id)
+    else logoutRevenueCat()
+  }, [user?.id])
   // Onboarding tutorial — shown once after first sign-up
   const [showOnboarding, setShowOnboarding] = useState(false)
   // Hero landing — splash shown once per browser session in the content area
