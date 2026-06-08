@@ -154,10 +154,11 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
   }
 
   // Tier 1 — search by name within the identified set (finds full-art/showcase versions)
-  // This is the key fallback for special treatments where the collector number is off
+  // This is the key fallback for special treatments where the collector number is off.
+  // include:multilingual so foreign printings (e.g. Japanese Mystical Archive) match too.
   if (setCode) {
     try {
-      const q = `!"${name}" set:${setCode}`
+      const q = `!"${name}" set:${setCode} include:multilingual`
       const res = await fetch(
         `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&order=collector_number`
       )
@@ -169,13 +170,20 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
           if (collectorNumber && json.data.length > 1) {
             const target = parseInt(collectorNumber, 10)
             const closest = json.data.reduce((best, c) => {
-              const diff = Math.abs(parseInt(c.collector_number, 10) - target)
+              const diff     = Math.abs(parseInt(c.collector_number, 10) - target)
               const bestDiff = Math.abs(parseInt(best.collector_number, 10) - target)
-              return diff < bestDiff ? c : best
+              if (diff !== bestDiff) return diff < bestDiff ? c : best
+              // Tie on collector number (e.g. EN printing + its translations):
+              // prefer English, then a printing that actually has a USD price.
+              if (c.lang === 'en' && best.lang !== 'en') return c
+              if (c.lang === best.lang && c.prices?.usd && !best.prices?.usd) return c
+              return best
             })
             return cacheAndReturn(closest, 'exact')
           }
-          return cacheAndReturn(json.data[0], 'exact')
+          // Single-result fallback: prefer the English printing if present
+          const en = json.data.find(c => c.lang === 'en')
+          return cacheAndReturn(en || json.data[0], 'exact')
         }
       }
     } catch { /* continue */ }
