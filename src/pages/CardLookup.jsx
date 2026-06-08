@@ -377,7 +377,7 @@ function SetView({ set, onBack, onCardSelect }) {
   const [loadingMore, setLoadingMore] = useState(false)
 
   useEffect(() => {
-    const cacheKey = `vs-setcards-${set.code}`
+    const cacheKey = `vs-setcards-v2-${set.code}`
     // Serve the first page instantly from session cache if we've loaded it before
     try {
       const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null')
@@ -392,7 +392,10 @@ function SetView({ set, onBack, onCardSelect }) {
 
     setLoad(true)
     setCards([])
-    fetch(`https://api.scryfall.com/cards/search?q=set:${set.code}&order=usd&unique=cards&dir=desc`)
+    // unique=prints (not cards) so every distinct printing shows — including
+    // Japanese/foreign alternate-art versions (e.g. Mystical Archive JP) and
+    // showcase/borderless/etched treatments, which unique=cards collapses away.
+    fetch(`https://api.scryfall.com/cards/search?q=set:${set.code}&order=usd&unique=prints&dir=desc`)
       .then(r => r.json())
       .then(data => {
         if (data.data) {
@@ -462,27 +465,44 @@ function SetView({ set, onBack, onCardSelect }) {
         <div style={{ padding: '48px', textAlign: 'center', color: MUTED, fontSize: '.85rem' }}>Loading cards…</div>
       ) : (
         <>
-          {sorted.map(card => (
+          {sorted.map(card => {
+            const thumb = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small
+            // Distinguish printings of the same card: language, special treatment
+            const isForeign = card.lang && card.lang !== 'en'
+            const treatment = card.frame_effects?.includes('showcase') ? 'Showcase'
+              : card.frame_effects?.includes('extendedart') ? 'Extended'
+              : card.frame_effects?.includes('etched') ? 'Etched'
+              : card.border_color === 'borderless' ? 'Borderless'
+              : card.full_art ? 'Full Art'
+              : null
+            return (
             <div
               key={card.id}
               onClick={() => onCardSelect(card)}
-              style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', borderBottom: `1px solid var(--border)`, cursor: 'pointer', transition: 'background .1s' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderBottom: `1px solid var(--border)`, cursor: 'pointer', transition: 'background .1s' }}
               onMouseEnter={e => e.currentTarget.style.background = ROW}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
+              {thumb
+                ? <img src={thumb} alt="" style={{ width: 30, borderRadius: 3, flexShrink: 0 }} loading="lazy" />
+                : <div style={{ width: 30, height: 42, background: 'var(--bg-card)', borderRadius: 3, flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {card.name}
                 </div>
-                <div style={{ fontSize: '.7rem', color: RARITY_COLOR[card.rarity] || MUTED, marginTop: '2px' }}>
-                  {RARITY_LABEL[card.rarity] || card.rarity}
+                <div style={{ fontSize: '.7rem', color: MUTED, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ color: RARITY_COLOR[card.rarity] || MUTED }}>{RARITY_LABEL[card.rarity] || card.rarity}</span>
+                  <span>#{card.collector_number}</span>
+                  {isForeign && <span style={{ color: '#f97316', fontWeight: 700, textTransform: 'uppercase' }}>{card.lang}</span>}
+                  {treatment && <span style={{ color: 'var(--accent-blue)' }}>{treatment}</span>}
                 </div>
               </div>
               <div style={{ fontWeight: 700, color: card.prices?.usd ? WHITE : '#2a2a2a', fontSize: '.88rem', marginLeft: '14px', flexShrink: 0 }}>
                 {card.prices?.usd ? `$${card.prices.usd}` : '—'}
               </div>
             </div>
-          ))}
+            )
+          })}
 
           {/* Load more */}
           {hasMore && (

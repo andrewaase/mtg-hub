@@ -150,10 +150,12 @@ exports.handler = async (event) => {
               {
                 type: 'text',
                 text: `This image shows two strips of a Magic: The Gathering card — the title bar (top) and the bottom info strip, separated by a small black gap. Read both strips carefully and reply with ONLY a JSON object in this exact format (no markdown, no extra text):
-{"name":"<exact card name from top strip>","setCode":"<2-4 letter set code from bottom strip, lowercase>","collectorNumber":"<collector number from bottom strip>"}
+{"name":"<card's official English name>","setCode":"<2-4 letter set code from bottom strip, lowercase>","collectorNumber":"<collector number from bottom strip>"}
 
-The set code is the 2-4 letter abbreviation printed at the bottom (e.g. "one", "bro", "mh3", "ltr", "tmt").
-The collector number is the number printed at the bottom (e.g. "112", "261a").
+The card may be printed in ANY language (English, Japanese, Korean, Chinese, German, French, Italian, etc.). ALWAYS return the card's official ENGLISH name — identify the card from its art and title even when the printed name is not in English, and translate it to its English name. Give your best guess if unsure.
+The set code and collector number at the bottom are ALWAYS printed in Latin letters and digits regardless of the card's language — read them carefully, as they are the most reliable way to identify a foreign printing.
+The set code is the 2-4 letter abbreviation printed at the bottom (e.g. "one", "bro", "mh3", "ltr", "sta").
+The collector number is the number printed at the bottom (e.g. "112", "261a", "082").
 If you cannot read a field, use null.
 If this is clearly not a Magic card, reply with: {"name":"unknown","setCode":null,"collectorNumber":null}`,
               },
