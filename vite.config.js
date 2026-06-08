@@ -16,8 +16,4 @@ export default defineConfig({
     __BUILD_TIME__: JSON.stringify(BUILD_TIME),
     __BUILD_HASH__: JSON.stringify(BUILD_HASH),
   },
-  // Tesseract.js uses dynamic workers that Vite's optimizer doesn't handle well
-  optimizeDeps: {
-    exclude: ['tesseract.js']
-  }
 })
