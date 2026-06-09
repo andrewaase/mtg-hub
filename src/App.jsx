@@ -31,12 +31,13 @@ import Lab from './pages/Lab'
 import HeroLanding from './pages/HeroLanding'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
+import Support from './pages/Support'
 import OnboardingTutorial from './components/OnboardingTutorial'
 import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
 
 // 'lab' is intentionally hidden from Sidebar/MobileNav — reachable only at /#lab
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms', 'privacy']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms', 'privacy', 'support']
 
 const PAGE_TITLES = {
   dashboard:  'Mana Mint | MTG Card Collection Tracker',
@@ -56,6 +57,7 @@ const PAGE_TITLES = {
   lab:        'Hero Lab (sandbox) | Mana Mint',
   terms:      'Terms of Service & Privacy Policy | Mana Mint',
   privacy:    'Privacy Policy | Mana Mint',
+  support:    'Help & Support | Mana Mint',
 }
 
 const PAGE_DESCRIPTIONS = {
@@ -507,6 +509,7 @@ export default function App() {
               {mountedPages.has('lab')        && <div style={{ display: page === 'lab'        ? undefined : 'none' }}><Lab setPage={setPage} /></div>}
               {mountedPages.has('terms')      && <div style={{ display: page === 'terms'      ? undefined : 'none' }}><Terms setPage={setPage} /></div>}
               {mountedPages.has('privacy')    && <div style={{ display: page === 'privacy'    ? undefined : 'none' }}><Privacy setPage={setPage} /></div>}
+              {mountedPages.has('support')    && <div style={{ display: page === 'support'    ? undefined : 'none' }}><Support setPage={setPage} /></div>}
             </>
           )}
         </div>
