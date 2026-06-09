@@ -30,12 +30,13 @@ import Membership from './pages/Membership'
 import Lab from './pages/Lab'
 import HeroLanding from './pages/HeroLanding'
 import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import OnboardingTutorial from './components/OnboardingTutorial'
 import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Skeleton'
 import { useMembership } from './hooks/useMembership'
 
 // 'lab' is intentionally hidden from Sidebar/MobileNav — reachable only at /#lab
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms', 'privacy']
 
 const PAGE_TITLES = {
   dashboard:  'Mana Mint | MTG Card Collection Tracker',
@@ -54,6 +55,7 @@ const PAGE_TITLES = {
   admin:      'Control Center | Mana Mint',
   lab:        'Hero Lab (sandbox) | Mana Mint',
   terms:      'Terms of Service & Privacy Policy | Mana Mint',
+  privacy:    'Privacy Policy | Mana Mint',
 }
 
 const PAGE_DESCRIPTIONS = {
@@ -504,6 +506,7 @@ export default function App() {
               {mountedPages.has('admin')      && <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>}
               {mountedPages.has('lab')        && <div style={{ display: page === 'lab'        ? undefined : 'none' }}><Lab setPage={setPage} /></div>}
               {mountedPages.has('terms')      && <div style={{ display: page === 'terms'      ? undefined : 'none' }}><Terms setPage={setPage} /></div>}
+              {mountedPages.has('privacy')    && <div style={{ display: page === 'privacy'    ? undefined : 'none' }}><Privacy setPage={setPage} /></div>}
             </>
           )}
         </div>

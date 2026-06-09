@@ -57,6 +57,22 @@ async function proPackage(period = 'monthly') {
   return pkgs.find(p => p.packageType === want) || pkgs[0] || null
 }
 
+/** Returns localized price strings from RevenueCat offerings e.g. { monthly: '$3.99', annual: '$29.99' } */
+export async function getProPrices() {
+  if (!iapAvailable) return null
+  try {
+    const { Purchases } = await mod()
+    const offerings = await Purchases.getOfferings()
+    const pkgs = offerings?.current?.availablePackages || []
+    const monthly = pkgs.find(p => p.packageType === 'MONTHLY')
+    const annual  = pkgs.find(p => p.packageType === 'ANNUAL')
+    return {
+      monthly: monthly?.product?.priceString || null,
+      annual:  annual?.product?.priceString  || null,
+    }
+  } catch { return null }
+}
+
 /** Launch the Apple purchase sheet. Returns { active } once complete. */
 export async function purchasePro(period = 'monthly') {
   if (!iapAvailable) throw new Error('In-app purchase is only available in the iOS app')

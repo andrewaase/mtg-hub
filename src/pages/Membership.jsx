@@ -1,9 +1,9 @@
 // src/pages/Membership.jsx
 // Pro membership page — shows current status, pricing plans, and lets users
 // subscribe, manage their billing, or redeem free months from store purchases.
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { iapAvailable, purchasePro, restorePro, isUserCancelled, manageAppleSubscription } from '../lib/revenuecat'
+import { iapAvailable, purchasePro, restorePro, isUserCancelled, manageAppleSubscription, getProPrices } from '../lib/revenuecat'
 
 const MONTHLY_PRICE_ID = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_1TW5PM3vsGfrYNehY1OmZnFZ'
 const ANNUAL_PRICE_ID  = import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID  || 'price_1TW5PM3vsGfrYNehCP3u9HTL'
@@ -11,6 +11,11 @@ const ANNUAL_PRICE_ID  = import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID  || 'price_
 export default function Membership({ user, showToast, membership, onMembershipChange }) {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'annual'
   const [loading, setLoading] = useState('')        // '' | 'subscribe' | 'portal' | 'redeem' | 'restore'
+  const [iosPrices, setIosPrices] = useState(null)  // { monthly, annual } from RevenueCat
+
+  useEffect(() => {
+    if (iapAvailable) getProPrices().then(p => { if (p) setIosPrices(p) })
+  }, [])
 
   // Refresh membership a couple of times — the RevenueCat webhook updates
   // Supabase a beat after purchase, so re-poll to reflect Pro promptly.
@@ -120,6 +125,10 @@ export default function Membership({ user, showToast, membership, onMembershipCh
     ? new Date(membership.membershipEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null
 
+  // Use real App Store prices on iOS (fetched from RevenueCat), fall back to
+  // hardcoded iOS prices, or Stripe/web prices on web.
+  const monthlyPrice = (iapAvailable && iosPrices?.monthly) ? iosPrices.monthly : iapAvailable ? '$3.99' : '$2.99'
+  const annualPrice  = (iapAvailable && iosPrices?.annual)  ? iosPrices.annual  : iapAvailable ? '$29.99' : '$24.99'
   const annualSave = Math.round(100 - (24.99 / (2.99 * 12)) * 100)
 
   return (
@@ -260,10 +269,10 @@ export default function Membership({ user, showToast, membership, onMembershipCh
 
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
-                {billing === 'annual' ? '$24.99' : '$2.99'}
+                {billing === 'annual' ? annualPrice : monthlyPrice}
               </div>
               <div style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                {billing === 'annual' ? 'per year (~$2.08 / mo)' : 'per month'}
+                {billing === 'annual' ? 'per year' : 'per month'}
               </div>
             </div>
 
@@ -296,7 +305,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
                 ? 'Sign in to Subscribe'
                 : loading === 'subscribe'
                 ? 'Redirecting…'
-                : `Get Pro — ${billing === 'annual' ? '$24.99/yr' : '$2.99/mo'}`}
+                : `Get Pro — ${billing === 'annual' ? annualPrice : monthlyPrice}`}
             </button>
 
             {!user && (
