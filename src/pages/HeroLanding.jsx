@@ -31,9 +31,9 @@ const PORTRAIT = {
   src: '/welcome-popup-portrait.png',
   w: 1086, h: 1448,
   hotspots: [
-    { label: 'Go to Dashboard',                nav: 'dashboard',  left: '22%',   top: '87%',   width: '29%',   height: '5.5%' },
-    { label: 'Explore Store',                  nav: 'store',      left: '51.5%', top: '87%',   width: '26.5%', height: '5.5%' },
-    { label: 'Learn more about Mana Mint Pro', nav: 'membership', left: '47%',   top: '92.8%', width: '24%',   height: '3%'   },
+    { label: 'Go to Dashboard',                nav: 'dashboard',  left: '16%', top: '87%', width: '34%', height: '6%' },
+    { label: 'Explore Store',                  nav: 'store',      left: '52%', top: '87%', width: '33%', height: '6%' },
+    { label: 'Learn more about Mana Mint Pro', nav: 'membership', left: '46%', top: '95%', width: '24%', height: '2%' },
   ],
 }
 
