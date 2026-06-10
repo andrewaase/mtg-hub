@@ -85,7 +85,7 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
           <SheetBtn icon={Icons.camera} label="Scan a Card"   sub="Use your camera"  onClick={() => { setShowSheet(false); openCamera?.() }} />
           <SheetBtn icon={Icons.edit}   label="Type Manually" sub="Search by name"   onClick={() => { setShowSheet(false); openAddCard?.() }} />
           <div style={{ height: '1px', background: 'var(--border)', margin: '4px 10px' }} />
-          <SheetBtn icon={Icons.swords} label="Log a Match" onClick={() => { setShowSheet(false); openLogMatch?.() }} muted />
+          <SheetBtn icon={Icons.swords} label="Log a Match" onClick={() => { setShowSheet(false); openLogMatch?.() }} />
         </div>
       )}
 
@@ -130,7 +130,7 @@ export default function MobileNav({ page, setPage, openLogMatch, openCamera, ope
   )
 }
 
-function SheetBtn({ icon, label, sub, onClick, muted }) {
+function SheetBtn({ icon, label, sub, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -138,13 +138,13 @@ function SheetBtn({ icon, label, sub, onClick, muted }) {
         display: 'flex', alignItems: 'center', gap: '14px',
         padding: '13px 16px', background: 'none', border: 'none',
         cursor: 'pointer', borderRadius: '14px',
-        color: muted ? 'var(--text-muted)' : 'var(--text-primary)',
-        fontSize: '.9rem', fontWeight: muted ? 400 : 600, textAlign: 'left',
+        color: 'var(--text-primary)',
+        fontSize: '.9rem', fontWeight: 600, textAlign: 'left',
         width: '100%',
       }}
     >
       {icon && (
-        <span style={{ opacity: muted ? .5 : .8, flexShrink: 0 }}>{icon}</span>
+        <span style={{ opacity: .8, flexShrink: 0 }}>{icon}</span>
       )}
       <div>
         <div>{label}</div>

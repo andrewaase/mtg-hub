@@ -1,4 +1,5 @@
 import { useId, useState, useEffect } from 'react'
+import { useScrollLock } from '../hooks/useScrollLock'
 const logoPng = '/Mana-Mint-Logo-With-Box.png'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
@@ -794,6 +795,7 @@ function MoverRow({ item, type, sort = 'dollar', onClick }) {
 }
 
 function MoverCardModal({ name, onClose, setPage }) {
+  useScrollLock()
   const [card,    setCard]    = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -836,8 +838,8 @@ function MoverCardModal({ name, onClose, setPage }) {
       }}>
         <button onClick={onClose} style={{
           position: 'absolute', top: 14, right: 14,
-          background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%',
-          width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem',
+          background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%',
+          width: 32, height: 32, cursor: 'pointer', color: 'var(--text-primary)', fontSize: '.9rem',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>✕</button>
 

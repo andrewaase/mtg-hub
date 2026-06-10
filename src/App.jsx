@@ -435,10 +435,19 @@ export default function App() {
     document.title = PAGE_TITLES['store']
   }, [])
 
+  const openLogMatch = () => {
+    if (!user) {
+      setAuthPrompt({ icon: '⚔️', title: 'Track your match history', body: 'Create a free account to log matches and track your win rate.' })
+      setShowAuth(true)
+      return
+    }
+    setShowLogMatch(true)
+  }
+
   const pageProps = {
     user, isAdmin, matches, setMatches, collection, setCollection, wishlist, setWishlist, showToast, setPage,
     membership,
-    openLogMatch: () => setShowLogMatch(true),
+    openLogMatch,
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
     openCamera: () => {
       if (!user) {
@@ -468,7 +477,7 @@ export default function App() {
       <Sidebar page={page} setPage={setPage} user={user} isAdmin={isAdmin} onAuthClick={() => setShowAuth(true)} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div id="overlay" className={sidebarOpen ? 'open' : ''} onClick={() => setSidebarOpen(false)} />
       <div id="main">
-        <TopBar page={page} user={user} setPage={setPage} onLogMatch={() => setShowLogMatch(true)} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} hideLogMatch={page === 'store'} />
+        <TopBar page={page} user={user} setPage={setPage} onLogMatch={openLogMatch} onAuthClick={() => setShowAuth(true)} onMenuClick={() => setSidebarOpen(!sidebarOpen)} onLogoClick={() => setPage('dashboard')} hideLogMatch={page === 'store'} />
         <div id="content">
           {loading ? (
             /* Show a contextual skeleton while data loads */
@@ -514,7 +523,7 @@ export default function App() {
           )}
         </div>
       </div>
-      <MobileNav page={page} setPage={setPage} openLogMatch={() => setShowLogMatch(true)} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
+      <MobileNav page={page} setPage={setPage} openLogMatch={openLogMatch} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
 
       {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} setPage={setPage} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}

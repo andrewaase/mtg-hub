@@ -50,9 +50,6 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
 
   const menuItems = [
     ...(user ? [{ label: 'Account Settings', icon: '⚙️', action: () => { onAuthClick(); setMenuOpen(false) } }] : []),
-    { label: 'Privacy Policy', icon: '🔒', action: () => handleNavClick('privacy') },
-    { label: 'Terms of Service', icon: '📄', action: () => handleNavClick('terms') },
-    { label: 'Help & Support', icon: '💬', action: () => handleNavClick('support') },
   ]
 
   return (
@@ -157,26 +154,26 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
             </span>
           </div>
         ) : (
-          <div>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={onAuthClick}>
-              Sign In
-            </button>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 10 }}>
-              {[['Privacy', 'privacy'], ['Terms', 'terms'], ['Support', 'support']].map(([label, id]) => (
-                <button
-                  key={id}
-                  onClick={() => handleNavClick(id)}
-                  style={{
-                    background: 'none', border: 'none', color: 'var(--text-muted)',
-                    fontSize: '.68rem', cursor: 'pointer', padding: 0,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={onAuthClick}>
+            Sign In
+          </button>
         )}
+
+        {/* Footer links — always visible */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 10 }}>
+          {[['Privacy', 'privacy'], ['Terms', 'terms'], ['Support', 'support']].map(([label, id]) => (
+            <button
+              key={id}
+              onClick={() => handleNavClick(id)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--text-muted)',
+                fontSize: '.68rem', cursor: 'pointer', padding: 0,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

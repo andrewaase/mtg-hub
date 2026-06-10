@@ -289,7 +289,7 @@ function BulkImportModal({ onClose, collection, setCollection, user, showToast }
               Paste a card list or upload a .txt / .csv file
             </div>
           </div>
-          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: '#fff', fontSize: '.9rem' }}>✕</button>
+          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: 'var(--text-primary)', fontSize: '.9rem' }}>✕</button>
         </div>
 
         {/* Step: input */}

@@ -882,8 +882,9 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
             {recentCards.map(rc => (
               <div
                 key={rc.id}
-                onClick={() => openCardDetail(rc.name)}
+                onClick={() => { setHoverInfo(null); openCardDetail(rc.name) }}
                 onMouseEnter={e => {
+                  if (!window.matchMedia('(hover: hover)').matches) return
                   const rect = e.currentTarget.getBoundingClientRect()
                   setHoverInfo({ img: toNormalImg(rc.img), name: rc.name, price: rc.price, set: rc.set, x: rect.left + rect.width / 2, y: rect.top })
                 }}

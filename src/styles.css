@@ -59,6 +59,39 @@ html.capacitor {
   user-select: none;          /* prevent accidental text selection while scrolling */
 }
 
+/* Pin the page to the viewport and let #main be the only scroll container.
+   Without this, the WKWebView's own rubber-band/bounce scroll drags
+   position:fixed elements (bottom nav, cart bar, modals) along with it. */
+html.capacitor,
+html.capacitor body {
+  position: fixed;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+html.capacitor #root,
+html.capacitor #app {
+  height: 100%;
+}
+
+html.capacitor #main {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* #content's own overflow-x:hidden would otherwise force overflow-y:auto on
+   #content itself (per spec), turning IT into the scroll container instead
+   of #main. Let its content size naturally so #main scrolls. */
+html.capacitor #content {
+  overflow: visible;
+}
+
 /* Push topbar down below status bar on native */
 html.capacitor #topbar {
   padding-top: var(--safe-top);
@@ -73,9 +106,10 @@ html.capacitor #mobile-nav {
   padding-bottom: var(--safe-bottom) !important;
 }
 
-/* Store cart bar clears home indicator on native */
+/* Store cart bar floats above the bottom nav (+ home indicator) on native,
+   instead of overlapping/being hidden behind it. */
 html.capacitor .store-cart-bar {
-  padding-bottom: var(--safe-bottom);
+  bottom: calc(var(--bottom-nav-height) + var(--safe-bottom)) !important;
 }
 
 /* Content area accounts for taller topbar on native */
@@ -145,6 +179,17 @@ body {
 #sidebar.mobile-open {
   transform: translateX(0);
   box-shadow: 8px 0 40px rgba(0, 0, 0, .6);
+  /* Sit above the bottom nav and floating cart bar (same/lower z-index,
+     later in DOM) so the account row at the bottom of the sidebar
+     isn't covered/unclickable. */
+  z-index: 160;
+}
+
+@media (max-width: 899px) {
+  /* Leave room so the bottom (account/links) section clears the bottom nav bar. */
+  #sidebar.mobile-open {
+    padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom));
+  }
 }
 
 @media (min-width: 900px) {
@@ -369,7 +414,7 @@ body {
    CONTENT
    ============================================================ */
 #content {
-  padding: 16px 16px calc(var(--bottom-nav-height) + 24px);
+  padding: 16px 16px calc(var(--bottom-nav-height) + var(--safe-bottom) + 24px);
   flex: 1;
   width: 100%;
   max-width: 100%;
@@ -712,6 +757,17 @@ body {
 
 .form-select option { background: var(--bg-secondary); }
 .form-textarea { resize: vertical; min-height: 80px; }
+
+/* iOS Safari/WKWebView auto-zooms the page on focus when an input's
+   font-size is below 16px. Bump to 16px on mobile so opening a form
+   (e.g. Add Card, Log a Match) doesn't zoom the whole modal in. */
+@media (max-width: 899px) {
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-size: 16px;
+  }
+}
 
 /* ============================================================
    OUTCOME TOGGLE  (Log Match modal)
@@ -1109,6 +1165,11 @@ body {
 
 @media (min-width: 900px) {
   #mobile-nav { display: none; }
+}
+
+/* Store cart bar floats above the bottom nav on mobile web too */
+@media (max-width: 899px) {
+  .store-cart-bar { bottom: calc(var(--bottom-nav-height) + var(--safe-bottom)) !important; }
 }
 
 .mobile-nav-items {
@@ -1594,6 +1655,8 @@ body {
   padding: 24px;
   width: 90%;
   max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
   position: fixed;
   top: 50%;
   left: 50%;

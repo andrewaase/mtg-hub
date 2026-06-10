@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '')
 const CART_KEY      = 'vs-cart-v1'
@@ -219,6 +220,7 @@ function PriceChart({ scryfallId, isFoil, currentPrice }) {
 
 //  Card detail modal 
 function CardDetailModal({ listing, onClose, onAdd, inCart }) {
+  useScrollLock()
   const [cardData, setCardData] = useState(null)
   const [loadingCard, setLoadingCard] = useState(true)
 
@@ -720,6 +722,7 @@ function getResealedImages(name = '') {
 
 //  Product detail modal (sealed / resealed — no Scryfall data)
 function ProductDetailModal({ listing, onClose, onAdd, inCart }) {
+  useScrollLock()
   const [imgSide, setImgSide] = useState('front')
 
   const stockColor = listing.qty_available <= 2 ? '#f87171' : listing.qty_available <= 5 ? '#fb923c' : '#4ade80'
@@ -1226,7 +1229,7 @@ function WaitlistModal({ listing, user, onClose }) {
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 410 }} />
       <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px,92vw)', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 411, padding: '24px 22px 28px', boxShadow: '0 24px 60px rgba(0,0,0,.65)' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: '#fff', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', color: 'var(--text-primary)', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         {done ? (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <div style={{ fontSize: '2rem', marginBottom: 10 }}></div>

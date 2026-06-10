@@ -305,7 +305,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
                 ? 'Sign in to Subscribe'
                 : loading === 'subscribe'
                 ? 'Redirecting…'
-                : `Get Pro — ${billing === 'annual' ? annualPrice : monthlyPrice}`}
+                : `Get Pro - ${billing === 'annual' ? annualPrice : monthlyPrice}`}
             </button>
 
             {!user && (
