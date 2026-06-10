@@ -9,8 +9,6 @@ export default function LogMatchModal({ onClose, user, matches, setMatches, show
     format: 'Commander',
     date: new Date().toISOString().split('T')[0],
     myDeck: '',
-    // Column is still named myColors in the DB — now holds a deck archetype
-    // (e.g. "Aggro") instead of a color identity.
     myColors: 'Aggro',
     oppDeck: '',
     oppType: 'Aggro',

@@ -11,22 +11,51 @@ function lsSet(data) {
   localStorage.setItem(LS_KEY, JSON.stringify({ ...current, ...data }))
 }
 
-//  MATCHES 
+//  MATCHES
+// DB columns are snake_case; JS objects use camelCase — map both ways.
+function matchRowToObj(row) {
+  return {
+    id:       row.id,
+    format:   row.format,
+    date:     row.played_date ?? row.created_at?.split('T')[0] ?? '',
+    myDeck:   row.my_deck ?? '',
+    myColors: row.my_deck_type ?? '',
+    oppDeck:  row.opponent_deck ?? '',
+    oppType:  row.opponent_deck_type ?? '',
+    result:   row.result,
+    notes:    row.notes ?? '',
+  }
+}
+
+function matchToRow(match, userId) {
+  return {
+    user_id:            userId,
+    format:             match.format,
+    played_date:        match.date,
+    my_deck:            match.myDeck,
+    my_deck_type:       match.myColors,
+    opponent_deck:      match.oppDeck,
+    opponent_deck_type: match.oppType,
+    result:             match.result,
+    notes:              match.notes,
+  }
+}
+
 export async function getMatches(userId) {
   if (hasSupabase && userId) {
     const { data } = await supabase.from('matches').select('*').eq('user_id', userId).order('created_at', { ascending: false })
-    return data || []
+    return (data || []).map(matchRowToObj)
   }
   return lsGet().matches || []
 }
 
 export async function addMatch(match, userId) {
   if (hasSupabase && userId) {
-    const { data, error } = await supabase.from('matches').insert({ ...match, user_id: userId }).select().single()
+    const { data, error } = await supabase.from('matches').insert(matchToRow(match, userId)).select().single()
     if (error) { console.error('[db] addMatch error:', error); throw new Error(error.message) }
     // Fall back to the submitted form data if the insert succeeded but the
     // select-back returned nothing (e.g. RLS) — callers must never receive null.
-    return data || { ...match, user_id: userId, id: Date.now() }
+    return data ? matchRowToObj(data) : { ...match, id: Date.now() }
   }
   const matches = lsGet().matches || []
   const newMatch = { ...match, id: Date.now() }
