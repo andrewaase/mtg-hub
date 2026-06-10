@@ -26,7 +26,7 @@ export function formatNumber(num) {
 
 export function calculateWinRate(matches) {
   if (!matches || matches.length === 0) return 0
-  const wins = matches.filter(m => m.result === 'win').length
+  const wins = matches.filter(m => m?.result === 'win').length
   return Math.round((wins / matches.length) * 100)
 }
 
@@ -36,7 +36,7 @@ export function calculateStreak(matches) {
   let type = matches[0]?.result === 'win' ? 'win' : matches[0]?.result === 'loss' ? 'loss' : 'draw'
 
   for (const m of matches) {
-    if (m.result === type) {
+    if (m?.result === type) {
       count++
     } else {
       break

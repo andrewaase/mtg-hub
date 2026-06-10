@@ -2,20 +2,24 @@ import { calculateWinRate } from '../lib/utils'
 
 export default function Stats({ matches }) {
   const byDeck = {}
+  const byDeckType = {}
   const byOpponent = {}
   const byFormat = {}
 
-  matches.forEach(m => {
+  matches.filter(Boolean).forEach(m => {
     if (!byDeck[m.myDeck]) byDeck[m.myDeck] = { wins: 0, total: 0 }
+    if (!byDeckType[m.myColors]) byDeckType[m.myColors] = { wins: 0, total: 0 }
     if (!byOpponent[m.oppType]) byOpponent[m.oppType] = { wins: 0, total: 0 }
     if (!byFormat[m.format]) byFormat[m.format] = { wins: 0, total: 0 }
 
     byDeck[m.myDeck].total++
+    byDeckType[m.myColors].total++
     byOpponent[m.oppType].total++
     byFormat[m.format].total++
 
     if (m.result === 'win') {
       byDeck[m.myDeck].wins++
+      byDeckType[m.myColors].wins++
       byOpponent[m.oppType].wins++
       byFormat[m.format].wins++
     }
@@ -47,6 +51,10 @@ export default function Stats({ matches }) {
       <div>
         <div className="section-title"> Win Rate by Deck</div>
         <div className="card">{renderStats(byDeck)}</div>
+      </div>
+      <div>
+        <div className="section-title"> By Deck Type</div>
+        <div className="card">{renderStats(byDeckType)}</div>
       </div>
       <div>
         <div className="section-title"> vs. Archetype</div>

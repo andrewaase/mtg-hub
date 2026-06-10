@@ -347,8 +347,8 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
   const winRate = calculateWinRate(matches)
   const streak  = calculateStreak(matches)
 
-  const wins   = matches.filter(m => m.result === 'win').length
-  const losses = matches.filter(m => m.result === 'loss').length
+  const wins   = matches.filter(m => m?.result === 'win').length
+  const losses = matches.filter(m => m?.result === 'loss').length
 
   const totalMid   = collection.reduce((s, c) => s + (parseFloat(c.price) || 0) * (c.qty || 1), 0)
   const totalCards = collection.reduce((s, c) => s + (c.qty || 1), 0)
@@ -397,7 +397,7 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
   const matchupSummary = {}
   matches.forEach(m => {
-    if (!m.oppType) return
+    if (!m?.oppType) return
     if (!matchupSummary[m.oppType]) matchupSummary[m.oppType] = { wins: 0, total: 0 }
     matchupSummary[m.oppType].total++
     if (m.result === 'win') matchupSummary[m.oppType].wins++

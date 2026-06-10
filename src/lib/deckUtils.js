@@ -150,6 +150,7 @@ export const FORMAT_COLORS = {
   Vintage:        { bg: 'rgba(183,28,28,.15)',   color: '#ef9a9a' },
   Commander:      { bg: 'rgba(255,215,0,.15)',   color: '#ffd700' },
   Brawl:          { bg: 'rgba(255,215,0,.12)',   color: 'var(--accent-gold)' },
+  Historic:       { bg: 'rgba(30,196,166,.12)',  color: 'var(--accent-gold)' },
   'Historic Brawl':{ bg: 'rgba(30,196,166,.12)', color: 'var(--accent-gold)' },
   Pauper:         { bg: 'rgba(158,158,158,.15)', color: '#bdbdbd' },
   Alchemy:        { bg: 'rgba(0,188,212,.15)',   color: '#4dd0e1' },

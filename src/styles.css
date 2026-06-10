@@ -112,11 +112,6 @@ html.capacitor .store-cart-bar {
   bottom: calc(var(--bottom-nav-height) + var(--safe-bottom)) !important;
 }
 
-/* Content area accounts for taller topbar on native */
-html.capacitor #main {
-  padding-top: var(--safe-top);
-}
-
 /* ============================================================
    DARK MODE — applied when <html data-theme="dark">
    ============================================================ */

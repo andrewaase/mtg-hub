@@ -22,8 +22,11 @@ export async function getMatches(userId) {
 
 export async function addMatch(match, userId) {
   if (hasSupabase && userId) {
-    const { data } = await supabase.from('matches').insert({ ...match, user_id: userId }).select().single()
-    return data
+    const { data, error } = await supabase.from('matches').insert({ ...match, user_id: userId }).select().single()
+    if (error) { console.error('[db] addMatch error:', error); throw new Error(error.message) }
+    // Fall back to the submitted form data if the insert succeeded but the
+    // select-back returned nothing (e.g. RLS) — callers must never receive null.
+    return data || { ...match, user_id: userId, id: Date.now() }
   }
   const matches = lsGet().matches || []
   const newMatch = { ...match, id: Date.now() }

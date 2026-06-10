@@ -1,17 +1,30 @@
-import { useState } from 'react'
-import { addMatch } from '../lib/db'
+import { useState, useEffect } from 'react'
+import { addMatch, getDecks } from '../lib/db'
+
+// Shared by "Deck Type" and "Opponent Type" — keep these two in sync.
+const DECK_TYPES = ['Aggro', 'Control', 'Midrange', 'Combo', 'Ramp', 'Stax']
 
 export default function LogMatchModal({ onClose, user, matches, setMatches, showToast }) {
   const [form, setForm] = useState({
     format: 'Commander',
     date: new Date().toISOString().split('T')[0],
     myDeck: '',
-    myColors: 'W',
+    // Column is still named myColors in the DB — now holds a deck archetype
+    // (e.g. "Aggro") instead of a color identity.
+    myColors: 'Aggro',
     oppDeck: '',
     oppType: 'Aggro',
     result: 'win',
     notes: '',
   })
+  const [decks, setDecks] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    getDecks(user?.id).then(d => { if (!cancelled) setDecks(d) })
+    return () => { cancelled = true }
+  }, [user?.id])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -20,10 +33,18 @@ export default function LogMatchModal({ onClose, user, matches, setMatches, show
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const newMatch = await addMatch(form, user?.id)
-    setMatches([newMatch, ...matches])
-    showToast('Match logged successfully!')
-    onClose()
+    setSubmitting(true)
+    try {
+      const newMatch = await addMatch(form, user?.id)
+      setMatches([newMatch, ...matches])
+      showToast('Match logged successfully!')
+      onClose()
+    } catch (err) {
+      console.error('[LogMatchModal] failed to save match:', err)
+      showToast('Failed to save match — please try again')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -38,7 +59,12 @@ export default function LogMatchModal({ onClose, user, matches, setMatches, show
               <select className="form-select" name="format" value={form.format} onChange={handleChange}>
                 <option>Commander</option>
                 <option>Standard</option>
+                <option>Pioneer</option>
                 <option>Modern</option>
+                <option>Legacy</option>
+                <option>Premodern</option>
+                <option>Brawl</option>
+                <option>Historic</option>
                 <option>Draft</option>
                 <option>Sealed</option>
               </select>
@@ -52,23 +78,15 @@ export default function LogMatchModal({ onClose, user, matches, setMatches, show
           <div className="grid-2 gap-12">
             <div className="form-group">
               <label className="form-label">My Deck</label>
-              <input type="text" className="form-input" name="myDeck" value={form.myDeck} onChange={handleChange} placeholder="Deck name" />
+              <input type="text" className="form-input" name="myDeck" value={form.myDeck} onChange={handleChange} placeholder="Deck name" list="my-decks-list" autoComplete="off" />
+              <datalist id="my-decks-list">
+                {decks.map(d => <option key={d.id} value={d.name} />)}
+              </datalist>
             </div>
             <div className="form-group">
-              <label className="form-label">My Colors</label>
+              <label className="form-label">Deck Type</label>
               <select className="form-select" name="myColors" value={form.myColors} onChange={handleChange}>
-                <option value="W"> White</option>
-                <option value="U"> Blue</option>
-                <option value="B"> Black</option>
-                <option value="R"> Red</option>
-                <option value="G"> Green</option>
-                <option value="WU">WU - Azorius</option>
-                <option value="UB">UB - Dimir</option>
-                <option value="BR">BR - Rakdos</option>
-                <option value="RG">RG - Gruul</option>
-                <option value="GW">GW - Selesnya</option>
-                <option value="WUB">WUB - Esper</option>
-                <option value="WUBRG">WUBRG - 5 Color</option>
+                {DECK_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -81,12 +99,7 @@ export default function LogMatchModal({ onClose, user, matches, setMatches, show
             <div className="form-group">
               <label className="form-label">Opponent Type</label>
               <select className="form-select" name="oppType" value={form.oppType} onChange={handleChange}>
-                <option>Aggro</option>
-                <option>Control</option>
-                <option>Midrange</option>
-                <option>Combo</option>
-                <option>Ramp</option>
-                <option>Stax</option>
+                {DECK_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>
@@ -112,8 +125,8 @@ export default function LogMatchModal({ onClose, user, matches, setMatches, show
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Save Match</button>
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Saving…' : 'Save Match'}</button>
           </div>
         </form>
       </div>

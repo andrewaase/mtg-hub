@@ -4,7 +4,7 @@
   "webDir": "dist",
   "backgroundColor": "#f0f4f8",
   "ios": {
-    "contentInset": "automatic",
+    "contentInset": "never",
     "scrollEnabled": true,
     "limitsNavigationsToAppBoundDomains": true,
     "allowsLinkPreview": false

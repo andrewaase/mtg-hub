@@ -5,7 +5,7 @@ import { deleteMatch } from '../lib/db'
 export default function MatchLog({ matches, setMatches, user, openLogMatch }) {
   const [filter, setFilter] = useState('all')
 
-  const filtered = filter === 'all' ? matches : matches.filter(m => m.format.toLowerCase() === filter.toLowerCase())
+  const filtered = (filter === 'all' ? matches : matches.filter(m => m?.format?.toLowerCase() === filter.toLowerCase())).filter(Boolean)
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this match?')) return
