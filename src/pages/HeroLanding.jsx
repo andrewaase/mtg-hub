@@ -1,46 +1,101 @@
 // ──────────────────────────────────────────────────────────────────────────────
-// HeroLanding — hero splash shown once per browser session in the content area.
+// HeroLanding — welcome splash shown once per browser session in the content area.
+//
+// The artwork is a fully-composed image (headline, feature cards, and CTA buttons
+// are all baked in). We render the whole image and overlay transparent click
+// targets ("hotspots") on top of the baked-in buttons so they remain functional.
+//
+// Two crops of the same design are shipped: a landscape version for desktop/tablet
+// and a portrait version for phones. We swap art + hotspot coordinates at the app's
+// 900px breakpoint (where the sidebar gives way to the mobile nav).
 //
 // Renders as a normal page inside #content (sidebar and topbar stay visible).
-// Dismissed by: clicking any CTA button, the ✕ button, or any sidebar nav link
+// Dismissed by: clicking any hotspot, the ✕ button, or any sidebar nav link
 // (the parent wires setPage to call onDismiss before navigating).
 // ──────────────────────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react'
 
-const HERO_IMG = '/Hero-vault-v2.png'
+// Each art crop carries its native size (to lock the image box's aspect ratio so
+// hotspots line up) and its own hotspot map (positions differ between layouts).
+const LANDSCAPE = {
+  src: '/welcome-popup.png',
+  w: 1448, h: 1086,
+  hotspots: [
+    { label: 'Go to Dashboard',                nav: 'dashboard',  left: '48.5%', top: '84.5%', width: '22.5%', height: '6.5%' },
+    { label: 'Explore Store',                  nav: 'store',      left: '72.2%', top: '84.5%', width: '21%',   height: '6.5%' },
+    { label: 'Learn more about Mana Mint Pro', nav: 'membership', left: '68%',   top: '92.5%', width: '18%',   height: '3%'   },
+  ],
+}
+
+const PORTRAIT = {
+  src: '/welcome-popup-portrait.png',
+  w: 1086, h: 1448,
+  hotspots: [
+    { label: 'Go to Dashboard',                nav: 'dashboard',  left: '22%',   top: '87%',   width: '29%',   height: '5.5%' },
+    { label: 'Explore Store',                  nav: 'store',      left: '51.5%', top: '87%',   width: '26.5%', height: '5.5%' },
+    { label: 'Learn more about Mana Mint Pro', nav: 'membership', left: '47%',   top: '92.8%', width: '24%',   height: '3%'   },
+  ],
+}
+
+// True when the viewport is narrower than the sidebar breakpoint (phone layout).
+function useIsNarrow() {
+  const query = '(max-width: 899px)'
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = e => setNarrow(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
 
 export default function HeroLanding({ user, onNavigate, onAuthClick }) {
+  const art = useIsNarrow() ? PORTRAIT : LANDSCAPE
+
   return (
-    // Outer wrapper — fills the content pane height, clips the background image
+    // Outer wrapper — fills the content pane, centers the artwork on a dark field
+    // that matches the image's deep-navy background so any letterboxing is seamless.
     <div style={{
       position: 'relative',
       height: 'calc(100svh - 56px)',
       minHeight: 500,
       overflow: 'hidden',
-      background: '#08080a',
+      background: '#02152f',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     }}>
 
-      {/* ── Image layer — pushed right so cards stay away from the text ── */}
+      {/* Image box — width is capped by BOTH the pane width and height so the whole
+          composition is always visible while preserving aspect ratio. Hotspots are
+          positioned as % of this box, so they track the baked-in buttons exactly. */}
       <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage:    `url(${HERO_IMG})`,
-        backgroundSize:     'cover',
-        backgroundPosition: 'right center',
-        backgroundRepeat:   'no-repeat',
-      }} />
+        position: 'relative',
+        width: `min(100%, calc((100svh - 56px) * ${art.w} / ${art.h}))`,
+        aspectRatio: `${art.w} / ${art.h}`,
+      }}>
+        <img
+          src={art.src}
+          alt="Welcome to Mana Mint — your all-in-one destination for Magic: The Gathering singles, collection tools, and premium repacks."
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
 
-      {/* ── Left → clear gradient: heavy dark zone keeps text readable ── */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'linear-gradient(to right, rgba(8,8,10,0.95) 0%, rgba(8,8,10,0.85) 25%, rgba(8,8,10,0.55) 48%, rgba(8,8,10,0.15) 68%, rgba(8,8,10,0) 85%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* ── Bottom fade ── */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, height: '20%',
-        background: 'linear-gradient(to bottom, rgba(8,8,10,0) 0%, rgba(8,8,10,1) 100%)',
-        pointerEvents: 'none',
-      }} />
+        {/* Transparent click targets sitting on top of the baked-in buttons. */}
+        {art.hotspots.map(h => (
+          <button
+            key={h.label}
+            onClick={() => onNavigate(h.nav)}
+            aria-label={h.label}
+            style={{
+              ...hotspot,
+              left: h.left, top: h.top, width: h.width, height: h.height,
+            }}
+          />
+        ))}
+      </div>
 
       {/* ── ✕ close → dashboard ── */}
       <button
@@ -60,135 +115,23 @@ export default function HeroLanding({ user, onNavigate, onAuthClick }) {
           lineHeight: 1,
         }}
         onMouseEnter={e => {
-          e.currentTarget.style.background    = 'rgba(255,255,255,.22)'
-          e.currentTarget.style.borderColor   = 'rgba(255,255,255,.55)'
+          e.currentTarget.style.background  = 'rgba(255,255,255,.22)'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,.55)'
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.background    = 'rgba(255,255,255,.10)'
-          e.currentTarget.style.borderColor   = 'rgba(255,255,255,.28)'
+          e.currentTarget.style.background  = 'rgba(255,255,255,.10)'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,.28)'
         }}
       >✕</button>
-
-      {/* ── Content ── */}
-      <div style={{
-        position: 'relative', zIndex: 2,
-        height: '100%',
-        display: 'flex', alignItems: 'center',
-        padding: '0 clamp(22px, 6vw, 72px)',
-        maxWidth: 1200, margin: '0 auto',
-      }}>
-        <div style={{ maxWidth: 460, color: '#fff' }}>
-
-          {/* Eyebrow */}
-          <div style={{
-            fontSize: '.7rem', fontWeight: 800, letterSpacing: '.2em',
-            textTransform: 'uppercase', color: 'var(--accent-teal)',
-            marginBottom: 18,
-          }}>
-            Collection Tools · Singles · Premium Repacks
-          </div>
-
-          {/* Headline */}
-          <h1 style={{
-            fontSize: 'clamp(2.2rem, 5vw, 4rem)',
-            fontWeight: 800, lineHeight: 1.02,
-            letterSpacing: '-.02em',
-            margin: '0 0 32px',
-            textShadow: '0 4px 28px rgba(0,0,0,.7)',
-          }}>
-            Stock Better<br />
-            <span style={{
-              background: 'linear-gradient(135deg, #3dd6ba 0%, #1ec4a6 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}>Singles.</span>
-          </h1>
-
-          {/* ── CTA buttons ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 11, maxWidth: 320 }}>
-
-            <button
-              onClick={() => onNavigate('dashboard')}
-              style={{
-                background: 'linear-gradient(135deg, var(--accent-gold) 0%, #1ec4a6 100%)',
-                color: '#0a0a0c', border: 'none',
-                padding: '14px 26px', borderRadius: 99,
-                fontSize: '.92rem', fontWeight: 800,
-                cursor: 'pointer', letterSpacing: '.03em',
-                boxShadow: '0 8px 24px rgba(30,196,166,.35)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'opacity .15s, box-shadow .15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '.9'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(30,196,166,.45)' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1';  e.currentTarget.style.boxShadow = '0 8px 24px rgba(30,196,166,.35)' }}
-            >
-              Go to Dashboard
-            </button>
-
-            <button
-              onClick={() => onNavigate('store')}
-              style={{
-                background: 'rgba(20,184,166,.15)',
-                color: 'var(--accent-teal)',
-                border: '1.5px solid rgba(20,184,166,.5)',
-                padding: '14px 26px', borderRadius: 99,
-                fontSize: '.92rem', fontWeight: 700,
-                cursor: 'pointer', letterSpacing: '.03em',
-                backdropFilter: 'blur(8px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'background .15s, border-color .15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(20,184,166,.25)'; e.currentTarget.style.borderColor = 'rgba(20,184,166,.8)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(20,184,166,.15)'; e.currentTarget.style.borderColor = 'rgba(20,184,166,.5)' }}
-            >
-              Shop Singles &amp; Repacks
-            </button>
-
-            <button
-              onClick={() => onNavigate('collection')}
-              style={{
-                background: 'rgba(255,255,255,.08)',
-                color: '#fff',
-                border: '1.5px solid rgba(255,255,255,.28)',
-                padding: '14px 26px', borderRadius: 99,
-                fontSize: '.92rem', fontWeight: 700,
-                cursor: 'pointer', letterSpacing: '.03em',
-                backdropFilter: 'blur(8px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'background .15s, border-color .15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.16)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.5)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.28)' }}
-            >
-              Manage Collection
-            </button>
-
-          </div>
-
-          {/* ── Sign In / Sign Up — only when logged out ── */}
-          {!user && (
-            <button
-              onClick={onAuthClick}
-              style={{
-                marginTop: 20,
-                background: 'transparent',
-                color: 'rgba(255,255,255,.6)',
-                border: 'none',
-                padding: '8px 0',
-                fontSize: '.82rem', fontWeight: 600,
-                cursor: 'pointer', letterSpacing: '.02em',
-                display: 'flex', alignItems: 'center', gap: 7,
-                transition: 'color .15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#fff' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.6)' }}
-            >
-              Sign In / Sign Up
-            </button>
-          )}
-
-        </div>
-      </div>
     </div>
   )
+}
+
+// Shared style for the transparent, clickable overlays sitting on baked-in buttons.
+const hotspot = {
+  position: 'absolute',
+  background: 'transparent',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
 }
