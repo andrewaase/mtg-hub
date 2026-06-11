@@ -110,7 +110,7 @@ async function batchFetchMetaPrices(decks) {
 }
 
 //  Main Decks page 
-export default function Decks({ user, collection, showToast, setDeckModalOpen, openCardSearch, membership, setPage }) {
+export default function Decks({ user, collection, showToast, setDeckModalOpen, openCardSearch, membership, setPage, openDeckBuilder }) {
   const [decks, setDecks]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [selected, setSelected]     = useState(null)
@@ -275,6 +275,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
         {activeTab === 'my' && (
           <button className="btn btn-primary btn-sm" style={{ alignSelf: 'center', marginRight: '16px', fontSize: '.78rem' }}
             onClick={() => {
+              if (!openDeckBuilder?.()) return
               const deckLimit = membership?.deckLimit ?? 10
               const isPro     = membership?.isPro ?? false
               if (!isPro && decks.length >= deckLimit) {
@@ -383,7 +384,7 @@ export default function Decks({ user, collection, showToast, setDeckModalOpen, o
             <div className="empty-state" style={{ padding: '60px 20px' }}>
               <div className="empty-icon"></div>
               <p>No decks yet.<br />Import a decklist to get started.</p>
-              <button className="btn btn-primary" onClick={() => setShowImport(true)} style={{ marginTop: '16px' }}>
+              <button className="btn btn-primary" onClick={() => { if (openDeckBuilder?.()) setShowImport(true) }} style={{ marginTop: '16px' }}>
                 + Import Deck
               </button>
             </div>

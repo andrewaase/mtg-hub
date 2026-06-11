@@ -32,7 +32,7 @@
   /* --- Layout --- */
   --sidebar-width:      220px;
   --topbar-height:      56px;
-  --bottom-nav-height:  60px;
+  --bottom-nav-height:  54px;
   --nav-height:         60px; /* legacy compat */
   --radius:             14px;
   --radius-sm:          8px;
@@ -1166,7 +1166,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 10px 6px;
+  padding: 6px 10px 5px;
   cursor: pointer;
   color: var(--text-muted);
   font-size: .58rem;

@@ -14,19 +14,20 @@ export default function TopBar({ page, user, setPage, onLogMatch, onAuthClick, o
             background: 'var(--bg-hover)',
             border: '1.5px solid var(--border)',
             borderRadius: 8,
-            padding: '7px 10px',
+            padding: 0,
             cursor: 'pointer',
-            fontSize: '1.1rem',
-            lineHeight: 1,
             color: 'var(--text-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: 38,
-            minHeight: 38,
+            width: 40,
+            height: 40,
+            flexShrink: 0,
           }}
         >
-          ☰
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 4.5H16M2 9H16M2 13.5H16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
         </button>
         {/* Logo + wordmark — tapping goes to dashboard */}
         <div

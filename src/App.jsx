@@ -444,6 +444,25 @@ export default function App() {
     setShowLogMatch(true)
   }
 
+  const openAddCard = (prefill) => {
+    if (!user) {
+      setAuthPrompt({ icon: '🃏', title: 'Build your collection', body: 'Create a free account to add cards to your collection.' })
+      setShowAuth(true)
+      return
+    }
+    setPrefillCard(prefill || null)
+    setShowAddCard(true)
+  }
+
+  const openDeckBuilder = () => {
+    if (!user) {
+      setAuthPrompt({ icon: '🛠️', title: 'Build your decks', body: 'Create a free account to build and save your decks.' })
+      setShowAuth(true)
+      return false
+    }
+    return true
+  }
+
   const pageProps = {
     user, isAdmin, matches, setMatches, collection, setCollection, wishlist, setWishlist, showToast, setPage,
     membership,
@@ -452,7 +471,8 @@ export default function App() {
       setAuthPrompt({ icon: '⭐', title: 'Unlock Mana Mint Pro', body: 'Create a free account to subscribe and unlock premium features.' })
       setShowAuth(true)
     },
-    openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
+    openAddCard,
+    openDeckBuilder,
     openCamera: () => {
       if (!user) {
         setAuthPrompt({ icon: '📷', title: 'Scan cards with your camera', body: 'Create a free account to scan cards and add them to your collection instantly.' })
@@ -527,7 +547,7 @@ export default function App() {
           )}
         </div>
       </div>
-      <MobileNav page={page} setPage={setPage} openLogMatch={openLogMatch} openCamera={pageProps.openCamera} openAddCard={(prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) }} />
+      <MobileNav page={page} setPage={setPage} openLogMatch={openLogMatch} openCamera={pageProps.openCamera} openAddCard={openAddCard} />
 
       {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} setPage={setPage} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
