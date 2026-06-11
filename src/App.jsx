@@ -539,7 +539,7 @@ export default function App() {
               {mountedPages.has('collection') && <div style={{ display: page === 'collection' ? undefined : 'none' }}><Collection {...pageProps} /></div>}
               {mountedPages.has('releases')   && <div style={{ display: page === 'releases'   ? undefined : 'none' }}><SetReleases /></div>}
               {mountedPages.has('friends')    && <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} isActive={page === 'friends'} /></div>}
-              {mountedPages.has('lifetracker') && <div style={{ display: page === 'lifetracker' ? undefined : 'none' }}><LifeTracker setPage={setPage} /></div>}
+              {mountedPages.has('lifetracker') && <div style={{ display: page === 'lifetracker' ? undefined : 'none' }}><LifeTracker setPage={setPage} openLogMatch={openLogMatch} /></div>}
               {mountedPages.has('decks')      && <div style={{ display: page === 'decks'      ? undefined : 'none' }}><Decks {...pageProps} /></div>}
               {mountedPages.has('wishlist')   && <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>}
               {mountedPages.has('store')      && <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} isActive={page === 'store'} /></div>}

@@ -62,7 +62,7 @@ function OrientationPreview({ rows }) {
   )
 }
 
-export default function LifeTracker({ setPage }) {
+export default function LifeTracker({ setPage, openLogMatch }) {
   const [view, setView] = useState('setup')
   const [format, setFormat] = useState('Commander')
   const [lifeTotal, setLifeTotal] = useState(40)
@@ -110,6 +110,11 @@ export default function LifeTracker({ setPage }) {
   const goHome = () => {
     setShowMenu(false)
     setPage?.('dashboard')
+  }
+
+  const logMatch = () => {
+    setShowMenu(false)
+    openLogMatch?.()
   }
 
   if (view === 'game' && players) {
@@ -173,6 +178,9 @@ export default function LifeTracker({ setPage }) {
                 </button>
                 <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={setupAgain}>
                   ⚙️ Set Up Again
+                </button>
+                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={logMatch}>
+                  📝 Log Match
                 </button>
                 <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={goHome}>
                   🏠 Home

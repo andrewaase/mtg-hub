@@ -57,6 +57,9 @@ html.capacitor {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   user-select: none;          /* prevent accidental text selection while scrolling */
+  /* Disable double-tap-to-zoom (rapid taps on +/- buttons etc. shouldn't
+     zoom the viewport); pinch-to-zoom remains enabled. */
+  touch-action: manipulation;
 }
 
 /* Pin the page to the viewport and let #main be the only scroll container.
