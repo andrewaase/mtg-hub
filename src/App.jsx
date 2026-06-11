@@ -9,6 +9,7 @@ import TopBar from './components/TopBar'
 import MobileNav from './components/MobileNav'
 import Toast from './components/Toast'
 import AuthModal from './components/auth/AuthModal'
+import ResetPasswordModal from './components/auth/ResetPasswordModal'
 import LogMatchModal from './modals/LogMatchModal'
 import AddCardModal from './modals/AddCardModal'
 import DecklistModal from './modals/DecklistModal'
@@ -22,6 +23,7 @@ import Collection from './pages/Collection'
 import SetReleases from './pages/SetReleases'
 import AdminPanel from './pages/AdminPanel'
 import Friends from './pages/Friends'
+import LifeTracker from './pages/LifeTracker'
 import Decks from './pages/Decks'
 import Wishlist from './pages/Wishlist'
 import Store from './pages/Store'
@@ -37,7 +39,7 @@ import { CollectionSkeleton, DecksSkeleton, PageSkeleton } from './components/Sk
 import { useMembership } from './hooks/useMembership'
 
 // 'lab' is intentionally hidden from Sidebar/MobileNav — reachable only at /#lab
-const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms', 'privacy', 'support']
+const VALID_PAGES = ['dashboard', 'log', 'stats', 'news', 'cards', 'collection', 'releases', 'friends', 'lifetracker', 'decks', 'wishlist', 'store', 'membership', 'about', 'admin', 'lab', 'terms', 'privacy', 'support']
 
 const PAGE_TITLES = {
   dashboard:  'Mana Mint | MTG Card Collection Tracker',
@@ -88,6 +90,7 @@ export default function App() {
   const [wishlist, setWishlist] = useState([])
   const [toast, setToast] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
+  const [showResetPassword, setShowResetPassword] = useState(false)
   const [showLogMatch, setShowLogMatch] = useState(false)
   const [showAddCard, setShowAddCard] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
@@ -269,9 +272,10 @@ export default function App() {
   useEffect(() => {
     if (!hasSupabase) { setLoading(false); return }
 
-    // Handle Supabase redirect after email confirmation.
+    // Handle Supabase redirect after email confirmation or password recovery.
     // The URL hash contains either access_token=... (success) or error=... (failure).
     const rawHash = window.location.hash.slice(1)
+    const isRecovery = new URLSearchParams(rawHash).get('type') === 'recovery'
     if (rawHash.startsWith('access_token=') || rawHash.startsWith('error=')) {
       const params = new URLSearchParams(rawHash)
       if (params.get('error')) {
@@ -286,7 +290,9 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
-      if (event === 'SIGNED_IN' && rawHash.startsWith('access_token=')) {
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowResetPassword(true)
+      } else if (event === 'SIGNED_IN' && rawHash.startsWith('access_token=') && !isRecovery) {
         // User just confirmed their email and got signed in automatically
         setTimeout(() => showToast('Email confirmed — welcome to Mana Mint!', 4000), 400)
       }
@@ -533,6 +539,7 @@ export default function App() {
               {mountedPages.has('collection') && <div style={{ display: page === 'collection' ? undefined : 'none' }}><Collection {...pageProps} /></div>}
               {mountedPages.has('releases')   && <div style={{ display: page === 'releases'   ? undefined : 'none' }}><SetReleases /></div>}
               {mountedPages.has('friends')    && <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} isActive={page === 'friends'} /></div>}
+              {mountedPages.has('lifetracker') && <div style={{ display: page === 'lifetracker' ? undefined : 'none' }}><LifeTracker setPage={setPage} /></div>}
               {mountedPages.has('decks')      && <div style={{ display: page === 'decks'      ? undefined : 'none' }}><Decks {...pageProps} /></div>}
               {mountedPages.has('wishlist')   && <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>}
               {mountedPages.has('store')      && <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} isActive={page === 'store'} /></div>}
@@ -550,6 +557,7 @@ export default function App() {
       <MobileNav page={page} setPage={setPage} openLogMatch={openLogMatch} openCamera={pageProps.openCamera} openAddCard={openAddCard} />
 
       {showAuth    && <AuthModal onClose={() => { setShowAuth(false); setAuthPrompt(null) }} showToast={showToast} user={user} prompt={authPrompt} defaultTab={authPrompt ? 'signup' : 'signin'} setPage={setPage} />}
+      {showResetPassword && <ResetPasswordModal onClose={() => setShowResetPassword(false)} showToast={showToast} />}
       {showLogMatch && <LogMatchModal onClose={() => setShowLogMatch(false)} {...pageProps} />}
       {showAddCard  && <AddCardModal onClose={() => setShowAddCard(false)} prefill={prefillCard} {...pageProps} />}
       {showCamera   && <CameraModal onClose={() => setShowCamera(false)} {...pageProps} />}

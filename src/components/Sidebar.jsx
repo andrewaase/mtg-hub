@@ -30,6 +30,7 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
     { id: 'wishlist',   label: 'Wishlist',          section: 'Tools',    requiresSupabase: true },
     { id: 'log',        label: 'Match Log',         section: 'Tools',    requiresSupabase: true },
     { id: 'stats',      label: 'Stats',             section: 'Tools',    requiresSupabase: true },
+    { id: 'lifetracker', label: 'Life Tracker',     section: 'Social' },
     { id: 'friends',    label: 'Friends & Trades',  section: 'Social',   requiresSupabase: true },
     { id: 'admin',      label: 'Control Center',   section: 'Admin',    requiresAdmin: true },
   ]

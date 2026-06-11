@@ -57,6 +57,14 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
   const [loading, setLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting,       setDeleting]      = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+
+  // Change-password (signed-in account settings)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [newPassword,     setNewPassword]     = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwError,   setPwError]   = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
 
   const handleSignOut = async () => {
     setLoading(true)
@@ -106,6 +114,43 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      })
+      if (error) throw error
+      setResetSent(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    setPwError('')
+    if (newPassword.length < 6) { setPwError('Password must be at least 6 characters.'); return }
+    if (newPassword !== confirmPassword) { setPwError('Passwords do not match.'); return }
+    setPwLoading(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      showToast('Password updated successfully')
+      setNewPassword('')
+      setConfirmPassword('')
+      setShowChangePassword(false)
+    } catch (err) {
+      setPwError(err.message)
+    } finally {
+      setPwLoading(false)
     }
   }
 
@@ -209,6 +254,71 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
             </button>
           </div>
 
+          {/* Change password */}
+          <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)' }}>
+            {!showChangePassword ? (
+              <button
+                type="button"
+                onClick={() => { setShowChangePassword(true); setPwError('') }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600,
+                }}
+              >
+                Change Password
+                <span style={{ color: 'var(--text-muted)' }}>›</span>
+              </button>
+            ) : (
+              <form onSubmit={handleChangePassword}>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={labelStyle}>New Password</label>
+                  <input
+                    type="password"
+                    style={inputStyle}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={labelStyle}>Confirm New Password</label>
+                  <input
+                    type="password"
+                    style={inputStyle}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                {pwError && (
+                  <div style={{ color: 'var(--accent-red)', fontSize: '.78rem', marginBottom: '10px', padding: '8px 10px', background: 'rgba(201,64,64,.1)', borderRadius: '8px' }}>
+                    {pwError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowChangePassword(false); setNewPassword(''); setConfirmPassword(''); setPwError('') }}
+                    disabled={pwLoading}
+                    style={{ flex: 1, padding: '9px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600, fontSize: '.8rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={pwLoading}
+                    className="btn btn-primary"
+                    style={{ flex: 1, justifyContent: 'center', fontSize: '.8rem' }}
+                  >
+                    {pwLoading ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               Close
@@ -293,20 +403,44 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
             MANA MINT
           </div>
           <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {tab === 'signin' ? 'Sign in to sync your collection across devices' : 'Create your account'}
+            {tab === 'signin' ? 'Sign in to sync your collection across devices' : tab === 'forgot' ? 'Reset your password' : 'Create your account'}
           </div>
         </div>
 
-        <div className="tabs" style={{ marginBottom: '20px' }}>
-          <button className={`tab ${tab === 'signin' ? 'active' : ''}`} onClick={() => { setTab('signin'); setError('') }}>
-            Sign In
-          </button>
-          <button className={`tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => { setTab('signup'); setError('') }}>
-            Create Account
-          </button>
-        </div>
+        {tab === 'forgot' ? (
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              type="button"
+              onClick={() => { setTab('signin'); setError(''); setResetSent(false) }}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent-gold)', cursor: 'pointer', fontSize: '.78rem', fontWeight: 600 }}
+            >
+              ← Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <div className="tabs" style={{ marginBottom: '20px' }}>
+            <button className={`tab ${tab === 'signin' ? 'active' : ''}`} onClick={() => { setTab('signin'); setError('') }}>
+              Sign In
+            </button>
+            <button className={`tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => { setTab('signup'); setError('') }}>
+              Create Account
+            </button>
+          </div>
+        )}
 
-        <form onSubmit={tab === 'signin' ? handleSignIn : handleSignUp}>
+        {tab === 'forgot' && resetSent ? (
+          <div style={{ textAlign: 'center', padding: '12px 0' }}>
+            <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>📧</div>
+            <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '6px' }}>Check your email</div>
+            <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '20px' }}>
+              We sent a password reset link to <strong>{email}</strong>. Follow the link to choose a new password.
+            </div>
+            <button type="button" className="btn btn-primary" onClick={() => { setTab('signin'); setResetSent(false) }}>
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+        <form onSubmit={tab === 'signin' ? handleSignIn : tab === 'forgot' ? handleForgotPassword : handleSignUp}>
 
           {/* Sign-up only: full name */}
           {tab === 'signup' && (
@@ -324,7 +458,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
           )}
 
           {/* Email */}
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: tab === 'forgot' ? 0 : 14 }}>
             <label style={labelStyle}>Email</label>
             <input
               type="email"
@@ -336,16 +470,31 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
           </div>
 
           {/* Password */}
-          <div style={{ marginBottom: tab === 'signup' ? 14 : 0 }}>
-            <label style={labelStyle}>Password</label>
-            <input
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          {tab !== 'forgot' && (
+            <div style={{ marginBottom: tab === 'signup' ? 14 : 0 }}>
+              <label style={labelStyle}>Password</label>
+              <input
+                type="password"
+                className="form-input"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          {/* Forgot password link */}
+          {tab === 'signin' && (
+            <div style={{ textAlign: 'right', marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={() => { setTab('forgot'); setError(''); setResetSent(false) }}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent-gold)', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600 }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           {/* Sign-up only: shipping address */}
           {tab === 'signup' && (
@@ -442,7 +591,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Loading…' : (tab === 'signin' ? 'Sign In' : 'Create Account')}
+              {loading ? 'Loading…' : (tab === 'signin' ? 'Sign In' : tab === 'forgot' ? 'Send Reset Link' : 'Create Account')}
             </button>
           </div>
 
@@ -460,6 +609,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
             </p>
           )}
         </form>
+        )}
       </div>
     </div>
   )

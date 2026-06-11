@@ -1,6 +1,5 @@
 import { useId, useState, useEffect } from 'react'
 import { useScrollLock } from '../hooks/useScrollLock'
-const logoPng = '/Mana-Mint-Logo-With-Box.png'
 import { calculateWinRate, calculateStreak, fetchNews } from '../lib/utils'
 import { getTCGPlayerLink } from '../lib/tcgplayer'
 import { getManaPoolLink } from '../lib/manapool'
@@ -400,33 +399,6 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
   return (
     <div>
-
-      {/*  Hero welcome strip (empty collection)  */}
-      {collection.length === 0 && matches.length === 0 && (
-        <div style={{
-          margin: '12px 16px 0',
-          background: 'linear-gradient(135deg, rgba(30,196,166,0.07) 0%, rgba(139,94,164,0.07) 100%)',
-          border: '1px solid rgba(30,196,166,0.18)',
-          borderRadius: '12px',
-          padding: '12px 16px',
-          display: 'flex', alignItems: 'center', gap: '12px',
-        }}>
-          <img
-            src={logoPng}
-            alt="Mana Mint"
-            style={{
-              width: '52px', height: 'auto', flexShrink: 0,
-              borderRadius: '12px',
-            }}
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Scan a card to start building your vault.</div>
-          </div>
-          <button onClick={() => setPage?.('collection')} style={{ padding: '6px 14px', borderRadius: '99px', background: 'var(--accent-gold)', color: '#1a1000', border: 'none', fontWeight: 700, fontSize: '.75rem', cursor: 'pointer', flexShrink: 0 }}>
-            + Add
-          </button>
-        </div>
-      )}
 
       {/*  Wishlist alert badge  */}
       {(() => {
