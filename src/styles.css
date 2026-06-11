@@ -32,7 +32,7 @@
   /* --- Layout --- */
   --sidebar-width:      220px;
   --topbar-height:      56px;
-  --bottom-nav-height:  68px;
+  --bottom-nav-height:  60px;
   --nav-height:         60px; /* legacy compat */
   --radius:             14px;
   --radius-sm:          8px;
@@ -111,6 +111,7 @@ html.capacitor #mobile-nav {
 html.capacitor .store-cart-bar {
   bottom: calc(var(--bottom-nav-height) + var(--safe-bottom)) !important;
 }
+
 
 /* ============================================================
    DARK MODE — applied when <html data-theme="dark">
@@ -679,22 +680,6 @@ body {
 .match-meta-row     { font-size: .7rem; color: var(--text-secondary); margin-top: 2px; }
 .match-item-right   { text-align: right; flex-shrink: 0; }
 .match-item-date    { font-size: .66rem; color: var(--text-muted); margin-top: 3px; }
-
-/* ============================================================
-   MATCHUP ROWS
-   ============================================================ */
-.matchup-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.matchup-row:last-child { border-bottom: none; }
-.matchup-name { width: 100px; font-size: .82rem; flex-shrink: 0; color: var(--text-secondary); }
-.matchup-bar  { flex: 1; }
-.matchup-wr   { width: 44px; text-align: right; font-size: .82rem; font-weight: 700; flex-shrink: 0; }
 
 /* ============================================================
    WIN-RATE BARS

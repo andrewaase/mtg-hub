@@ -8,7 +8,7 @@ import { iapAvailable, purchasePro, restorePro, isUserCancelled, manageAppleSubs
 const MONTHLY_PRICE_ID = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_1TW5PM3vsGfrYNehY1OmZnFZ'
 const ANNUAL_PRICE_ID  = import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID  || 'price_1TW5PM3vsGfrYNehCP3u9HTL'
 
-export default function Membership({ user, showToast, membership, onMembershipChange }) {
+export default function Membership({ user, showToast, membership, onMembershipChange, openAuth }) {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'annual'
   const [loading, setLoading] = useState('')        // '' | 'subscribe' | 'portal' | 'redeem' | 'restore'
   const [iosPrices, setIosPrices] = useState(null)  // { monthly, annual } from RevenueCat
@@ -26,7 +26,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
 
   //  Subscribe — Apple IAP in the iOS app, Stripe Checkout on the web
   const handleSubscribe = async () => {
-    if (!user) { showToast('Sign in first to subscribe'); return }
+    if (!user) { openAuth?.(); return }
     setLoading('subscribe')
     try {
       if (iapAvailable) {
@@ -299,7 +299,7 @@ export default function Membership({ user, showToast, membership, onMembershipCh
                 background: 'var(--accent-gold)', color: '#1a1000', letterSpacing: '.5px',
               }}
               onClick={handleSubscribe}
-              disabled={!user || loading === 'subscribe'}
+              disabled={loading === 'subscribe'}
             >
               {!user
                 ? 'Sign in to Subscribe'

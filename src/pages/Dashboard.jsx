@@ -395,14 +395,6 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
       .finally(() => setMoversLoading(false))
   }, [])
 
-  const matchupSummary = {}
-  matches.forEach(m => {
-    if (!m?.oppType) return
-    if (!matchupSummary[m.oppType]) matchupSummary[m.oppType] = { wins: 0, total: 0 }
-    matchupSummary[m.oppType].total++
-    if (m.result === 'win') matchupSummary[m.oppType].wins++
-  })
-
   const streakLabel = streak.type === 'win' ? 'W' : streak.type === 'loss' ? 'L' : '—'
   const streakClass = streak.type === 'win' ? 'green' : streak.type === 'loss' ? 'red' : 'blue'
 
@@ -714,29 +706,6 @@ export default function Dashboard({ matches, collection, wishlist, openLogMatch,
 
       {/*  MTG News  */}
       <NewsWidget setPage={setPage} />
-
-      {/*  Matchup Summary  */}
-      {Object.keys(matchupSummary).length > 0 && (
-        <div style={{ margin: '12px 16px 16px' }}>
-          <div className="section-title" style={{ padding: '0 0 8px' }}>Matchup Summary</div>
-          <div className="card">
-            {Object.entries(matchupSummary).map(([archetype, data]) => {
-              const wr = Math.round((data.wins / data.total) * 100)
-              return (
-                <div key={archetype} className="matchup-row">
-                  <div className="matchup-name">{archetype}</div>
-                  <div className="matchup-bar">
-                    <div className="wr-bar-track">
-                      <div className="wr-bar-fill" style={{ width: `${wr}%`, background: wr >= 50 ? 'var(--accent-green)' : 'var(--accent-red)' }} />
-                    </div>
-                  </div>
-                  <div className="matchup-wr" style={{ color: wr >= 50 ? 'var(--accent-green)' : 'var(--accent-red)' }}>{wr}%</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/*  Restart tutorial  */}
       <div style={{ textAlign: 'center', padding: '28px 16px 8px' }}>

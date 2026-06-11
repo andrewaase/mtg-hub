@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { clearLocalCache } from '../../lib/db'
 
 const inputStyle = {
   width: '100%', padding: '10px 12px',
@@ -60,6 +61,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
   const handleSignOut = async () => {
     setLoading(true)
     await supabase.auth.signOut()
+    clearLocalCache()
     showToast('Signed out successfully')
     setLoading(false)
     onClose()
@@ -81,6 +83,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
         throw new Error(j.error || 'Could not delete account')
       }
       await supabase.auth.signOut()
+      clearLocalCache()
       showToast('Your account and data have been deleted')
       onClose()
     } catch (err) {

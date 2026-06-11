@@ -11,6 +11,13 @@ function lsSet(data) {
   localStorage.setItem(LS_KEY, JSON.stringify({ ...current, ...data }))
 }
 
+// Clears the guest-mode local cache (collection/matches/wishlist/decks).
+// Called on sign-out so a previously-migrated account's data doesn't
+// reappear as if it belongs to the signed-out guest session.
+export function clearLocalCache() {
+  try { localStorage.removeItem(LS_KEY) } catch { /* ignore */ }
+}
+
 //  MATCHES
 // DB columns are snake_case; JS objects use camelCase — map both ways.
 function matchRowToObj(row) {

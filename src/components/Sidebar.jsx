@@ -54,7 +54,7 @@ export default function Sidebar({ page, setPage, user, isAdmin, onAuthClick, sid
 
   return (
     <div id="sidebar" className={sidebarOpen ? 'mobile-open' : ''}>
-      <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 16px' }}>
+      <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 16px', paddingTop: 'calc(20px + var(--safe-top))' }}>
         <img
           src={logoPng}
           alt="Mana Mint"

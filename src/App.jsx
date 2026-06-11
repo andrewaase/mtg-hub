@@ -448,6 +448,10 @@ export default function App() {
     user, isAdmin, matches, setMatches, collection, setCollection, wishlist, setWishlist, showToast, setPage,
     membership,
     openLogMatch,
+    openAuth: () => {
+      setAuthPrompt({ icon: '⭐', title: 'Unlock Mana Mint Pro', body: 'Create a free account to subscribe and unlock premium features.' })
+      setShowAuth(true)
+    },
     openAddCard: (prefill) => { setPrefillCard(prefill || null); setShowAddCard(true) },
     openCamera: () => {
       if (!user) {
@@ -512,7 +516,7 @@ export default function App() {
               {mountedPages.has('decks')      && <div style={{ display: page === 'decks'      ? undefined : 'none' }}><Decks {...pageProps} /></div>}
               {mountedPages.has('wishlist')   && <div style={{ display: page === 'wishlist'   ? undefined : 'none' }}><Wishlist {...pageProps} /></div>}
               {mountedPages.has('store')      && <div style={{ display: page === 'store'      ? undefined : 'none' }}><Store initialSearch={storeSearch} onSearchUsed={() => setStoreSearch('')} user={user} isActive={page === 'store'} /></div>}
-              {mountedPages.has('membership') && <div style={{ display: page === 'membership' ? undefined : 'none' }}><Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} /></div>}
+              {mountedPages.has('membership') && <div style={{ display: page === 'membership' ? undefined : 'none' }}><Membership user={user} showToast={showToast} membership={membership} onMembershipChange={membership.refresh} openAuth={pageProps.openAuth} /></div>}
               {mountedPages.has('about')      && <div style={{ display: page === 'about'      ? undefined : 'none' }}><About setPage={setPage} /></div>}
               {mountedPages.has('admin')      && <div style={{ display: page === 'admin'      ? undefined : 'none' }}><AdminPanel user={user} isAdmin={isAdmin} /></div>}
               {mountedPages.has('lab')        && <div style={{ display: page === 'lab'        ? undefined : 'none' }}><Lab setPage={setPage} /></div>}

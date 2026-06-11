@@ -832,7 +832,6 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
       {/* Page title */}
       <div style={{ padding: '20px 16px 12px' }}>
         <div style={{ fontSize: '1.7rem', fontWeight: 800, color: WHITE, letterSpacing: '-.4px' }}>Card Lookup</div>
-        <div style={{ fontSize: '.78rem', color: MUTED, marginTop: '3px' }}>Search cards · Browse sets · Explore products</div>
       </div>
 
       {/* Search all cards row */}
