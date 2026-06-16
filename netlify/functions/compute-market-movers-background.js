@@ -213,6 +213,9 @@ exports.handler = async (event) => {
   for (const [name, { price: newPrice, img }] of Object.entries(todayPrices)) {
     const ref = refPrices[name]
     if (!ref?.price) continue
+    // Skip if a different printing became cheapest — comparing two different
+    // products (e.g. base card vs alt art) produces spurious movers.
+    if (ref.img && img && ref.img !== img) continue
     const oldPrice = ref.price
     if (Math.abs(newPrice - oldPrice) < 0.005) continue  // skip floating-point noise
 

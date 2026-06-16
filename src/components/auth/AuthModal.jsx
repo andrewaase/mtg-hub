@@ -392,7 +392,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
             borderRadius: '10px', padding: '14px 16px', marginBottom: '20px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{prompt.icon}</div>
+            {prompt.icon && <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{prompt.icon}</div>}
             <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--accent-gold)', marginBottom: '4px' }}>{prompt.title}</div>
             <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{prompt.body}</div>
           </div>

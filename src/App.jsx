@@ -111,12 +111,9 @@ export default function App() {
   }, [user?.id])
   // Onboarding tutorial — shown once after first sign-up
   const [showOnboarding, setShowOnboarding] = useState(false)
-  // Hero landing — splash shown once per browser session in the content area
-  const [showHeroLanding, setShowHeroLanding] = useState(
-    () => !sessionStorage.getItem('vaulted:hero-seen')
-  )
-  // Ref so setPage (used by Sidebar) can dismiss the hero without stale closures
-  const heroLandingActiveRef = useRef(!sessionStorage.getItem('vaulted:hero-seen'))
+  // Hero landing — disabled; HeroLanding.jsx kept for easy re-enable
+  const [showHeroLanding, setShowHeroLanding] = useState(false)
+  const heroLandingActiveRef = useRef(false)
 
   // Lazy-mount pages: track which pages have been visited so they stay mounted
   // (hidden with display:none) without crashing pages that haven't been opened yet
@@ -443,7 +440,7 @@ export default function App() {
 
   const openLogMatch = () => {
     if (!user) {
-      setAuthPrompt({ icon: '⚔️', title: 'Track your match history', body: 'Create a free account to log matches and track your win rate.' })
+      setAuthPrompt({ title: 'Join Mana Mint', body: 'Build a collection, look up cards, log matches, and more — it\'s free.' })
       setShowAuth(true)
       return
     }

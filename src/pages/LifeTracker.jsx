@@ -173,17 +173,21 @@ export default function LifeTracker({ setPage, openLogMatch }) {
             <div className="modal-box" style={{ maxWidth: 320 }} onClick={e => e.stopPropagation()}>
               <h3 style={{ textAlign: 'center' }}>Game Menu</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={resetLife}>
-                  🔄 Reset Life Totals
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', gap: 8 }} onClick={resetLife}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.27"/></svg>
+                  Reset Life Totals
                 </button>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={setupAgain}>
-                  ⚙️ Set Up Again
+                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', gap: 8 }} onClick={setupAgain}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                  Set Up Again
                 </button>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={logMatch}>
-                  📝 Log Match
+                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', gap: 8 }} onClick={logMatch}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Log Match
                 </button>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={goHome}>
-                  🏠 Home
+                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', gap: 8 }} onClick={goHome}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+                  Home
                 </button>
                 <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }} onClick={() => setShowMenu(false)}>
                   Cancel
@@ -199,7 +203,6 @@ export default function LifeTracker({ setPage, openLogMatch }) {
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
       <div className="card" style={{ textAlign: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: '2rem', marginBottom: 4 }}>❤️</div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 4 }}>Life Tracker</h2>
         <p style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>Set up your game and start tracking life totals.</p>
       </div>
