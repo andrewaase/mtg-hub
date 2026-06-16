@@ -1452,7 +1452,24 @@ function OrdersTab() {
   )
 }
 
-//  Settings tab 
+//  Settings tab
+
+function SettingsField({ label, value, onChange, desc }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-secondary)' }}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', maxWidth: 200 }}>
+        <span style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.9rem', borderRight: '1px solid var(--border)' }}>$</span>
+        <input
+          type="number" min="0" step="0.01" value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '.95rem', fontWeight: 600 }}
+        />
+      </div>
+      {desc && <div style={{ fontSize: '.68rem', color: 'var(--text-secondary)' }}>{desc}</div>}
+    </div>
+  )
+}
 
 function SettingsTab() {
   const [shipping,    setShipping]    = useState('')
@@ -1484,11 +1501,14 @@ function SettingsTab() {
       setSaving(false); return
     }
     try {
-      const { error } = await supabase.from('store_settings').upsert([
-        { key: 'shipping_cost', value: shippingVal.toFixed(2), updated_at: new Date().toISOString() },
-        { key: 'handling_fee',  value: handlingVal.toFixed(2), updated_at: new Date().toISOString() },
-      ], { onConflict: 'key' })
-      if (error) throw new Error(error.message)
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/update-store-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ shipping_cost: shippingVal.toFixed(2), handling_fee: handlingVal.toFixed(2) }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Save failed')
       setResult({ ok: true })
     } catch (err) {
       setResult({ ok: false, message: err.message })
@@ -1496,21 +1516,6 @@ function SettingsTab() {
       setSaving(false)
     }
   }
-
-  const Field = ({ label, value, onChange, desc }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-secondary)' }}>{label}</label>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', maxWidth: 200 }}>
-        <span style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.9rem', borderRight: '1px solid var(--border)' }}>$</span>
-        <input
-          type="number" min="0" step="0.01" value={value}
-          onChange={e => onChange(e.target.value)}
-          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '.95rem', fontWeight: 600 }}
-        />
-      </div>
-      {desc && <div style={{ fontSize: '.68rem', color: 'var(--text-secondary)' }}>{desc}</div>}
-    </div>
-  )
 
   return (
     <div style={{ maxWidth: 560 }}>
@@ -1531,13 +1536,13 @@ function SettingsTab() {
               Flat rate charged per order at checkout. Set to 0 for free shipping.
             </div>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-              <Field
+              <SettingsField
                 label="Shipping Cost"
                 value={shipping}
                 onChange={setShipping}
                 desc="Standard flat-rate shipping per order"
               />
-              <Field
+              <SettingsField
                 label="Handling Fee"
                 value={handling}
                 onChange={setHandling}

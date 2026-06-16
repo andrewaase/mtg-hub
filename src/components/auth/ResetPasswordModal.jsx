@@ -43,10 +43,8 @@ export default function ResetPasswordModal({ onClose, showToast }) {
     <div className="auth-modal open">
       <div className="modal-box" style={{ maxWidth: '380px' }}>
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--accent-gold)', letterSpacing: '1px' }}>
-            MANA MINT
-          </div>
-          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <img src="/Horizontal-Mana-Mint-logo-transparent.png" alt="Mana Mint" style={{ width: '160px', height: 'auto', marginBottom: '6px' }} />
+          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
             Choose a new password
           </div>
         </div>

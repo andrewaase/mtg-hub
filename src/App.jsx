@@ -459,7 +459,7 @@ export default function App() {
 
   const openDeckBuilder = () => {
     if (!user) {
-      setAuthPrompt({ icon: '🛠️', title: 'Build your decks', body: 'Create a free account to build and save your decks.' })
+      setAuthPrompt({ title: 'Build your decks', body: 'Create a free account to build and save your decks.' })
       setShowAuth(true)
       return false
     }

@@ -137,9 +137,16 @@ function PrintingCard({ printing, isSelected, onSelect }) {
 
 //  Card Detail View 
 function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard, showToast, onPrintingSelect, user, onStoreSearch }) {
-  const rc  = RARITY_COLOR[card.rarity] || MUTED
-  const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal
+  const rc = RARITY_COLOR[card.rarity] || MUTED
   const setIconUrl = card.set ? `https://svgs.scryfall.io/sets/${card.set}.svg` : null
+
+  // Double-faced card support
+  const cardFaces = (card.card_faces || []).filter(f => f.image_uris?.normal)
+  const isDoubleFaced = cardFaces.length >= 2
+  const [faceIdx, setFaceIdx] = useState(0)
+  const img = isDoubleFaced
+    ? cardFaces[faceIdx]?.image_uris?.normal
+    : (card.image_uris?.normal || cardFaces[0]?.image_uris?.normal)
 
   // Check if this card is available in the Vaulted Singles store
   const [storeListing, setStoreListing] = useState(null)
@@ -178,7 +185,25 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
       {/* Card image + legality (side-by-side on wide screens, stacked on mobile) */}
       <div style={{ padding: '20px 20px 8px', display: 'flex', gap: 28, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {img && (
-          <img src={img} alt={card.name} style={{ width: 'min(260px, 62vw)', borderRadius: '14px', boxShadow: '0 12px 60px rgba(0,0,0,.9)', flexShrink: 0, display: 'block' }} />
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <img src={img} alt={card.name} style={{ width: 'min(260px, 62vw)', borderRadius: '14px', boxShadow: '0 12px 60px rgba(0,0,0,.9)', display: 'block' }} />
+            {isDoubleFaced && (
+              <button
+                onClick={() => setFaceIdx(i => 1 - i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
+                  color: 'var(--text-secondary)', borderRadius: 8, padding: '6px 16px',
+                  fontSize: '.75rem', fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+                {faceIdx === 0 ? 'Show Back' : 'Show Front'}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Legality table */}
