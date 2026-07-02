@@ -392,24 +392,33 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
   )
 }
 
-//  Set Card List View 
+//  Set Card List View
+
+// Returns a label if the card has a special art treatment, null for base art.
+function getTreatment(card) {
+  const fx = card.frame_effects || []
+  if (fx.includes('showcase'))    return 'Showcase'
+  if (fx.includes('extendedart')) return 'Extended Art'
+  if (fx.includes('etched'))      return 'Etched'
+  if (fx.includes('inverted'))    return 'Comic Art'
+  if (card.border_color === 'borderless') return 'Borderless'
+  if (card.full_art)              return 'Full Art'
+  return null
+}
+
 function SetView({ set, onBack, onCardSelect }) {
-  const [cards, setCards]   = useState([])
-  const [loading, setLoad]  = useState(true)
-  const [sortBy, setSortBy] = useState('price')
-  const [hasMore, setHasMore] = useState(false)
-  const [nextPage, setNextPage] = useState(null)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [cards, setCards]         = useState([])
+  const [loading, setLoad]        = useState(true)
+  const [loadingAll, setLoadAll]  = useState(false)
+  const [sortBy, setSortBy]       = useState('number')
+  const [artFilter, setArtFilter] = useState('all') // 'all' | 'base' | 'alt'
 
   useEffect(() => {
-    const cacheKey = `vs-setcards-v2-${set.code}`
-    // Serve the first page instantly from session cache if we've loaded it before
+    const cacheKey = `vs-setcards-v3-${set.code}`
     try {
       const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null')
-      if (cached?.cards?.length) {
-        setCards(cached.cards)
-        setHasMore(cached.hasMore || false)
-        setNextPage(cached.nextPage || null)
+      if (cached?.length) {
+        setCards(cached)
         setLoad(false)
         return
       }
@@ -417,50 +426,47 @@ function SetView({ set, onBack, onCardSelect }) {
 
     setLoad(true)
     setCards([])
-    // unique=prints (not cards) so every distinct printing shows — including
-    // Japanese/foreign alternate-art versions (e.g. Mystical Archive JP) and
-    // showcase/borderless/etched treatments, which unique=cards collapses away.
-    fetch(`https://api.scryfall.com/cards/search?q=set:${set.code}&order=usd&unique=prints&dir=desc`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.data) {
-          setCards(data.data)
-          setHasMore(data.has_more || false)
-          setNextPage(data.next_page || null)
-          try {
-            sessionStorage.setItem(cacheKey, JSON.stringify({
-              cards: data.data, hasMore: data.has_more || false, nextPage: data.next_page || null,
-            }))
-          } catch {}
+
+    // Fetch all pages automatically so every card in the set is visible —
+    // reprints and alt-art treatments with low/null prices sort to later pages
+    // and would be invisible with a single-page fetch.
+    const fetchAll = async () => {
+      let url = `https://api.scryfall.com/cards/search?q=set:${set.code}&order=number&unique=prints&dir=asc`
+      let all = []
+      try {
+        while (url) {
+          const res  = await fetch(url)
+          const data = await res.json()
+          if (!data.data) break
+          all = [...all, ...data.data]
+          setCards([...all])   // stream results as each page arrives
+          setLoad(false)
+          setLoadAll(data.has_more)
+          url = data.has_more ? data.next_page : null
+          if (url) await new Promise(r => setTimeout(r, 80)) // be polite to Scryfall
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoad(false))
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(all)) } catch {}
+      } catch {
+        setLoad(false)
+      }
+      setLoadAll(false)
+    }
+    fetchAll()
   }, [set.code])
 
-  const loadMore = async () => {
-    if (!nextPage || loadingMore) return
-    setLoadingMore(true)
-    try {
-      const res = await fetch(nextPage)
-      const data = await res.json()
-      if (data.data) {
-        setCards(prev => [...prev, ...data.data])
-        setHasMore(data.has_more || false)
-        setNextPage(data.next_page || null)
-      }
-    } catch {}
-    setLoadingMore(false)
-  }
+  const filtered = useMemo(() => {
+    if (artFilter === 'base') return cards.filter(c => !getTreatment(c))
+    if (artFilter === 'alt')  return cards.filter(c =>  getTreatment(c))
+    return cards
+  }, [cards, artFilter])
 
   const sorted = useMemo(() => {
-    const arr = [...cards]
-    if (sortBy === 'price')   return arr.sort((a, b) => (parseFloat(b.prices?.usd) || 0) - (parseFloat(a.prices?.usd) || 0))
-    if (sortBy === 'az')      return arr.sort((a, b) => a.name.localeCompare(b.name))
-    if (sortBy === 'rarity')  return arr.sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9))
-    if (sortBy === 'number')  return arr.sort((a, b) => parseInt(a.collector_number || 0) - parseInt(b.collector_number || 0))
-    return arr
-  }, [cards, sortBy])
+    const arr = [...filtered]
+    if (sortBy === 'price')  return arr.sort((a, b) => (parseFloat(b.prices?.usd) || 0) - (parseFloat(a.prices?.usd) || 0))
+    if (sortBy === 'az')     return arr.sort((a, b) => a.name.localeCompare(b.name))
+    if (sortBy === 'rarity') return arr.sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9))
+    return arr.sort((a, b) => parseInt(a.collector_number || 0) - parseInt(b.collector_number || 0))
+  }, [filtered, sortBy])
 
   return (
     <div style={{ background: BG, minHeight: '100vh' }}>
@@ -475,13 +481,17 @@ function SetView({ set, onBack, onCardSelect }) {
         <SetIcon uri={set.icon_svg_uri} />
       </div>
 
-      {/* Sort chips */}
+      {/* Sort + Art filter */}
       <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: `1px solid ${DIVID}`, overflowX: 'auto' }}>
-        {[['az','A-Z'], ['price','Price'], ['rarity','Rarity'], ['number','Card #']].map(([val, label]) => (
+        {[['number','Card #'], ['az','A-Z'], ['price','Price'], ['rarity','Rarity']].map(([val, label]) => (
           <SortChip key={val} label={label} active={sortBy === val} onClick={() => setSortBy(val)} />
         ))}
-        <div style={{ marginLeft: 'auto', fontSize: '.7rem', color: MUTED, alignSelf: 'center', flexShrink: 0 }}>
-          {cards.length} cards
+        <div style={{ width: 1, background: DIVID, margin: '2px 4px', flexShrink: 0 }} />
+        {[['all','All'], ['base','Base Art'], ['alt','Alt Art']].map(([val, label]) => (
+          <SortChip key={val} label={label} active={artFilter === val} onClick={() => setArtFilter(val)} />
+        ))}
+        <div style={{ marginLeft: 'auto', fontSize: '.7rem', color: MUTED, alignSelf: 'center', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          {sorted.length}{loadingAll ? '…' : ''} cards
         </div>
       </div>
 
@@ -492,14 +502,8 @@ function SetView({ set, onBack, onCardSelect }) {
         <>
           {sorted.map(card => {
             const thumb = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small
-            // Distinguish printings of the same card: language, special treatment
             const isForeign = card.lang && card.lang !== 'en'
-            const treatment = card.frame_effects?.includes('showcase') ? 'Showcase'
-              : card.frame_effects?.includes('extendedart') ? 'Extended'
-              : card.frame_effects?.includes('etched') ? 'Etched'
-              : card.border_color === 'borderless' ? 'Borderless'
-              : card.full_art ? 'Full Art'
-              : null
+            const treatment = getTreatment(card)
             return (
             <div
               key={card.id}
@@ -522,22 +526,20 @@ function SetView({ set, onBack, onCardSelect }) {
                   {treatment && <span style={{ color: 'var(--accent-blue)' }}>{treatment}</span>}
                 </div>
               </div>
-              <div style={{ fontWeight: 700, color: card.prices?.usd ? WHITE : '#2a2a2a', fontSize: '.88rem', marginLeft: '14px', flexShrink: 0 }}>
+              <div style={{ fontWeight: 700, color: card.prices?.usd ? WHITE : '#333', fontSize: '.88rem', marginLeft: '14px', flexShrink: 0 }}>
                 {card.prices?.usd ? `$${card.prices.usd}` : '—'}
               </div>
             </div>
             )
           })}
-
-          {/* Load more */}
-          {hasMore && (
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <button onClick={loadMore} disabled={loadingMore} style={{
-                background: 'transparent', border: `1px solid var(--border)`, color: 'var(--text-secondary)',
-                padding: '8px 24px', borderRadius: '99px', fontSize: '.78rem', cursor: 'pointer',
-              }}>
-                {loadingMore ? 'Loading…' : 'Load more'}
-              </button>
+          {!loadingAll && sorted.length === 0 && artFilter !== 'all' && (
+            <div style={{ padding: '48px 24px', textAlign: 'center', color: MUTED, fontSize: '.85rem' }}>
+              No {artFilter === 'base' ? 'base art' : 'alt art'} cards in this set.
+            </div>
+          )}
+          {loadingAll && (
+            <div style={{ padding: '12px', textAlign: 'center', color: MUTED, fontSize: '.75rem' }}>
+              Loading more cards…
             </div>
           )}
         </>
