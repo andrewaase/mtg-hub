@@ -20,8 +20,8 @@ const WHITE = 'var(--text-primary)'
 function SortChip({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
-      padding: '5px 14px', borderRadius: '99px', fontSize: '.74rem', fontWeight: 600,
-      cursor: 'pointer', border: '1px solid',
+      padding: '5px 12px', borderRadius: '99px', fontSize: '.74rem', fontWeight: 600,
+      cursor: 'pointer', border: '1px solid', flexShrink: 0, whiteSpace: 'nowrap',
       background: active ? 'var(--accent-gold)' : 'transparent',
       color:      active ? '#fff' : 'var(--text-secondary)',
       borderColor: active ? 'var(--accent-gold)' : 'var(--border)',
@@ -394,13 +394,35 @@ function CardDetailView({ card, printings, printingsLoading, onBack, openAddCard
 
 //  Set Card List View
 
+// Some sets have a companion "bonus sheet" that Scryfall files under a separate
+// set code with no parent link (e.g. Marvel Super Heroes' reprint sheet lives in
+// the "Marvel Universe" masterpiece set). Merge those in so browsing the main set
+// shows every card — including the pricey comic-book reprints.
+const SET_COMPANIONS = { msh: ['mar'] }
+
+// Best available USD price: fall back to foil/etched when the nonfoil price is
+// null (foil-only printings like the Marvel Tales covers have no plain usd).
+function cardPrice(card) {
+  const p = card.prices || {}
+  return parseFloat(p.usd || p.usd_foil || p.usd_etched) || 0
+}
+
 // Returns a label if the card has a special art treatment, null for base art.
 function getTreatment(card) {
-  const fx = card.frame_effects || []
-  if (fx.includes('showcase'))    return 'Showcase'
+  const fx    = card.frame_effects || []
+  const promo = card.promo_types   || []
+  const foilOnly = card.finishes?.length === 1 && card.finishes[0] === 'foil'
+  const isMarvel = card.set === 'msh' || card.set === 'mar'
+  // Marvel "Marvel Tales" magazine-cover variants — borderless, foil-only, and
+  // NOT the inverted (showcase) frame. These are the premium comic-book covers
+  // worth far more than the ordinary showcase printing.
+  if (isMarvel && card.border_color === 'borderless' && foilOnly && !fx.includes('inverted'))
+    return 'Comic Book'
+  // Comic-panel "source material" reprints (Marvel Universe bonus sheet, etc.)
+  if (promo.includes('sourcematerial')) return 'Comic Book'
+  if (fx.includes('inverted') || fx.includes('showcase')) return 'Showcase'
   if (fx.includes('extendedart')) return 'Extended Art'
   if (fx.includes('etched'))      return 'Etched'
-  if (fx.includes('inverted'))    return 'Comic Art'
   if (card.border_color === 'borderless') return 'Borderless'
   if (card.full_art)              return 'Full Art'
   return null
@@ -414,7 +436,7 @@ function SetView({ set, onBack, onCardSelect }) {
   const [artFilter, setArtFilter] = useState('all') // 'all' | 'base' | 'alt'
 
   useEffect(() => {
-    const cacheKey = `vs-setcards-v3-${set.code}`
+    const cacheKey = `vs-setcards-v4-${set.code}`
     try {
       const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null')
       if (cached?.length) {
@@ -429,21 +451,25 @@ function SetView({ set, onBack, onCardSelect }) {
 
     // Fetch all pages automatically so every card in the set is visible —
     // reprints and alt-art treatments with low/null prices sort to later pages
-    // and would be invisible with a single-page fetch.
+    // and would be invisible with a single-page fetch. Companion bonus-sheet
+    // sets (see SET_COMPANIONS) are merged in so their reprints show up too.
     const fetchAll = async () => {
-      let url = `https://api.scryfall.com/cards/search?q=set:${set.code}&order=number&unique=prints&dir=asc`
+      const codes = [set.code, ...(SET_COMPANIONS[set.code] || [])]
       let all = []
       try {
-        while (url) {
-          const res  = await fetch(url)
-          const data = await res.json()
-          if (!data.data) break
-          all = [...all, ...data.data]
-          setCards([...all])   // stream results as each page arrives
-          setLoad(false)
-          setLoadAll(data.has_more)
-          url = data.has_more ? data.next_page : null
-          if (url) await new Promise(r => setTimeout(r, 80)) // be polite to Scryfall
+        for (const code of codes) {
+          let url = `https://api.scryfall.com/cards/search?q=set:${code}&order=number&unique=prints&dir=asc`
+          while (url) {
+            const res  = await fetch(url)
+            const data = await res.json()
+            if (!data.data) break
+            all = [...all, ...data.data]
+            setCards([...all])   // stream results as each page arrives
+            setLoad(false)
+            setLoadAll(true)
+            url = data.has_more ? data.next_page : null
+            if (url) await new Promise(r => setTimeout(r, 80)) // be polite to Scryfall
+          }
         }
         try { sessionStorage.setItem(cacheKey, JSON.stringify(all)) } catch {}
       } catch {
@@ -462,7 +488,7 @@ function SetView({ set, onBack, onCardSelect }) {
 
   const sorted = useMemo(() => {
     const arr = [...filtered]
-    if (sortBy === 'price')  return arr.sort((a, b) => (parseFloat(b.prices?.usd) || 0) - (parseFloat(a.prices?.usd) || 0))
+    if (sortBy === 'price')  return arr.sort((a, b) => cardPrice(b) - cardPrice(a))
     if (sortBy === 'az')     return arr.sort((a, b) => a.name.localeCompare(b.name))
     if (sortBy === 'rarity') return arr.sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9))
     return arr.sort((a, b) => parseInt(a.collector_number || 0) - parseInt(b.collector_number || 0))
@@ -481,18 +507,23 @@ function SetView({ set, onBack, onCardSelect }) {
         <SetIcon uri={set.icon_svg_uri} />
       </div>
 
-      {/* Sort + Art filter */}
-      <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: `1px solid ${DIVID}`, overflowX: 'auto' }}>
-        {[['number','Card #'], ['az','A-Z'], ['price','Price'], ['rarity','Rarity']].map(([val, label]) => (
-          <SortChip key={val} label={label} active={sortBy === val} onClick={() => setSortBy(val)} />
-        ))}
-        <div style={{ width: 1, background: DIVID, margin: '2px 4px', flexShrink: 0 }} />
-        {[['all','All'], ['base','Base Art'], ['alt','Alt Art']].map(([val, label]) => (
-          <SortChip key={val} label={label} active={artFilter === val} onClick={() => setArtFilter(val)} />
-        ))}
-        <div style={{ marginLeft: 'auto', fontSize: '.7rem', color: MUTED, alignSelf: 'center', flexShrink: 0, whiteSpace: 'nowrap' }}>
+      {/* Sort row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px 0' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1, scrollbarWidth: 'none' }}>
+          {[['number','Card #'], ['az','A-Z'], ['price','Price'], ['rarity','Rarity']].map(([val, label]) => (
+            <SortChip key={val} label={label} active={sortBy === val} onClick={() => setSortBy(val)} />
+          ))}
+        </div>
+        <div style={{ fontSize: '.7rem', color: MUTED, flexShrink: 0, whiteSpace: 'nowrap' }}>
           {sorted.length}{loadingAll ? '…' : ''} cards
         </div>
+      </div>
+
+      {/* Art filter row */}
+      <div style={{ display: 'flex', gap: '6px', padding: '8px 16px 10px', borderBottom: `1px solid ${DIVID}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {[['all','All Arts'], ['base','Base Only'], ['alt','Alt Art Only']].map(([val, label]) => (
+          <SortChip key={val} label={label} active={artFilter === val} onClick={() => setArtFilter(val)} />
+        ))}
       </div>
 
       {/* Card rows */}
@@ -504,6 +535,7 @@ function SetView({ set, onBack, onCardSelect }) {
             const thumb = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small
             const isForeign = card.lang && card.lang !== 'en'
             const treatment = getTreatment(card)
+            const price = cardPrice(card)
             return (
             <div
               key={card.id}
@@ -526,8 +558,8 @@ function SetView({ set, onBack, onCardSelect }) {
                   {treatment && <span style={{ color: 'var(--accent-blue)' }}>{treatment}</span>}
                 </div>
               </div>
-              <div style={{ fontWeight: 700, color: card.prices?.usd ? WHITE : '#333', fontSize: '.88rem', marginLeft: '14px', flexShrink: 0 }}>
-                {card.prices?.usd ? `$${card.prices.usd}` : '—'}
+              <div style={{ fontWeight: 700, color: price ? WHITE : '#333', fontSize: '.88rem', marginLeft: '14px', flexShrink: 0 }}>
+                {price ? `$${price.toFixed(2)}` : '—'}
               </div>
             </div>
             )

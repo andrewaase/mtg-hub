@@ -2,7 +2,7 @@ const FEATURES = [
   {
     icon: '🛒',
     title: 'Card Shop',
-    desc: 'Browse singles, sealed product, and curated resealed packs, all in one store. Filter by price range, condition, or foil status. Share any listing with a direct link.',
+    desc: 'Browse singles, sealed product, and curated resealed packs, all in one store. Filter by price range, condition, or foil status.',
     to: 'store',
   },
   {
@@ -47,9 +47,21 @@ const FEATURES = [
     to: 'log',
   },
   {
+    icon: '🏷️',
+    title: 'Sell Binder',
+    desc: 'Add cards to your sell binder to see what stores are willing to pay you for them.',
+    to: 'collection',
+  },
+  {
+    icon: '❤️',
+    title: 'Life Tracker',
+    desc: 'Set up and keep track of your life totals while playing a game of Magic.',
+    to: 'lifetracker',
+  },
+  {
     icon: '⭐',
-    title: 'Wishlist & Previews',
-    desc: 'Save cards you\'re hunting. Click any thumbnail for a full-size card preview with live market price. Great for quick buy decisions.',
+    title: 'Wishlist',
+    desc: 'Add cards to your wishlist and set a price target. Get notified the moment a card hits your target price.',
     to: 'wishlist',
   },
   {
@@ -176,8 +188,12 @@ export default function About({ setPage }) {
           Built by an MTG player,<br />for MTG players.
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '.92rem', lineHeight: 1.75, maxWidth: 560, margin: '0 auto' }}>
-          Mana Mint started as a personal project to solve a real problem: keeping track of a growing
-          Magic: The Gathering collection and making it easy to buy and sell singles at fair prices.
+          Mana Mint started as a personal project to solve a real problem. I had a favorite app that I
+          used for all my card and price lookups — one I had already paid for. Then it was moved behind
+          a monthly subscription paywall. Rather than pay up, I got fed up and decided to build my own
+          card lookup app. As I kept building, more ideas came, and I kept adding them to Mana Mint. The
+          result is a comprehensive, intuitive Magic: The Gathering assistant that tracks everything from
+          your collection to your daily matches.
         </p>
       </div>
 
@@ -191,13 +207,20 @@ export default function About({ setPage }) {
         </h2>
         <div style={{ color: 'var(--text-secondary)', fontSize: '.9rem', lineHeight: 1.8 }}>
           <p style={{ margin: '0 0 12px' }}>
-            Magic: The Gathering has been a part of my life for years. The strategy, the art, the community,
-            and yes, the hunt for that one card that completes the deck. Over time my collection grew to the
-            point where I needed a better way to manage it, price it, and eventually start selling.
+            Magic: The Gathering has been a huge part of my life for a long time. I was introduced to the
+            game when I was 12 or 13. I still remember walking into a card shop and looking at all the
+            singles — it had to be right around the time the original Lorwyn set dropped, because I remember
+            staring at rows of Lorwyn and Morningtide cards.
           </p>
-          <p style={{ margin: 0, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-             <strong>Placeholder</strong> - add your real story here: how you got into Magic, when you started collecting,
-            what gap Mana Mint fills for you, and why you opened the shop.
+          <p style={{ margin: '0 0 12px' }}>
+            The first card I ever bought was Deathrender. I had no idea how to play it or even what it did,
+            but I had to have it. For my first Standard tournament, I bought a UR Eventide precon, convinced
+            I was going to take down the competition.
+          </p>
+          <p style={{ margin: 0 }}>
+            Since then, I've played in countless FNMs, won multiple Magic Game Days, and even competed in a
+            Grand Prix. I've always wanted to run a Magic store — it was never a matter of if, only when.
+            That's how Mana Mint was born.
           </p>
         </div>
       </div>
