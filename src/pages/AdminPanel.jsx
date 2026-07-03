@@ -1105,17 +1105,22 @@ function ListingsTab() {
     setListings(prev => prev.filter(l => l.id !== id))
   }
 
-  //  Export inventory as a ManaPool-compatible file.
-  //  ManaPool's inventory format is tab-separated with a fixed column set and
-  //  identifies each card by its Scryfall id (product_id). We enrich every
-  //  single-card listing from Scryfall — using the stored scryfall_id, with a
-  //  name lookup as a fallback — to fill in set code, collector number, rarity,
-  //  and market prices, so the file re-imports directly into ManaPool.
-  const MANAPOOL_COLUMNS = [
-    'product_type', 'product_id', 'name', 'set', 'number', 'rarity', 'language',
-    'finish', 'condition', 'price', 'market_low', 'market_price',
-    'market_price_foil', 'quantity', 'exported_at',
+  //  Export inventory as a ManaBox-format CSV.
+  //  ManaPool imports several CSV formats; its own ("Mana Pool Native") keys on
+  //  ManaPool's internal product_id, which we can't produce. ManaBox format is
+  //  also accepted and identifies cards by Scryfall id + set/collector number,
+  //  all of which we can fill from Scryfall — so we emit that instead.
+  //  https://support.manapool.com/hc/en-us/articles/26131255560855
+  const MANABOX_COLUMNS = [
+    'Binder Name', 'Binder Type', 'Name', 'Set code', 'Set name', 'Collector number',
+    'Foil', 'Rarity', 'Quantity', 'ManaBox ID', 'Scryfall ID', 'Purchase price',
+    'Misprint', 'Altered', 'Condition', 'Language', 'Purchase price currency',
   ]
+
+  // ManaPool collapses ManaBox's 7 grades into its 5. Map our condition to the
+  // ManaBox grade that lands on the matching ManaPool grade:
+  //   mint→NM, near_mint→LP, excellent→MP, light_played→HP, poor→DMG
+  const CONDITION_TO_MANABOX = { NM: 'mint', LP: 'near_mint', MP: 'excellent', HP: 'light_played', DMG: 'poor' }
 
   const exportCSV = async () => {
     const singles = listings.filter(l => (l.product_type || 'single') === 'single')
@@ -1142,45 +1147,49 @@ function ListingsTab() {
         if (i + 75 < identifiers.length) await new Promise(r => setTimeout(r, 100))
       }
 
-      const now   = new Date().toISOString()
-      // TSV fields shouldn't contain tabs/newlines — collapse any to a space.
-      const clean = (v) => v == null ? '' : String(v).replace(/[\t\r\n]+/g, ' ').trim()
+      // CSV cell escaping — quote any cell containing a comma, quote, or newline.
+      const esc   = (v) => {
+        if (v == null) return ''
+        const s = String(v)
+        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+      }
       const money = (v) => (v == null || v === '' || isNaN(parseFloat(v))) ? '' : parseFloat(v).toFixed(2)
 
       let unmatched = 0
       const rows = singles.map(l => {
         const card = (l.scryfall_id && byId[l.scryfall_id]) || byName[(l.name || '').toLowerCase()] || null
         if (!card) unmatched++
-        const prices = card?.prices || {}
         return [
-          'mtg_single',
-          '',                                   // product_id — ManaPool's own catalog id, not derivable from our data
-          card?.name || l.name,
-          (card?.set || '').toUpperCase(),      // set code, e.g. MSH
-          card?.collector_number || '',
-          card?.rarity || '',
-          (card?.lang || 'en').toUpperCase(),
-          l.is_foil ? 'FO' : 'NF',
-          l.condition || 'NM',
-          money(l.price),
-          money(prices.usd),
-          money(prices.usd),
-          money(prices.usd_foil),
-          String(l.qty_available ?? 0),
-          now,
-        ].map(clean).join('\t')
+          'Mana Mint',                                 // Binder Name
+          'list',                                      // Binder Type
+          card?.name || l.name,                        // Name
+          (card?.set || '').toUpperCase(),             // Set code
+          card?.set_name || l.set_name || '',          // Set name
+          card?.collector_number || '',                // Collector number
+          l.is_foil ? 'foil' : 'normal',               // Foil
+          card?.rarity || '',                          // Rarity
+          l.qty_available ?? 0,                        // Quantity
+          '',                                          // ManaBox ID (unused)
+          card?.id || l.scryfall_id || '',             // Scryfall ID
+          money(l.price),                              // Purchase price (ManaPool reads this as the price)
+          'false',                                     // Misprint
+          'false',                                     // Altered
+          CONDITION_TO_MANABOX[l.condition] || 'mint', // Condition
+          card?.lang || 'en',                          // Language
+          'USD',                                       // Purchase price currency
+        ].map(esc).join(',')
       })
 
-      const tsv  = MANAPOOL_COLUMNS.join('\t') + '\n' + rows.join('\n')
-      const blob = new Blob([tsv], { type: 'text/csv;charset=utf-8;' })
+      const csv  = MANABOX_COLUMNS.join(',') + '\n' + rows.join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `mana-mint-inventory-manapool-${now.slice(0, 10)}.csv`
+      a.download = `mana-mint-inventory-manabox-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(a.href)
 
       if (unmatched > 0) {
-        alert(`Exported ${singles.length} listings.\n\n${unmatched} could not be matched to Scryfall, so their set / number / rarity columns are blank.`)
+        alert(`Exported ${singles.length} listings in ManaBox format.\n\n${unmatched} could not be matched to Scryfall (blank set / number / Scryfall ID) and may not import — re-pick those cards from search so they store a Scryfall id.`)
       }
     } catch (e) {
       alert('Export failed: ' + e.message)
