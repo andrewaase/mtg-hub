@@ -995,6 +995,367 @@ Mox Pearl,Beta,LP,1250.00,1,false`
   )
 }
 
+//  ManaPool / ManaBox CSV codec (shared by export + sync)
+
+// ManaBox export header, exactly as ManaPool expects it.
+const MANABOX_COLUMNS = [
+  'Binder Name', 'Binder Type', 'Name', 'Set code', 'Set name', 'Collector number',
+  'Foil', 'Rarity', 'Quantity', 'ManaBox ID', 'Scryfall ID', 'Purchase price',
+  'Misprint', 'Altered', 'Condition', 'Language', 'Purchase price currency',
+]
+// Our 5 grades → the ManaBox grade that ManaPool collapses back to the same grade.
+const CONDITION_TO_MANABOX = { NM: 'mint', LP: 'near_mint', MP: 'excellent', HP: 'light_played', DMG: 'poor' }
+// ManaBox's 7 grades → our 5 (used when reading a file back in).
+const MANABOX_TO_CONDITION = { mint: 'NM', near_mint: 'LP', excellent: 'MP', good: 'MP', light_played: 'HP', played: 'HP', poor: 'DMG' }
+
+// Minimal RFC-4180 CSV parser — handles quoted fields with commas/quotes.
+function parseCsvRows(text) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n').filter(l => l.length)
+  if (!lines.length) return { headers: [], rows: [] }
+  const parseLine = (line) => {
+    const out = []; let cur = ''; let q = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (q) {
+        if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++ } else q = false }
+        else cur += ch
+      } else if (ch === '"') q = true
+      else if (ch === ',') { out.push(cur); cur = '' }
+      else cur += ch
+    }
+    out.push(cur); return out
+  }
+  const headers = parseLine(lines[0]).map(h => h.trim())
+  const rows = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i])
+    const obj = {}
+    headers.forEach((h, idx) => { obj[h] = (cols[idx] ?? '').trim() })
+    rows.push(obj)
+  }
+  return { headers, rows }
+}
+
+// Build a ManaBox-format CSV string from listings, enriching from Scryfall.
+async function generateManaboxCsv(singles) {
+  const idList   = [...new Set(singles.filter(l => l.scryfall_id).map(l => l.scryfall_id))]
+  const nameList = [...new Set(singles.filter(l => !l.scryfall_id && l.name).map(l => l.name))]
+  const identifiers = [...idList.map(id => ({ id })), ...nameList.map(name => ({ name }))]
+
+  const byId = {}, byName = {}
+  for (let i = 0; i < identifiers.length; i += 75) {
+    const res = await fetch('https://api.scryfall.com/cards/collection', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifiers: identifiers.slice(i, i + 75) }),
+    })
+    const data = await res.json()
+    for (const c of (data.data || [])) {
+      byId[c.id] = c
+      if (!byName[c.name.toLowerCase()]) byName[c.name.toLowerCase()] = c
+    }
+    if (i + 75 < identifiers.length) await new Promise(r => setTimeout(r, 100))
+  }
+
+  const esc   = (v) => { if (v == null) return ''; const s = String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+  const money = (v) => (v == null || v === '' || isNaN(parseFloat(v))) ? '' : parseFloat(v).toFixed(2)
+
+  let unmatched = 0
+  const rows = singles.map(l => {
+    const card = (l.scryfall_id && byId[l.scryfall_id]) || byName[(l.name || '').toLowerCase()] || null
+    if (!card) unmatched++
+    return [
+      'Mana Mint', 'list', card?.name || l.name, (card?.set || '').toUpperCase(),
+      card?.set_name || l.set_name || '', card?.collector_number || '',
+      l.is_foil ? 'foil' : 'normal', card?.rarity || '', l.qty_available ?? 0, '',
+      card?.id || l.scryfall_id || '', money(l.price), 'false', 'false',
+      CONDITION_TO_MANABOX[l.condition] || 'mint', card?.lang || 'en', 'USD',
+    ].map(esc).join(',')
+  })
+
+  return { csv: MANABOX_COLUMNS.join(',') + '\n' + rows.join('\n'), unmatched, count: singles.length }
+}
+
+//  Export-setup modal — choose what to send to ManaPool before downloading
+function ExportSetupModal({ listings, onClose, onDone }) {
+  const [mode, setMode]         = useState('unsent')  // 'unsent' | 'range' | 'all'
+  const [from, setFrom]         = useState('')
+  const [to, setTo]             = useState('')
+  const [stockOnly, setStockOnly] = useState(true)
+  const [markSent, setMarkSent] = useState(true)
+  const [busy, setBusy]         = useState(false)
+
+  const singles = useMemo(() => listings.filter(l => (l.product_type || 'single') === 'single'), [listings])
+
+  const filtered = useMemo(() => {
+    let out = singles
+    if (stockOnly) out = out.filter(l => l.active && l.qty_available > 0)
+    if (mode === 'unsent') out = out.filter(l => !l.last_exported_at)
+    else if (mode === 'range') {
+      const f = from ? new Date(from + 'T00:00:00') : null
+      const t = to   ? new Date(to   + 'T23:59:59') : null
+      out = out.filter(l => {
+        const c = l.created_at ? new Date(l.created_at) : null
+        if (!c) return false
+        if (f && c < f) return false
+        if (t && c > t) return false
+        return true
+      })
+    }
+    return out
+  }, [singles, mode, from, to, stockOnly])
+
+  const doExport = async () => {
+    if (!filtered.length) return
+    setBusy(true)
+    try {
+      const { csv, unmatched } = await generateManaboxCsv(filtered)
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `mana-mint-inventory-manabox-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(a.href)
+
+      if (markSent) {
+        const now = new Date().toISOString()
+        const ids = filtered.map(l => l.id)
+        try {
+          for (let i = 0; i < ids.length; i += 200) {
+            const { error } = await supabase.from('store_listings').update({ last_exported_at: now }).in('id', ids.slice(i, i + 200))
+            if (error) throw error
+          }
+        } catch (e) {
+          alert('Downloaded, but could not mark cards as sent — add the last_exported_at column (see instructions).\n\n' + e.message)
+        }
+      }
+      if (unmatched > 0) {
+        alert(`Exported ${filtered.length} listings.\n\n${unmatched} couldn't be matched to Scryfall (blank set / number / Scryfall ID) and may not import.`)
+      }
+      onDone?.()
+      onClose()
+    } catch (e) {
+      alert('Export failed: ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const radio = (val, label, hint) => (
+    <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${mode === val ? 'rgba(30,196,166,.5)' : 'var(--border)'}`, background: mode === val ? 'rgba(30,196,166,.06)' : 'transparent' }}>
+      <input type="radio" checked={mode === val} onChange={() => setMode(val)} style={{ marginTop: 2 }} />
+      <div>
+        <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--text-primary)' }}>{label}</div>
+        <div style={{ fontSize: '.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{hint}</div>
+      </div>
+    </label>
+  )
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(520px,96vw)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 401, padding: '22px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>Export to ManaPool</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+          {radio('unsent', 'Not yet sent to ManaPool', 'Only cards you haven\'t exported before — ideal after a new scan batch.')}
+          {radio('range', 'Added in a date range', 'Cards created between two dates.')}
+          {mode === 'range' && (
+            <div style={{ display: 'flex', gap: 10, padding: '0 12px 4px 34px' }}>
+              <label style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>From<br /><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="form-input" style={{ padding: '6px 8px', fontSize: '.8rem' }} /></label>
+              <label style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>To<br /><input type="date" value={to} onChange={e => setTo(e.target.value)} className="form-input" style={{ padding: '6px 8px', fontSize: '.8rem' }} /></label>
+            </div>
+          )}
+          {radio('all', 'Everything', 'All single-card listings.')}
+        </div>
+
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '.78rem', color: 'var(--text-secondary)', marginBottom: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={stockOnly} onChange={e => setStockOnly(e.target.checked)} />
+          Only active listings in stock (qty &gt; 0)
+        </label>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '.78rem', color: 'var(--text-secondary)', marginBottom: 16, cursor: 'pointer' }}>
+          <input type="checkbox" checked={markSent} onChange={e => setMarkSent(e.target.checked)} />
+          Mark these as sent to ManaPool after downloading
+        </label>
+
+        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.15)', fontSize: '.8rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
+          <span style={{ fontWeight: 800, color: '#16a389', fontSize: '.95rem' }}>{filtered.length}</span> listing{filtered.length !== 1 ? 's' : ''} will be exported
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: '0 0 auto', padding: '11px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.85rem' }}>Cancel</button>
+          <button onClick={doExport} disabled={!filtered.length || busy} style={{ flex: 1, padding: 11, borderRadius: 10, border: 'none', background: (!filtered.length || busy) ? 'rgba(30,196,166,.3)' : '#16a389', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: (!filtered.length || busy) ? 'not-allowed' : 'pointer' }}>
+            {busy ? 'Preparing…' : `Download CSV (${filtered.length})`}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+//  Sync-from-ManaPool modal — reconcile quantities against a ManaPool export
+function SyncFromManaPoolModal({ listings, onClose, onDone }) {
+  const [csv, setCsv]       = useState('')
+  const [busy, setBusy]     = useState(false)
+  const [result, setResult] = useState(null)
+  const fileRef = useRef(null)
+
+  const plan = useMemo(() => {
+    if (!csv.trim()) return null
+    const { rows } = parseCsvRows(csv)
+    if (!rows.length) return { error: 'No data rows found.' }
+
+    // Normalize each file row → { scryfallId, name, isFoil, condition(NM-scale), qty }
+    const bySid = {}, byName = {}
+    for (const r of rows) {
+      const qty = parseInt(r['Quantity'] ?? r['quantity'] ?? r['Qty'] ?? '', 10)
+      if (isNaN(qty)) continue
+      const name = r['Name'] || r['name'] || ''
+      const sid  = r['Scryfall ID'] || r['scryfall_id'] || ''
+      const foil = (r['Foil'] || r['finish'] || '').toLowerCase()
+      const isFoil = foil === 'foil' || foil === 'fo' || foil === 'etched'
+      const condRaw = (r['Condition'] || r['condition'] || '').toLowerCase()
+      const condition = MANABOX_TO_CONDITION[condRaw] || (r['Condition'] || r['condition'] || 'NM').toUpperCase()
+      if (sid)  { const k = `${sid}|${isFoil}|${condition}`;               bySid[k]  = (bySid[k]  || 0) + qty }
+      const nk = `${name.toLowerCase()}|${isFoil}|${condition}`;           byName[nk] = (byName[nk] || 0) + qty
+    }
+
+    const singles = listings.filter(l => (l.product_type || 'single') === 'single')
+    const updates = []
+    for (const l of singles) {
+      const cond = l.condition || 'NM'
+      const sidKey  = l.scryfall_id ? `${l.scryfall_id}|${!!l.is_foil}|${cond}` : null
+      const nameKey = `${(l.name || '').toLowerCase()}|${!!l.is_foil}|${cond}`
+      let fileQty = null
+      if (sidKey && sidKey in bySid) fileQty = bySid[sidKey]
+      else if (nameKey in byName)    fileQty = byName[nameKey]
+
+      if (fileQty != null) {
+        if (fileQty !== (l.qty_available ?? 0)) {
+          updates.push({ id: l.id, name: l.name, oldQty: l.qty_available ?? 0, newQty: fileQty })
+        }
+      } else if (l.last_exported_at && (l.qty_available ?? 0) > 0) {
+        // Was sent to ManaPool but is gone from its export → sold out there.
+        updates.push({ id: l.id, name: l.name, oldQty: l.qty_available ?? 0, newQty: 0 })
+      }
+    }
+    return { fileRows: rows.length, updates }
+  }, [csv, listings])
+
+  const readFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setCsv(String(reader.result || ''))
+    reader.readAsText(file)
+  }
+
+  const apply = async () => {
+    if (!plan?.updates?.length) return
+    setBusy(true); setResult(null)
+    try {
+      const byQty = {}
+      for (const u of plan.updates) { (byQty[u.newQty] ||= []).push(u.id) }
+      for (const [q, ids] of Object.entries(byQty)) {
+        const qn = Number(q)
+        const patch = qn === 0 ? { qty_available: 0, active: false } : { qty_available: qn }
+        for (let i = 0; i < ids.length; i += 200) {
+          const { error } = await supabase.from('store_listings').update(patch).in('id', ids.slice(i, i + 200))
+          if (error) throw error
+        }
+      }
+      setResult({ ok: true, count: plan.updates.length })
+      onDone?.()
+    } catch (e) {
+      setResult({ ok: false, message: e.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const soldout = plan?.updates?.filter(u => u.newQty === 0).length || 0
+  const changed = plan?.updates?.filter(u => u.newQty > 0).length  || 0
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(640px,96vw)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 401, padding: '22px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>Sync from ManaPool</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ fontSize: '.74rem', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.6 }}>
+          Export your inventory from ManaPool (ManaBox format is best — it includes the Scryfall ID) and drop it here.
+          Mana Mint sets each listing's quantity to match ManaPool, and any card you previously sent to ManaPool that's
+          now missing from the file is treated as sold out and hidden.
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={e => readFile(e.target.files?.[0])} style={{ display: 'none' }} />
+          <button onClick={() => fileRef.current?.click()} style={{ fontSize: '.75rem', padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            Choose CSV file…
+          </button>
+          {csv && <button onClick={() => { setCsv(''); setResult(null) }} style={{ fontSize: '.75rem', padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Clear</button>}
+        </div>
+
+        <textarea
+          value={csv}
+          onChange={e => setCsv(e.target.value)}
+          placeholder="…or paste the CSV contents here"
+          style={{ width: '100%', minHeight: 100, padding: '10px 12px', fontSize: '.72rem', fontFamily: 'monospace', background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)', resize: 'vertical', boxSizing: 'border-box', outline: 'none' }}
+        />
+
+        {plan?.error && (
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#fca5a5', fontSize: '.78rem' }}>{plan.error}</div>
+        )}
+
+        {plan && !plan.error && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
+              Read <strong>{plan.fileRows}</strong> row{plan.fileRows !== 1 ? 's' : ''} · <strong style={{ color: '#4ade80' }}>{plan.updates.length}</strong> change{plan.updates.length !== 1 ? 's' : ''}
+              {plan.updates.length > 0 && <> ({changed} quantity update{changed !== 1 ? 's' : ''}, {soldout} sold out → hidden)</>}
+            </div>
+            {plan.updates.length > 0 && (
+              <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)', maxHeight: 220, overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.72rem' }}>
+                  <thead><tr style={{ background: 'var(--bg-hover)' }}>
+                    {['Card', 'Qty', '→', 'New'].map(h => <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600, position: 'sticky', top: 0, background: 'var(--bg-hover)' }}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {plan.updates.slice(0, 40).map((u, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '5px 10px', color: 'var(--text-primary)', fontWeight: 600 }}>{u.name}</td>
+                        <td style={{ padding: '5px 10px', color: 'var(--text-secondary)' }}>{u.oldQty}</td>
+                        <td style={{ padding: '5px 10px', color: 'var(--text-muted)' }}>→</td>
+                        <td style={{ padding: '5px 10px', fontWeight: 700, color: u.newQty === 0 ? '#f87171' : '#4ade80' }}>{u.newQty === 0 ? 'sold out' : u.newQty}</td>
+                      </tr>
+                    ))}
+                    {plan.updates.length > 40 && <tr><td colSpan={4} style={{ padding: '6px 10px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>…and {plan.updates.length - 40} more</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {result && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: '.78rem', background: result.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${result.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: result.ok ? '#4ade80' : '#fca5a5' }}>
+            {result.ok ? `✓ Synced ${result.count} listing${result.count !== 1 ? 's' : ''}.` : `Sync failed: ${result.message}`}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button onClick={onClose} style={{ flex: '0 0 auto', padding: '11px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.85rem' }}>Close</button>
+          <button onClick={apply} disabled={!plan?.updates?.length || busy} style={{ flex: 1, padding: 11, borderRadius: 10, border: 'none', background: (!plan?.updates?.length || busy) ? 'rgba(30,196,166,.3)' : '#16a389', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: (!plan?.updates?.length || busy) ? 'not-allowed' : 'pointer' }}>
+            {busy ? 'Syncing…' : plan?.updates?.length ? `Apply ${plan.updates.length} change${plan.updates.length !== 1 ? 's' : ''}` : 'No changes'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function ListingsTab() {
   const [listings,     setListings]     = useState([])
   const [loading,      setLoading]      = useState(true)
@@ -1008,7 +1369,8 @@ function ListingsTab() {
   const [filterActive, setFilterActive] = useState('all')
   const [merging,      setMerging]      = useState(false)
   const [mergeResult,  setMergeResult]  = useState(null)
-  const [exporting,    setExporting]    = useState(false)
+  const [showExport,   setShowExport]   = useState(false)
+  const [showSync,     setShowSync]     = useState(false)
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
@@ -1105,100 +1467,7 @@ function ListingsTab() {
     setListings(prev => prev.filter(l => l.id !== id))
   }
 
-  //  Export inventory as a ManaBox-format CSV.
-  //  ManaPool imports several CSV formats; its own ("Mana Pool Native") keys on
-  //  ManaPool's internal product_id, which we can't produce. ManaBox format is
-  //  also accepted and identifies cards by Scryfall id + set/collector number,
-  //  all of which we can fill from Scryfall — so we emit that instead.
-  //  https://support.manapool.com/hc/en-us/articles/26131255560855
-  const MANABOX_COLUMNS = [
-    'Binder Name', 'Binder Type', 'Name', 'Set code', 'Set name', 'Collector number',
-    'Foil', 'Rarity', 'Quantity', 'ManaBox ID', 'Scryfall ID', 'Purchase price',
-    'Misprint', 'Altered', 'Condition', 'Language', 'Purchase price currency',
-  ]
-
-  // ManaPool collapses ManaBox's 7 grades into its 5. Map our condition to the
-  // ManaBox grade that lands on the matching ManaPool grade:
-  //   mint→NM, near_mint→LP, excellent→MP, light_played→HP, poor→DMG
-  const CONDITION_TO_MANABOX = { NM: 'mint', LP: 'near_mint', MP: 'excellent', HP: 'light_played', DMG: 'poor' }
-
-  const exportCSV = async () => {
-    const singles = listings.filter(l => (l.product_type || 'single') === 'single')
-    if (!singles.length) { alert('No single-card listings to export.'); return }
-    setExporting(true)
-    try {
-      // Resolve Scryfall card data in batches (collection endpoint takes 75 ids).
-      const idList   = [...new Set(singles.filter(l => l.scryfall_id).map(l => l.scryfall_id))]
-      const nameList = [...new Set(singles.filter(l => !l.scryfall_id && l.name).map(l => l.name))]
-      const identifiers = [...idList.map(id => ({ id })), ...nameList.map(name => ({ name }))]
-
-      const byId = {}, byName = {}
-      for (let i = 0; i < identifiers.length; i += 75) {
-        const res = await fetch('https://api.scryfall.com/cards/collection', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ identifiers: identifiers.slice(i, i + 75) }),
-        })
-        const data = await res.json()
-        for (const c of (data.data || [])) {
-          byId[c.id] = c
-          if (!byName[c.name.toLowerCase()]) byName[c.name.toLowerCase()] = c
-        }
-        if (i + 75 < identifiers.length) await new Promise(r => setTimeout(r, 100))
-      }
-
-      // CSV cell escaping — quote any cell containing a comma, quote, or newline.
-      const esc   = (v) => {
-        if (v == null) return ''
-        const s = String(v)
-        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-      }
-      const money = (v) => (v == null || v === '' || isNaN(parseFloat(v))) ? '' : parseFloat(v).toFixed(2)
-
-      let unmatched = 0
-      const rows = singles.map(l => {
-        const card = (l.scryfall_id && byId[l.scryfall_id]) || byName[(l.name || '').toLowerCase()] || null
-        if (!card) unmatched++
-        return [
-          'Mana Mint',                                 // Binder Name
-          'list',                                      // Binder Type
-          card?.name || l.name,                        // Name
-          (card?.set || '').toUpperCase(),             // Set code
-          card?.set_name || l.set_name || '',          // Set name
-          card?.collector_number || '',                // Collector number
-          l.is_foil ? 'foil' : 'normal',               // Foil
-          card?.rarity || '',                          // Rarity
-          l.qty_available ?? 0,                        // Quantity
-          '',                                          // ManaBox ID (unused)
-          card?.id || l.scryfall_id || '',             // Scryfall ID
-          money(l.price),                              // Purchase price (ManaPool reads this as the price)
-          'false',                                     // Misprint
-          'false',                                     // Altered
-          CONDITION_TO_MANABOX[l.condition] || 'mint', // Condition
-          card?.lang || 'en',                          // Language
-          'USD',                                       // Purchase price currency
-        ].map(esc).join(',')
-      })
-
-      const csv  = MANABOX_COLUMNS.join(',') + '\n' + rows.join('\n')
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `mana-mint-inventory-manabox-${new Date().toISOString().slice(0, 10)}.csv`
-      a.click()
-      URL.revokeObjectURL(a.href)
-
-      if (unmatched > 0) {
-        alert(`Exported ${singles.length} listings in ManaBox format.\n\n${unmatched} could not be matched to Scryfall (blank set / number / Scryfall ID) and may not import — re-pick those cards from search so they store a Scryfall id.`)
-      }
-    } catch (e) {
-      alert('Export failed: ' + e.message)
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  //  Inventory stats 
+  //  Inventory stats
   const stats = useMemo(() => {
     const active = listings.filter(l => l.active && l.qty_available > 0)
     return {
@@ -1252,12 +1521,20 @@ function ListingsTab() {
           {syncing ? ' Syncing…' : ' Sync Prices'}
         </button>
         <button
-          onClick={exportCSV}
-          disabled={!listings.length || exporting}
-          title="Export all single-card listings as a ManaPool-compatible CSV"
-          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(234,179,8,.3)', background: 'rgba(234,179,8,.1)', color: '#fde68a', fontWeight: 700, fontSize: '.82rem', cursor: (listings.length && !exporting) ? 'pointer' : 'not-allowed', flexShrink: 0, opacity: (listings.length && !exporting) ? 1 : 0.6 }}
+          onClick={() => setShowSync(true)}
+          disabled={!listings.length}
+          title="Sync quantities from a ManaPool inventory export (removes cards sold on ManaPool)"
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(244,114,182,.3)', background: 'rgba(244,114,182,.1)', color: '#f9a8d4', fontWeight: 700, fontSize: '.82rem', cursor: listings.length ? 'pointer' : 'not-allowed', flexShrink: 0, opacity: listings.length ? 1 : 0.6 }}
         >
-          {exporting ? 'Exporting…' : 'Export CSV'}
+          Sync from ManaPool
+        </button>
+        <button
+          onClick={() => setShowExport(true)}
+          disabled={!listings.length}
+          title="Export single-card listings as a ManaPool-compatible CSV (with filters)"
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(234,179,8,.3)', background: 'rgba(234,179,8,.1)', color: '#fde68a', fontWeight: 700, fontSize: '.82rem', cursor: listings.length ? 'pointer' : 'not-allowed', flexShrink: 0, opacity: listings.length ? 1 : 0.6 }}
+        >
+          Export CSV
         </button>
         <button
           onClick={() => setShowBulk(true)}
@@ -1405,6 +1682,8 @@ function ListingsTab() {
 
       {showCreate && <CreateListingModal onClose={() => setShowCreate(false)} onSaved={(merged) => { fetchListings(); if (merged) alert('Existing listing found — quantity updated instead of creating a duplicate.') }} />}
       {showBulk && <BulkImportModal onClose={() => setShowBulk(false)} onSaved={() => { fetchListings() }} />}
+      {showExport && <ExportSetupModal listings={listings} onClose={() => setShowExport(false)} onDone={fetchListings} />}
+      {showSync && <SyncFromManaPoolModal listings={listings} onClose={() => setShowSync(false)} onDone={fetchListings} />}
       {editListing && <EditListingModal listing={editListing} onClose={() => setEditListing(null)} onSaved={() => { fetchListings(); setEditListing(null) }} />}
     </div>
   )
