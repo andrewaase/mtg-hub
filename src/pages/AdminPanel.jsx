@@ -1104,6 +1104,46 @@ function ListingsTab() {
     setListings(prev => prev.filter(l => l.id !== id))
   }
 
+  //  Export inventory to CSV
+  const exportCSV = () => {
+    if (!listings.length) return
+    // Union of every column present across all rows, with the most useful
+    // fields ordered up front and any remaining columns appended after.
+    const PREFERRED = [
+      'name', 'set_name', 'collector_number', 'rarity', 'condition', 'is_foil',
+      'art_variant', 'treatment', 'finish', 'qty_available', 'price', 'product_type',
+      'product_format', 'active', 'description', 'scryfall_id', 'img_url', 'id', 'created_at',
+    ]
+    const seen = new Set()
+    const columns = []
+    for (const key of PREFERRED) {
+      if (listings.some(l => key in l)) { columns.push(key); seen.add(key) }
+    }
+    for (const l of listings) {
+      for (const key of Object.keys(l)) {
+        if (!seen.has(key)) { columns.push(key); seen.add(key) }
+      }
+    }
+
+    const escape = (val) => {
+      if (val == null) return ''
+      let s = typeof val === 'boolean' ? (val ? 'true' : 'false') : String(val)
+      if (/[",\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`
+      return s
+    }
+
+    const header = columns.join(',')
+    const body   = listings.map(l => columns.map(c => escape(l[c])).join(',')).join('\n')
+    const csv    = `${header}\n${body}`
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `mana-mint-inventory-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   //  Inventory stats 
   const stats = useMemo(() => {
     const active = listings.filter(l => l.active && l.qty_available > 0)
@@ -1156,6 +1196,14 @@ function ListingsTab() {
           style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: syncing ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: syncing ? 0.7 : 1 }}
         >
           {syncing ? ' Syncing…' : ' Sync Prices'}
+        </button>
+        <button
+          onClick={exportCSV}
+          disabled={!listings.length}
+          title="Download all inventory listings as a CSV spreadsheet"
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(234,179,8,.3)', background: 'rgba(234,179,8,.1)', color: '#fde68a', fontWeight: 700, fontSize: '.82rem', cursor: listings.length ? 'pointer' : 'not-allowed', flexShrink: 0, opacity: listings.length ? 1 : 0.6 }}
+        >
+          Export CSV
         </button>
         <button
           onClick={() => setShowBulk(true)}
