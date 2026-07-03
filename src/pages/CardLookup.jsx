@@ -707,7 +707,7 @@ function ssGetCard()   { try { const s = sessionStorage.getItem(SS_CARD); return
 function ssSaveView(v) { try { sessionStorage.setItem(SS_VIEW, v) } catch {} }
 function ssSaveCard(c) { try { if (c) sessionStorage.setItem(SS_CARD, JSON.stringify(c)); else sessionStorage.removeItem(SS_CARD) } catch {} }
 
-export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch }) {
+export default function CardLookup({ showToast, openAddCard, initialSearch = '', onSearchUsed, user, openStoreSearch, resetKey = 0 }) {
   const [view, setViewRaw]        = useState(ssGetView)  // restore from sessionStorage on mount
   const [sets, setSets]           = useState([])
   const [secretLairs, setSecretLairs] = useState([])
@@ -733,6 +733,20 @@ export default function CardLookup({ showToast, openAddCard, initialSearch = '',
   // Keep a ref to openCardDetail so the event listener always calls the latest version
   const openCardDetailRef = useRef(null)
   useEffect(() => { openCardDetailRef.current = openCardDetail })
+
+  // Tapping the Card Lookup nav while already here bumps resetKey (in App) — jump
+  // back to the landing view instead of staying in a set or card detail. Compare
+  // against the last-seen key so a session-restored view isn't wiped on mount
+  // (and StrictMode's double-invoked effects don't trigger a spurious reset).
+  const lastResetKey = useRef(resetKey)
+  useEffect(() => {
+    if (lastResetKey.current === resetKey) return
+    lastResetKey.current = resetKey
+    setView('home')
+    setSelSet(null)
+    setCardDetail(null)
+    setSetSearch('')
+  }, [resetKey]) // eslint-disable-line
 
   // Persistent listener for "View in Card Lookup" from Market Movers modal.
   // CardLookup stays mounted (display:none when hidden), so a mount-only effect

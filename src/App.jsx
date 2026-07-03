@@ -84,6 +84,8 @@ function getInitialPage() {
 
 export default function App() {
   const [page, setPageState] = useState(getInitialPage)
+  const pageRef = useRef(page)                       // last committed page (survives direct setPageState calls)
+  const [cardLookupResetKey, setCardLookupResetKey] = useState(0)
   const [user, setUser] = useState(null)
   const [matches, setMatches] = useState([])
   const [collection, setCollection] = useState([])
@@ -158,6 +160,10 @@ export default function App() {
   const setPage = useCallback((newPage) => {
     // Silently block navigation while the deck import/edit modal is open
     if (deckModalOpenRef.current) return
+    // Tapping Card Lookup while already on it resets it to the landing view
+    if (newPage === 'cards' && pageRef.current === 'cards') {
+      setCardLookupResetKey(k => k + 1)
+    }
     // Dismiss the hero landing whenever the user navigates anywhere
     if (heroLandingActiveRef.current) {
       sessionStorage.setItem('vaulted:hero-seen', '1')
@@ -180,6 +186,9 @@ export default function App() {
       document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', title)
     }
   }, [])
+
+  // Keep pageRef in sync with the committed page (some flows call setPageState directly)
+  useEffect(() => { pageRef.current = page }, [page])
 
   // Dismiss hero landing and navigate to the chosen page (buttons + ✕)
   const handleHeroNavigate = useCallback((dest) => {
@@ -532,7 +541,7 @@ export default function App() {
               {mountedPages.has('log')        && <div style={{ display: page === 'log'        ? undefined : 'none' }}><MatchLog {...pageProps} /></div>}
               {mountedPages.has('stats')      && <div style={{ display: page === 'stats'      ? undefined : 'none' }}><Stats {...pageProps} /></div>}
               {mountedPages.has('news')       && <div style={{ display: page === 'news'       ? undefined : 'none' }}><News {...pageProps} /></div>}
-              {mountedPages.has('cards')      && <div style={{ display: page === 'cards'      ? undefined : 'none' }}><CardLookup {...pageProps} initialSearch={cardSearch} onSearchUsed={() => setCardSearch('')} /></div>}
+              {mountedPages.has('cards')      && <div style={{ display: page === 'cards'      ? undefined : 'none' }}><CardLookup {...pageProps} initialSearch={cardSearch} onSearchUsed={() => setCardSearch('')} resetKey={cardLookupResetKey} /></div>}
               {mountedPages.has('collection') && <div style={{ display: page === 'collection' ? undefined : 'none' }}><Collection {...pageProps} /></div>}
               {mountedPages.has('releases')   && <div style={{ display: page === 'releases'   ? undefined : 'none' }}><SetReleases /></div>}
               {mountedPages.has('friends')    && <div style={{ display: page === 'friends'    ? undefined : 'none' }}><Friends {...pageProps} isActive={page === 'friends'} /></div>}
