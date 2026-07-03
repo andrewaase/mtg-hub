@@ -1008,6 +1008,7 @@ function ListingsTab() {
   const [filterActive, setFilterActive] = useState('all')
   const [merging,      setMerging]      = useState(false)
   const [mergeResult,  setMergeResult]  = useState(null)
+  const [exporting,    setExporting]    = useState(false)
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
@@ -1104,44 +1105,88 @@ function ListingsTab() {
     setListings(prev => prev.filter(l => l.id !== id))
   }
 
-  //  Export inventory to CSV
-  const exportCSV = () => {
-    if (!listings.length) return
-    // Union of every column present across all rows, with the most useful
-    // fields ordered up front and any remaining columns appended after.
-    const PREFERRED = [
-      'name', 'set_name', 'collector_number', 'rarity', 'condition', 'is_foil',
-      'art_variant', 'treatment', 'finish', 'qty_available', 'price', 'product_type',
-      'product_format', 'active', 'description', 'scryfall_id', 'img_url', 'id', 'created_at',
-    ]
-    const seen = new Set()
-    const columns = []
-    for (const key of PREFERRED) {
-      if (listings.some(l => key in l)) { columns.push(key); seen.add(key) }
-    }
-    for (const l of listings) {
-      for (const key of Object.keys(l)) {
-        if (!seen.has(key)) { columns.push(key); seen.add(key) }
+  //  Export inventory as a ManaPool-compatible file.
+  //  ManaPool's inventory format is tab-separated with a fixed column set and
+  //  identifies each card by its Scryfall id (product_id). We enrich every
+  //  single-card listing from Scryfall — using the stored scryfall_id, with a
+  //  name lookup as a fallback — to fill in set code, collector number, rarity,
+  //  and market prices, so the file re-imports directly into ManaPool.
+  const MANAPOOL_COLUMNS = [
+    'product_type', 'product_id', 'name', 'set', 'number', 'rarity', 'language',
+    'finish', 'condition', 'price', 'market_low', 'market_price',
+    'market_price_foil', 'quantity', 'exported_at',
+  ]
+
+  const exportCSV = async () => {
+    const singles = listings.filter(l => (l.product_type || 'single') === 'single')
+    if (!singles.length) { alert('No single-card listings to export.'); return }
+    setExporting(true)
+    try {
+      // Resolve Scryfall card data in batches (collection endpoint takes 75 ids).
+      const idList   = [...new Set(singles.filter(l => l.scryfall_id).map(l => l.scryfall_id))]
+      const nameList = [...new Set(singles.filter(l => !l.scryfall_id && l.name).map(l => l.name))]
+      const identifiers = [...idList.map(id => ({ id })), ...nameList.map(name => ({ name }))]
+
+      const byId = {}, byName = {}
+      for (let i = 0; i < identifiers.length; i += 75) {
+        const res = await fetch('https://api.scryfall.com/cards/collection', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ identifiers: identifiers.slice(i, i + 75) }),
+        })
+        const data = await res.json()
+        for (const c of (data.data || [])) {
+          byId[c.id] = c
+          if (!byName[c.name.toLowerCase()]) byName[c.name.toLowerCase()] = c
+        }
+        if (i + 75 < identifiers.length) await new Promise(r => setTimeout(r, 100))
       }
+
+      const now   = new Date().toISOString()
+      // TSV fields shouldn't contain tabs/newlines — collapse any to a space.
+      const clean = (v) => v == null ? '' : String(v).replace(/[\t\r\n]+/g, ' ').trim()
+      const money = (v) => (v == null || v === '' || isNaN(parseFloat(v))) ? '' : parseFloat(v).toFixed(2)
+
+      let unmatched = 0
+      const rows = singles.map(l => {
+        const card = (l.scryfall_id && byId[l.scryfall_id]) || byName[(l.name || '').toLowerCase()] || null
+        if (!card) unmatched++
+        const prices = card?.prices || {}
+        return [
+          'mtg_single',
+          '',                                   // product_id — ManaPool's own catalog id, not derivable from our data
+          card?.name || l.name,
+          (card?.set || '').toUpperCase(),      // set code, e.g. MSH
+          card?.collector_number || '',
+          card?.rarity || '',
+          (card?.lang || 'en').toUpperCase(),
+          l.is_foil ? 'FO' : 'NF',
+          l.condition || 'NM',
+          money(l.price),
+          money(prices.usd),
+          money(prices.usd),
+          money(prices.usd_foil),
+          String(l.qty_available ?? 0),
+          now,
+        ].map(clean).join('\t')
+      })
+
+      const tsv  = MANAPOOL_COLUMNS.join('\t') + '\n' + rows.join('\n')
+      const blob = new Blob([tsv], { type: 'text/csv;charset=utf-8;' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `mana-mint-inventory-manapool-${now.slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(a.href)
+
+      if (unmatched > 0) {
+        alert(`Exported ${singles.length} listings.\n\n${unmatched} could not be matched to Scryfall, so their set / number / rarity columns are blank.`)
+      }
+    } catch (e) {
+      alert('Export failed: ' + e.message)
+    } finally {
+      setExporting(false)
     }
-
-    const escape = (val) => {
-      if (val == null) return ''
-      let s = typeof val === 'boolean' ? (val ? 'true' : 'false') : String(val)
-      if (/[",\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`
-      return s
-    }
-
-    const header = columns.join(',')
-    const body   = listings.map(l => columns.map(c => escape(l[c])).join(',')).join('\n')
-    const csv    = `${header}\n${body}`
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `mana-mint-inventory-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
   }
 
   //  Inventory stats 
@@ -1199,11 +1244,11 @@ function ListingsTab() {
         </button>
         <button
           onClick={exportCSV}
-          disabled={!listings.length}
-          title="Download all inventory listings as a CSV spreadsheet"
-          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(234,179,8,.3)', background: 'rgba(234,179,8,.1)', color: '#fde68a', fontWeight: 700, fontSize: '.82rem', cursor: listings.length ? 'pointer' : 'not-allowed', flexShrink: 0, opacity: listings.length ? 1 : 0.6 }}
+          disabled={!listings.length || exporting}
+          title="Export all single-card listings as a ManaPool-compatible CSV"
+          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(234,179,8,.3)', background: 'rgba(234,179,8,.1)', color: '#fde68a', fontWeight: 700, fontSize: '.82rem', cursor: (listings.length && !exporting) ? 'pointer' : 'not-allowed', flexShrink: 0, opacity: (listings.length && !exporting) ? 1 : 0.6 }}
         >
-          Export CSV
+          {exporting ? 'Exporting…' : 'Export CSV'}
         </button>
         <button
           onClick={() => setShowBulk(true)}
