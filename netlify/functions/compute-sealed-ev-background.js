@@ -91,6 +91,7 @@ function boxPriceFor(sealedItems, setCode, boosterType) {
     .filter(it => (it.set_code || '').toLowerCase() === setCode.toLowerCase() && pat.test(it.name || ''))
     .map(it => (it.low_price != null ? Number(it.low_price) : (typeof it.price_market === 'number' ? it.price_market : null)))
     .filter(v => v != null && v > 0)
+    .map(v => v / 100) // ManaPool prices are in cents
   return prices.length ? Math.min(...prices) : null
 }
 
@@ -186,7 +187,7 @@ exports.handler = async (event) => {
   const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - YEARS_BACK)
   let sets
   try {
-    const res = await fetch('https://api.scryfall.com/sets')
+    const res = await fetch('https://api.scryfall.com/sets', { headers: { 'User-Agent': 'ManaMint/1.0 (mtgvaultedsingles@gmail.com)' } })
     const all = (await res.json()).data || []
     sets = all.filter(s =>
       !s.digital && SET_TYPES.has(s.set_type) && (s.card_count || 0) >= 50 &&
