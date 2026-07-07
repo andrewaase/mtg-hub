@@ -2068,11 +2068,135 @@ function ReportsTab() {
   )
 }
 
+//  Sealed EV admin tab
+
+function SealedEvTab() {
+  const [rows, setRows]       = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy]       = useState(false)
+  const [msg, setMsg]         = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('sealed_ev')
+      .select('*')
+      .gt('ev_per_pack', 0)
+      .order('released_at', { ascending: false })
+      .order('ev_per_box', { ascending: false, nullsFirst: false })
+    setRows(data || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const recompute = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/compute-sealed-ev-background', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      // Background functions return 202 and keep running; results land shortly.
+      if (res.status === 202 || res.ok) {
+        setMsg({ ok: true, text: 'Recompute started — give it a minute, then hit Refresh.' })
+      } else {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || `HTTP ${res.status}`)
+      }
+    } catch (e) {
+      setMsg({ ok: false, text: e.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Group booster rows by set, newest first.
+  const bySet = useMemo(() => {
+    const m = new Map()
+    for (const r of rows) {
+      if (!m.has(r.set_code)) m.set(r.set_code, { set_name: r.set_name, released_at: r.released_at, boosters: [] })
+      m.get(r.set_code).boosters.push(r)
+    }
+    return [...m.values()]
+  }, [rows])
+
+  const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
+  const fmtType = (t) => t.charAt(0).toUpperCase() + t.slice(1) + ' Booster'
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', flex: 1, minWidth: 200 }}>
+          Expected value of sealed product if opened — real pack odds (MTGJSON) priced with live Scryfall market data. Recent sets, refreshed weekly.
+        </div>
+        <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+          Refresh
+        </button>
+        <button onClick={recompute} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
+          {busy ? 'Starting…' : 'Recompute EV'}
+        </button>
+      </div>
+
+      {msg && (
+        <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 8, fontSize: '.78rem', background: msg.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: msg.ok ? '#4ade80' : '#fca5a5' }}>
+          {msg.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>
+      ) : bySet.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>
+          No EV data yet. Click <strong>Recompute EV</strong> to build it (takes a minute or two), then Refresh.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {bySet.map(set => (
+            <div key={set.set_name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 800, fontSize: '.92rem', color: 'var(--text-primary)' }}>{set.set_name}</span>
+                <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{set.released_at}</span>
+              </div>
+              {set.boosters.map(b => (
+                <div key={b.booster_type} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--text-primary)', minWidth: 130 }}>{fmtType(b.booster_type)}</div>
+                    <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                      Pack: <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_pack)}</span>
+                    </div>
+                    {b.ev_per_box != null && (
+                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                        Box ({b.packs_per_box}): <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_box)}</span>
+                      </div>
+                    )}
+                  </div>
+                  {Array.isArray(b.top_cards) && b.top_cards.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      {b.top_cards.slice(0, 6).map((c, i) => (
+                        <span key={i} style={{ fontSize: '.68rem', padding: '2px 8px', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                          {c.name}{c.foil ? ' (foil)' : ''} <span style={{ color: '#4ade80', fontWeight: 700 }}>${c.price}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'overview',  label: ' Overview'  },
   { id: 'listings',  label: ' Listings'  },
   { id: 'orders',    label: ' Orders'    },
   { id: 'meta',      label: ' Meta'      },
+  { id: 'sealedev',  label: ' Sealed EV' },
   { id: 'settings',  label: ' Settings'  },
   { id: 'reports',   label: ' Reports'   },
 ]
@@ -2940,6 +3064,8 @@ export default function AdminPanel({ user, isAdmin }) {
 
       {/*  Meta tab  */}
       {tab === 'meta' && <MetaTab />}
+
+      {tab === 'sealedev' && <SealedEvTab />}
 
       {/*  Settings tab  */}
       {tab === 'settings' && <SettingsTab />}

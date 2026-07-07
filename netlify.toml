@@ -24,6 +24,10 @@
 [functions."manapool-sync"]
   schedule = "*/30 * * * *"
 
+# Recompute sealed-product EV (MTGJSON pack odds × live prices) weekly, Mon 10am UTC
+[functions."compute-sealed-ev-background"]
+  schedule = "0 10 * * 1"
+
 [[redirects]]
   from = "https://vaultedsingles.com/*"
   to = "https://www.manamint.store/:splat"
