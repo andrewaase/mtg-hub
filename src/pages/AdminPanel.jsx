@@ -1200,7 +1200,30 @@ function SyncFromManaPoolModal({ listings, onClose, onDone }) {
   const [csv, setCsv]       = useState('')
   const [busy, setBusy]     = useState(false)
   const [result, setResult] = useState(null)
+  const [apiBusy, setApiBusy]     = useState(false)
+  const [apiResult, setApiResult] = useState(null)
   const fileRef = useRef(null)
+
+  // Live sync straight from the ManaPool API (no file needed). Runs the same
+  // reconciliation server-side via the manapool-sync Netlify function.
+  const syncViaApi = async () => {
+    setApiBusy(true); setApiResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/manapool-sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      setApiResult({ ok: true, ...json })
+      onDone?.()
+    } catch (e) {
+      setApiResult({ ok: false, message: e.message })
+    } finally {
+      setApiBusy(false)
+    }
+  }
 
   const plan = useMemo(() => {
     if (!csv.trim()) return null
@@ -1285,10 +1308,28 @@ function SyncFromManaPoolModal({ listings, onClose, onDone }) {
           <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>Sync from ManaPool</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ fontSize: '.74rem', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.6 }}>
-          Export your inventory from ManaPool (ManaBox format is best — it includes the Scryfall ID) and drop it here.
-          Mana Mint sets each listing's quantity to match ManaPool, and any card you previously sent to ManaPool that's
-          now missing from the file is treated as sold out and hidden.
+
+        {/* Live API sync (primary) */}
+        <div style={{ padding: '14px', borderRadius: 12, background: 'rgba(30,196,166,.06)', border: '1px solid rgba(30,196,166,.2)', marginBottom: 16 }}>
+          <div style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Live sync (recommended)</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.6 }}>
+            Pulls your current inventory straight from the ManaPool API and matches quantities — no file needed. Cards you'd sent to ManaPool that have sold are set to 0 and hidden. This also runs automatically every 30 minutes.
+          </div>
+          <button onClick={syncViaApi} disabled={apiBusy} style={{ width: '100%', padding: 11, borderRadius: 10, border: 'none', background: apiBusy ? 'rgba(30,196,166,.3)' : '#16a389', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: apiBusy ? 'not-allowed' : 'pointer' }}>
+            {apiBusy ? 'Syncing…' : 'Sync now'}
+          </button>
+          {apiResult && (
+            <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 8, fontSize: '.76rem', background: apiResult.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${apiResult.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: apiResult.ok ? '#4ade80' : '#fca5a5' }}>
+              {apiResult.ok
+                ? `✓ Synced against ${apiResult.manapool_items} ManaPool items — ${apiResult.updated} quantit${apiResult.updated === 1 ? 'y' : 'ies'} updated, ${apiResult.sold_out} sold out → hidden.`
+                : `Sync failed: ${apiResult.message}`}
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Or import a CSV file</div>
+        <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
+          Fallback if you'd rather work from a file: export your inventory from ManaPool (ManaBox format is best — it includes the Scryfall ID) and drop it here.
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>

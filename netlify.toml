@@ -19,6 +19,11 @@
 [functions."compute-market-movers-background"]
   schedule = "0 9 * * *"
 
+# Reconcile store inventory against ManaPool (primary sales channel) every 30 min
+# so cards sold on ManaPool drop out of Mana Mint automatically
+[functions."manapool-sync"]
+  schedule = "*/30 * * * *"
+
 [[redirects]]
   from = "https://vaultedsingles.com/*"
   to = "https://www.manamint.store/:splat"
