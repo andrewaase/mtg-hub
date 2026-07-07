@@ -2164,13 +2164,27 @@ function SealedEvTab() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                     <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--text-primary)', minWidth: 130 }}>{fmtType(b.booster_type)}</div>
                     <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-                      Pack: <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_pack)}</span>
+                      Pack EV: <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_pack)}</span>
                     </div>
                     {b.ev_per_box != null && (
                       <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-                        Box ({b.packs_per_box}): <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_box)}</span>
+                        Box EV ({b.packs_per_box}): <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_box)}</span>
                       </div>
                     )}
+                    {b.box_price != null && (
+                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                        Box cost: <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{money(b.box_price)}</span>
+                      </div>
+                    )}
+                    {b.ev_per_box != null && b.box_price != null && (() => {
+                      const diff = b.ev_per_box - b.box_price
+                      const up = diff >= 0
+                      return (
+                        <div style={{ fontSize: '.78rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: up ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.12)', color: up ? '#4ade80' : '#f87171' }}>
+                          {up ? '+' : '−'}{money(Math.abs(diff)).slice(1)} to crack ({Math.round((b.ev_per_box / b.box_price) * 100)}%)
+                        </div>
+                      )
+                    })()}
                   </div>
                   {Array.isArray(b.top_cards) && b.top_cards.length > 0 && (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>

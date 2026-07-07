@@ -2,7 +2,8 @@
 const { corsHeaders } = require('./_cors')
 // Computes accurate sealed Expected Value (EV) for recent sets using MTGJSON
 // booster configurations (real slot sheets + pull weights) priced with live
-// Scryfall market data, and stores the result in the sealed_ev table.
+// Scryfall market data, plus the real box price from the ManaPool API, and
+// stores the result in the sealed_ev table.
 //
 // EV of one pack of a booster type:
 //   EV = Σ_variations (variation.weight / boostersTotalWeight)
@@ -11,10 +12,21 @@ const { corsHeaders } = require('./_cors')
 //
 // Triggered by the weekly Netlify schedule, or a manual admin POST.
 
-const YEARS_BACK       = 3
-const SET_TYPES        = new Set(['expansion', 'core', 'draft_innovation', 'masters'])
-// Standard sealed box pack counts by booster type (null = per-pack only).
-const PACKS_PER_BOX    = { draft: 36, play: 30, set: 30, collector: 12, jumpstart: 24 }
+const YEARS_BACK    = 3
+const SET_TYPES     = new Set(['expansion', 'core', 'draft_innovation', 'masters'])
+const PACKS_PER_BOX = { draft: 36, play: 30, set: 30, collector: 12, jumpstart: 24 }
+// Shared bonus / special-guest sheets that modern boosters pull from. Their
+// cards live in these separate MTGJSON sets, not the main set file, so we fetch
+// them once and merge their uuid→scryfallId maps in for pricing.
+const BONUS_SETS    = ['SPG', 'PLST', 'WOT', 'MUL', 'BIG', 'OTP', 'REX']
+// Box name patterns for matching ManaPool sealed products to a booster type.
+const BOX_NAME = {
+  play:      /play booster box/i,
+  draft:     /draft booster box/i,
+  collector: /collector booster box/i,
+  set:       /set booster box/i,
+  jumpstart: /jumpstart booster box/i,
+}
 
 async function scryfallPrices(scryfallIds) {
   const priceById = {}
@@ -42,26 +54,63 @@ async function scryfallPrices(scryfallIds) {
   return priceById
 }
 
+// Build a shared uuid→scryfallId map from the bonus/special-guest sets.
+async function buildBonusMap() {
+  const map = {}
+  for (const code of BONUS_SETS) {
+    try {
+      const r = await fetch(`https://mtgjson.com/api/v5/${code}.json`)
+      if (!r.ok) continue
+      const d = (await r.json()).data
+      for (const c of (d?.cards || [])) {
+        if (c.identifiers?.scryfallId) map[c.uuid] = c.identifiers.scryfallId
+      }
+    } catch { /* skip */ }
+  }
+  return map
+}
+
+// Pull all sealed-product prices from ManaPool (public/price endpoint).
+async function fetchSealedPrices(email, token) {
+  try {
+    const res = await fetch('https://manapool.com/api/v1/prices/sealed', {
+      headers: {
+        ...(email && token ? { 'X-ManaPool-Email': email, 'X-ManaPool-Access-Token': token } : {}),
+        'Accept': 'application/json',
+      },
+    })
+    if (!res.ok) return []
+    return (await res.json()).data || []
+  } catch { return [] }
+}
+
+function boxPriceFor(sealedItems, setCode, boosterType) {
+  const pat = BOX_NAME[boosterType]
+  if (!pat) return null
+  const prices = sealedItems
+    .filter(it => (it.set_code || '').toLowerCase() === setCode.toLowerCase() && pat.test(it.name || ''))
+    .map(it => (it.low_price != null ? Number(it.low_price) : (typeof it.price_market === 'number' ? it.price_market : null)))
+    .filter(v => v != null && v > 0)
+  return prices.length ? Math.min(...prices) : null
+}
+
 // Compute EV for every booster type in one MTGJSON set object.
 function computeSetEV(setData, priceById, uuidToScryfall) {
   const results = []
-  const booster = setData.booster || {}
-
-  for (const [boosterType, cfg] of Object.entries(booster)) {
+  for (const [boosterType, cfg] of Object.entries(setData.booster || {})) {
     const sheets = cfg.sheets || {}
     const totalW = cfg.boostersTotalWeight || (cfg.boosters || []).reduce((s, b) => s + (b.weight || 0), 0)
     if (!totalW || !(cfg.boosters || []).length) continue
 
-    // Pre-compute each sheet's average card value.
     const sheetEV = {}
-    const cardContrib = [] // for "top cards": { name, contribution }
+    const cardContrib = []
     for (const [name, sheet] of Object.entries(sheets)) {
       const sw = sheet.totalWeight || Object.values(sheet.cards || {}).reduce((s, w) => s + w, 0)
       if (!sw) { sheetEV[name] = 0; continue }
       let ev = 0
       for (const [uuid, weight] of Object.entries(sheet.cards || {})) {
-        const sid = uuidToScryfall[uuid]
-        const p   = sid ? priceById[sid] : null
+        const sid   = uuidToScryfall[uuid]
+        const p     = sid ? priceById[sid] : null
         const price = p ? (sheet.foil ? (p.usd_foil ?? p.usd ?? 0) : (p.usd ?? 0)) : 0
         const prob  = weight / sw
         ev += prob * price
@@ -70,7 +119,6 @@ function computeSetEV(setData, priceById, uuidToScryfall) {
       sheetEV[name] = ev
     }
 
-    // Weighted average across booster variations.
     let evPerPack = 0
     for (const variation of cfg.boosters) {
       const vw = (variation.weight || 0) / totalW
@@ -82,7 +130,6 @@ function computeSetEV(setData, priceById, uuidToScryfall) {
     }
 
     const packsPerBox = PACKS_PER_BOX[boosterType] ?? null
-    // Top cards driving EV (dedupe by name+foil, keep highest price).
     const topMap = {}
     for (const c of cardContrib) {
       const k = `${c.name}|${c.foil}`
@@ -94,11 +141,11 @@ function computeSetEV(setData, priceById, uuidToScryfall) {
       .map(c => ({ name: c.name, foil: c.foil, price: Math.round(c.price * 100) / 100 }))
 
     results.push({
-      booster_type: boosterType,
-      ev_per_pack:  Math.round(evPerPack * 100) / 100,
+      booster_type:  boosterType,
+      ev_per_pack:   Math.round(evPerPack * 100) / 100,
       packs_per_box: packsPerBox,
-      ev_per_box:   packsPerBox ? Math.round(evPerPack * packsPerBox * 100) / 100 : null,
-      top_cards:    topCards,
+      ev_per_box:    packsPerBox ? Math.round(evPerPack * packsPerBox * 100) / 100 : null,
+      top_cards:     topCards,
     })
   }
   return results
@@ -113,11 +160,12 @@ exports.handler = async (event) => {
   const ADMIN_EMAIL  = process.env.ADMIN_EMAIL
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
+  const MP_EMAIL     = process.env.MANAPOOL_API_EMAIL
+  const MP_TOKEN     = process.env.MANAPOOL_API_TOKEN
   if (!SUPABASE_URL || !SERVICE_KEY || !ADMIN_EMAIL) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  // Auth check for manual POST (scheduler passes through with no httpMethod).
   if (event.httpMethod === 'POST') {
     const jwt = ((event.headers || {})['authorization'] || '').replace(/^Bearer\s+/i, '').trim()
     if (!jwt) return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Missing auth token' }) }
@@ -134,7 +182,7 @@ exports.handler = async (event) => {
 
   const adminHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }
 
-  // 1. Recent, paper, draftable sets from Scryfall.
+  // Recent, paper, draftable sets from Scryfall.
   const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - YEARS_BACK)
   let sets
   try {
@@ -144,13 +192,16 @@ exports.handler = async (event) => {
       !s.digital && SET_TYPES.has(s.set_type) && (s.card_count || 0) >= 50 &&
       s.released_at && new Date(s.released_at) >= cutoff && new Date(s.released_at) <= new Date()
     )
-  } catch (err) {
+  } catch {
     return { statusCode: 502, headers: corsHeaders(event), body: JSON.stringify({ error: 'Scryfall sets fetch failed' }) }
   }
 
-  const summary = { sets_considered: sets.length, sets_computed: 0, rows_upserted: 0, skipped: [], errors: [] }
+  // Shared bonus-card map + sealed box prices (fetched once, reused per set).
+  const bonusMap     = await buildBonusMap()
+  const sealedPrices = await fetchSealedPrices(MP_EMAIL, MP_TOKEN)
 
-  // 2. Per set: fetch MTGJSON booster config, price, compute, upsert.
+  const summary = { sets_considered: sets.length, sets_computed: 0, rows_upserted: 0, box_prices: 0, skipped: [], errors: [] }
+
   for (const set of sets) {
     try {
       const mj = await fetch(`https://mtgjson.com/api/v5/${set.code.toUpperCase()}.json`)
@@ -158,8 +209,8 @@ exports.handler = async (event) => {
       const data = (await mj.json()).data
       if (!data?.booster || !Object.keys(data.booster).length) { summary.skipped.push(`${set.code}: no booster data`); continue }
 
-      // uuid → scryfallId, and gather the scryfallIds referenced by sheets.
-      const uuidToScryfall = {}
+      // uuid → scryfallId: bonus sheets first, then this set's own cards.
+      const uuidToScryfall = { ...bonusMap }
       for (const c of (data.cards || [])) {
         if (c.identifiers?.scryfallId) uuidToScryfall[c.uuid] = c.identifiers.scryfallId
       }
@@ -177,13 +228,11 @@ exports.handler = async (event) => {
       const evRows = computeSetEV(data, priceById, uuidToScryfall)
       if (!evRows.length) { summary.skipped.push(`${set.code}: no computable boosters`); continue }
 
-      const payload = evRows.map(r => ({
-        set_code:     set.code,
-        set_name:     set.name,
-        released_at:  set.released_at,
-        computed_at:  new Date().toISOString(),
-        ...r,
-      }))
+      const payload = evRows.map(r => {
+        const box_price = boxPriceFor(sealedPrices, set.code, r.booster_type)
+        if (box_price != null) summary.box_prices++
+        return { set_code: set.code, set_name: set.name, released_at: set.released_at, computed_at: new Date().toISOString(), box_price, ...r }
+      })
       const up = await fetch(`${SUPABASE_URL}/rest/v1/sealed_ev?on_conflict=set_code,booster_type`, {
         method:  'POST',
         headers: { ...adminHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
