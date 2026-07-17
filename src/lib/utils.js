@@ -1,3 +1,19 @@
+//  Card attribute options — shared by the manual Add Card form and the scanner
+export const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG']
+export const LANGUAGES = [
+  { code: 'EN', label: 'English'    },
+  { code: 'JA', label: 'Japanese'   },
+  { code: 'DE', label: 'German'     },
+  { code: 'FR', label: 'French'     },
+  { code: 'IT', label: 'Italian'    },
+  { code: 'ES', label: 'Spanish'    },
+  { code: 'PT', label: 'Portuguese' },
+  { code: 'RU', label: 'Russian'    },
+  { code: 'KO', label: 'Korean'     },
+  { code: 'ZHS', label: 'Chinese (S)' },
+  { code: 'ZHT', label: 'Chinese (T)' },
+]
+
 export function formatDate(dateStr) {
   if (!dateStr) return 'N/A'
   const d = new Date(dateStr)

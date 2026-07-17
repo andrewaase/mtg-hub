@@ -95,6 +95,7 @@ function collectionRowToCard(row) {
     tcgplayerUrl: row.tcgplayer_url ?? row.tcgplayerUrl ?? null,
     scryfallId:   row.scryfall_id   ?? row.scryfallId   ?? null,
     forTrade:     row.in_trade_binder ?? false,
+    language:     row.language      ?? 'EN',
   }
 }
 
@@ -111,20 +112,30 @@ export async function addCard(card, userId) {
     // Dedup key: scryfall_id + is_foil + condition uniquely identifies a specific
     // printing variant (art, foiling, set). Fall back to name-only when no
     // scryfall_id so bulk-imported cards still merge as before.
-    let dupQuery = supabase.from('collection').select('*').eq('user_id', userId)
-    if (card.scryfallId) {
-      dupQuery = dupQuery
-        .eq('scryfall_id', card.scryfallId)
-        .eq('is_foil',     card.isFoil    || false)
-        .eq('condition',   card.condition || 'NM')
-    } else {
-      dupQuery = dupQuery
-        .eq('name',    card.name)
-        .is('scryfall_id', null)
-        .eq('is_foil', card.isFoil    || false)
-        .eq('condition', card.condition || 'NM')
+    // Language is part of the identity too — a Japanese copy is a separate row.
+    const lang = card.language || 'EN'
+    const buildDup = (withLang) => {
+      let q = supabase.from('collection').select('*').eq('user_id', userId)
+      if (card.scryfallId) {
+        q = q
+          .eq('scryfall_id', card.scryfallId)
+          .eq('is_foil',     card.isFoil    || false)
+          .eq('condition',   card.condition || 'NM')
+      } else {
+        q = q
+          .eq('name',    card.name)
+          .is('scryfall_id', null)
+          .eq('is_foil', card.isFoil    || false)
+          .eq('condition', card.condition || 'NM')
+      }
+      if (withLang) q = q.eq('language', lang)
+      return q.maybeSingle()
     }
-    const { data: existing, error: selectErr } = await dupQuery.maybeSingle()
+    let { data: existing, error: selectErr } = await buildDup(true)
+    // language column not yet in the schema — match without it
+    if (selectErr?.message?.includes('language')) {
+      ({ data: existing, error: selectErr } = await buildDup(false))
+    }
     if (selectErr) {
       console.error('[db] collection select error:', selectErr)
       throw new Error(selectErr.message)
@@ -149,15 +160,19 @@ export async function addCard(card, userId) {
       colors:        card.colors      ?? [],
       price:         card.price       ?? null,
       tcgplayer_url: card.tcgplayerUrl ?? null,
+      language:      lang,
       ...(card.scryfallId ? { scryfall_id: card.scryfallId } : {}),
       ...(card.isFoil === true ? { is_foil: true } : {}),
     }
-    let { data, error: insertErr } = await supabase.from('collection').insert(baseRow).select().single()
-    if (insertErr?.message?.includes('is_foil')) {
-      // is_foil column not yet in DB schema — retry without it
-      const { is_foil: _f, ...rowWithoutFoil } = baseRow
-      const { data: d2, error: e2 } = await supabase.from('collection').insert(rowWithoutFoil).select().single()
-      data = d2; insertErr = e2
+    const row = { ...baseRow }
+    let { data, error: insertErr } = await supabase.from('collection').insert(row).select().single()
+    // Retry without any column the schema doesn't have yet (is_foil / language)
+    for (const col of ['is_foil', 'language']) {
+      if (insertErr?.message?.includes(col) && col in row) {
+        delete row[col]
+        const retry = await supabase.from('collection').insert(row).select().single()
+        data = retry.data; insertErr = retry.error
+      }
     }
     if (insertErr) {
       console.error('[db] collection insert error:', insertErr)
@@ -166,11 +181,12 @@ export async function addCard(card, userId) {
     return collectionRowToCard(data)
   }
   const collection = lsGet().collection || []
-  // localStorage: match on scryfallId + isFoil + condition if available
+  // localStorage: match on scryfallId + isFoil + condition + language if available
+  const sameLang = c => (c.language || 'EN') === (card.language || 'EN')
   const existing = collection.find(c =>
     card.scryfallId
-      ? c.scryfallId === card.scryfallId && (c.isFoil || false) === (card.isFoil || false) && (c.condition || 'NM') === (card.condition || 'NM')
-      : c.name.toLowerCase() === card.name.toLowerCase() && !c.scryfallId && (c.isFoil || false) === (card.isFoil || false)
+      ? c.scryfallId === card.scryfallId && (c.isFoil || false) === (card.isFoil || false) && (c.condition || 'NM') === (card.condition || 'NM') && sameLang(c)
+      : c.name.toLowerCase() === card.name.toLowerCase() && !c.scryfallId && (c.isFoil || false) === (card.isFoil || false) && sameLang(c)
   )
   if (existing) {
     existing.qty += card.qty
@@ -187,6 +203,7 @@ export async function updateCollectionCard(id, patch, userId) {
   const dbPatch = {}
   if (patch.qty        !== undefined) dbPatch.qty              = patch.qty
   if (patch.condition  !== undefined) dbPatch.condition        = patch.condition
+  if (patch.language   !== undefined) dbPatch.language         = patch.language
   if (patch.scryfallId != null)        dbPatch.scryfall_id     = patch.scryfallId
   if (patch.forTrade   !== undefined) dbPatch.in_trade_binder  = patch.forTrade
   if (hasSupabase && userId && Object.keys(dbPatch).length > 0) {

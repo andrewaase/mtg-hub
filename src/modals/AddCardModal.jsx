@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { addCard, upsertStoreListing } from '../lib/db'
-import { searchScryfall, getAllPrintings } from '../lib/utils'
+import { searchScryfall, getAllPrintings, CONDITIONS, LANGUAGES } from '../lib/utils'
 
 //  Helpers 
 
@@ -49,8 +49,25 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
   // Always visible
   const [qty,           setQty]           = useState(1)
   const [condition,     setCondition]     = useState('NM')
+  const [language,      setLanguage]      = useState('EN')
 
   const inputRef = useRef(null)
+
+  // After adding, go back to the name search rather than closing, so batches of
+  // cards can be added in a row. Condition/language stay put — they're usually
+  // the same across a batch.
+  function resetToSearch() {
+    setCardName('')
+    setSuggestions([])
+    setShowDropdown(false)
+    setNameConfirmed(false)
+    setPrintings([])
+    setSelectedSet(null)
+    setSelectedCard(null)
+    setIsFoil(false)
+    setQty(1)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
 
   // Auto-fetch printings when name is confirmed
   useEffect(() => {
@@ -135,6 +152,7 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
       name:         selectedCard.name,
       qty:          parseInt(qty, 10) || 1,
       condition,
+      language,
       isFoil:       isFoil && finishes.includes('foil'),
       setName:      selectedCard.set_name,
       img:          cardImg(selectedCard),
@@ -159,14 +177,14 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
         }
         return [...prev, { ...card, id: saved?.id ?? Date.now() }]
       })
-      showToast('Card added!')
-      onClose()
+      showToast(`✓ Added ${card.qty > 1 ? `${card.qty}× ` : ''}${card.name}`)
+      resetToSearch()
     } catch (err) {
       showToast(`Save failed: ${err.message}`)
     }
   }
 
-  //  Admin: Add to collection + list in store 
+  //  Admin: Add to collection + list in store
   async function handleSubmitAndList(e) {
     e.preventDefault()
     if (!canSubmit) return
@@ -190,7 +208,7 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
         scryfall_id: selectedCard.id || null,
       })
       showToast(merged ? `✓ Added & stocked +1 ${selectedCard.name}` : `✓ Added & listed ${selectedCard.name}`)
-      onClose()
+      resetToSearch()
     } catch (err) {
       showToast(`Save failed: ${err.message}`)
     }
@@ -380,8 +398,8 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
             </div>
           )}
 
-          {/*  Qty + Condition  */}
-          <div className="grid-2 gap-12" style={{ marginBottom: '16px' }}>
+          {/*  Qty + Condition + Language  */}
+          <div className="gap-12" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '16px' }}>
             <div className="form-group">
               <label className="form-label">Quantity</label>
               <input
@@ -392,10 +410,13 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
             <div className="form-group">
               <label className="form-label">Condition</label>
               <select className="form-select" value={condition} onChange={e => setCondition(e.target.value)}>
-                <option>NM</option>
-                <option>LP</option>
-                <option>MP</option>
-                <option>HP</option>
+                {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Language</label>
+              <select className="form-select" value={language} onChange={e => setLanguage(e.target.value)}>
+                {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.code}</option>)}
               </select>
             </div>
           </div>

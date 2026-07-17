@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { addCard, upsertStoreListing, updateCollectionCard, removeCard } from '../lib/db'
 import { supabase } from '../lib/supabase'
+import { CONDITIONS, LANGUAGES } from '../lib/utils'
 import UpgradeModal from '../components/UpgradeModal'
 
 const RAPID_DELAY_MS = 1000  // pause before auto-adding in Rapid Mode
@@ -301,8 +302,14 @@ export default function CameraModal({
 
   // Store mode (admin only)
   const [storeMode,        setStoreMode]        = useState(false)
-  const [listingCondition, setListingCondition] = useState('NM')
   const [listingPrice,     setListingPrice]     = useState('')
+
+  // Per-card attributes for the scan — apply to the collection add and, in
+  // store mode, the listing too. They stay put between scans (a batch is
+  // usually the same condition/language).
+  const [scanQty,       setScanQty]       = useState(1)
+  const [scanCondition, setScanCondition] = useState('NM')
+  const [scanLanguage,  setScanLanguage]  = useState('EN')
 
   //  Camera 
   useEffect(() => {
@@ -566,10 +573,12 @@ export default function CameraModal({
       const cardPrice    = isFoil ? priceUsdFoil : (priceUsd ?? priceUsdFoil)
       const thumbImg     = snap.image_uris?.small || snap.card_faces?.[0]?.image_uris?.small || null
 
+      const addQty = parseInt(scanQty, 10) || 1
       const card = {
         name:         snap.name,
-        qty:          1,
-        condition:    'NM',
+        qty:          addQty,
+        condition:    scanCondition,
+        language:     scanLanguage,
         setName:      snap.set_name,
         img:          thumbImg,
         colors:       snap.color_identity || [],
@@ -590,7 +599,7 @@ export default function CameraModal({
       setCollection(prev => {
         const i = prev.findIndex(c => c.name.toLowerCase() === card.name.toLowerCase())
         if (i >= 0) {
-          const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + 1 }; return next
+          const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + addQty }; return next
         }
         return [...prev, saved || { ...card, id: Date.now() }]
       })
@@ -600,7 +609,7 @@ export default function CameraModal({
         const { merged } = await upsertStoreListing({
           name:        snap.name,
           set_name:    snap.set_name || null,
-          condition:   'NM',
+          condition:   scanCondition,
           is_foil:     isFoil,
           price:       cardPrice ?? 0,
           img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
@@ -695,7 +704,7 @@ export default function CameraModal({
       const { merged } = await upsertStoreListing({
         name:        snap.name,
         set_name:    snap.set_name || null,
-        condition:   listingCondition,
+        condition:   scanCondition,
         is_foil:     isFoil,
         price,
         img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
@@ -1217,6 +1226,47 @@ export default function CameraModal({
               )}
             </div>
 
+            {/* Qty / Condition / Language — apply to this add (and the listing in store mode) */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '2px',
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                borderRadius: '999px', padding: '2px 4px',
+              }}>
+                <button
+                  type="button" aria-label="Decrease quantity"
+                  onClick={() => setScanQty(q => Math.max(1, (parseInt(q, 10) || 1) - 1))}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, width: 22, height: 22 }}
+                >−</button>
+                <span style={{ minWidth: 26, textAlign: 'center', color: '#fff', fontSize: '.75rem', fontWeight: 800 }}>×{parseInt(scanQty, 10) || 1}</span>
+                <button
+                  type="button" aria-label="Increase quantity"
+                  onClick={() => setScanQty(q => (parseInt(q, 10) || 1) + 1)}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, width: 22, height: 22 }}
+                >+</button>
+              </div>
+              <select
+                value={scanCondition} onChange={e => setScanCondition(e.target.value)} aria-label="Condition"
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: '999px', color: '#fff', fontSize: '.72rem', fontWeight: 700,
+                  padding: '5px 8px', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                {CONDITIONS.map(c => <option key={c} value={c} style={{ color: '#000' }}>{c}</option>)}
+              </select>
+              <select
+                value={scanLanguage} onChange={e => setScanLanguage(e.target.value)} aria-label="Language"
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: '999px', color: '#fff', fontSize: '.72rem', fontWeight: 700,
+                  padding: '5px 8px', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                {LANGUAGES.map(l => <option key={l.code} value={l.code} style={{ color: '#000' }}>{l.code}</option>)}
+              </select>
+            </div>
+
             {/* Printings panel */}
             {showPrintings && printings.length > 0 && (
               <div style={{
@@ -1301,13 +1351,6 @@ export default function CameraModal({
                   marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px',
                 }}>
                   <span></span> Store Mode — adds directly to shop inventory
-                </div>
-
-                {/* Condition chips */}
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-                  {['NM', 'LP', 'MP', 'HP'].map(c => (
-                    <Chip key={c} active={listingCondition === c} onClick={() => setListingCondition(c)}>{c}</Chip>
-                  ))}
                 </div>
 
                 {/* Price input */}
