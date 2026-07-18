@@ -614,10 +614,11 @@ export default function CameraModal({
           price:       cardPrice ?? 0,
           img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
           scryfall_id: snap.id || null,
+          qty:         addQty,
         })
-        showToast(merged ? `✓ Added & stocked +1 ${snap.name}` : `✓ Added & listed ${snap.name}`)
+        showToast(merged ? `✓ Added & stocked +${addQty} ${snap.name}` : `✓ Added & listed ${addQty > 1 ? `${addQty}× ` : ''}${snap.name}`)
       } else {
-        showToast(`✓ Added ${snap.name}`)
+        showToast(`✓ Added ${addQty > 1 ? `${addQty}× ` : ''}${snap.name}`)
       }
 
       setAddedCards(prev => [
@@ -709,6 +710,7 @@ export default function CameraModal({
         price,
         img_url:     snap.image_uris?.normal || snap.card_faces?.[0]?.image_uris?.normal || null,
         scryfall_id: snap.id || null,
+        qty:         parseInt(scanQty, 10) || 1,
       })
       setAddedCards(prev => [
         ...prev,

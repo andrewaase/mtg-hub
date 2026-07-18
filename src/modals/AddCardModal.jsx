@@ -206,8 +206,11 @@ export default function AddCardModal({ onClose, prefill, user, isAdmin, collecti
         price:       card.price ?? 0,
         img_url:     selectedCard.image_uris?.normal || selectedCard.card_faces?.[0]?.image_uris?.normal || null,
         scryfall_id: selectedCard.id || null,
+        qty:         card.qty,
       })
-      showToast(merged ? `✓ Added & stocked +1 ${selectedCard.name}` : `✓ Added & listed ${selectedCard.name}`)
+      showToast(merged
+        ? `✓ Added & stocked +${card.qty} ${selectedCard.name}`
+        : `✓ Added & listed ${card.qty > 1 ? `${card.qty}× ` : ''}${selectedCard.name}`)
       resetToSearch()
     } catch (err) {
       showToast(`Save failed: ${err.message}`)
