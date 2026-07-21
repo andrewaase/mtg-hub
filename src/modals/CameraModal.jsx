@@ -747,7 +747,7 @@ export default function CameraModal({
     setLookupFailed(false)
     setPrintings([])
     setShowPrintings(false)
-    setListingCondition('NM')
+    setScanQty(1) // reset qty each scan; condition/language persist across a batch
     setListingPrice('')
     setEditingName(false)
     setDfcFlipped(false)
