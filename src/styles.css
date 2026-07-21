@@ -741,14 +741,19 @@ body {
 .form-select option { background: var(--bg-secondary); }
 .form-textarea { resize: vertical; min-height: 80px; }
 
-/* iOS Safari/WKWebView auto-zooms the page on focus when an input's
-   font-size is below 16px. Bump to 16px on mobile so opening a form
-   (e.g. Add Card, Log a Match) doesn't zoom the whole modal in. */
+/* iOS Safari/WKWebView auto-zooms the page on focus when a text field's
+   font-size is below 16px — and then won't let you pinch back out. Force
+   every text input/textarea to 16px on mobile so opening the keyboard (search
+   bars, Add Card, Log a Match) never triggers that zoom. !important because
+   many inputs set font-size inline, which beats a class selector. <select>
+   doesn't auto-zoom on iOS, so it's left at its designed size. Pinch-zoom on
+   the page/images is untouched, so manual zoom still resets normally. */
 @media (max-width: 899px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),
+  textarea,
   .form-input,
-  .form-select,
   .form-textarea {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 
