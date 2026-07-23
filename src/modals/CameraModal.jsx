@@ -122,6 +122,21 @@ function cacheKeyFor(name, setCode, collectorNumber) {
   return `${(setCode || '').toLowerCase()}|${collectorNumber || ''}|${(name || '').toLowerCase()}`
 }
 
+// Does a fetched Scryfall card actually match the name we read off the card?
+// Used to reject set+collector-number lookups when the number/set was misread —
+// otherwise we'd return whatever unrelated card lives at that slot even though
+// the OCR name was correct. Tolerant of punctuation, double-faced names, and
+// truncated reads.
+function nameMatches(card, ocrName) {
+  const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const o = norm(ocrName)
+  if (!o || o.length < 3) return false
+  const full  = norm(card?.name)
+  const faces = (card?.card_faces || []).map(f => norm(f.name))
+  const cands = [full, ...faces].filter(Boolean)
+  return cands.some(c => c === o || c.startsWith(o) || o.startsWith(c))
+}
+
 // 
 // Scryfall lookup
 // 
@@ -156,12 +171,14 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
     return null
   }
 
-  // Tier 0a — exact set + collector number (ideal for alt/showcase/foil)
+  // Tier 0a — exact set + collector number (ideal for alt/showcase/foil).
+  // Only trust it when the fetched card's name matches what we read — a misread
+  // set/number otherwise returns a totally unrelated card at that slot.
   if (setCode && collectorNumber) {
     const card = await tryScryfallCard(
       `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(collectorNumber)}`
     )
-    if (card) return cacheAndReturn(card, 'exact')
+    if (card && nameMatches(card, name)) return cacheAndReturn(card, 'exact')
 
     // Tier 0b — same but strip leading zeros (foil cards often print "0300", Scryfall stores "300")
     const stripped = collectorNumber.replace(/^0+(\d)/, '$1')
@@ -169,7 +186,7 @@ async function lookupCard(name, setCode = null, collectorNumber = null) {
       const card2 = await tryScryfallCard(
         `https://api.scryfall.com/cards/${encodeURIComponent(setCode)}/${encodeURIComponent(stripped)}`
       )
-      if (card2) return cacheAndReturn(card2, 'exact')
+      if (card2 && nameMatches(card2, name)) return cacheAndReturn(card2, 'exact')
     }
   }
 
