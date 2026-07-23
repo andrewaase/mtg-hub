@@ -6,7 +6,12 @@ import UpgradeModal from '../components/UpgradeModal'
 
 const RAPID_DELAY_MS = 1000  // pause before auto-adding in Rapid Mode
 
-const GUIDE = { x: 0.04, y: 0.01, w: 0.92, h: 0.98 }
+// The scan guide is a user-adjustable crop rectangle stored as fractions of the
+// on-screen camera preview. It is BOTH what the user frames AND the exact region
+// cropped for OCR — so what you box is what gets scanned (no hidden offset).
+const DEFAULT_GUIDE = { x: 0.13, y: 0.05, w: 0.74, h: 0.6 }
+const GUIDE_LS_KEY  = 'mtg-scan-guide-v1'
+const MIN_GUIDE     = 0.15  // smallest guide side, as a fraction of the preview
 
 // Strip crop fractions — what slice of the card region we actually send to Claude.
 // Card titles live in the top ~14% and set/collector code in the bottom ~7%.
@@ -43,22 +48,36 @@ function frameDiff(c1, c2) {
 
 // Capture title-bar + bottom-strip composition. Returns the canvas so callers can
 // run a sharpness check before encoding to JPEG.
-function captureCardCanvas(video) {
+function captureCardCanvas(video, guide) {
   const vw = video.videoWidth, vh = video.videoHeight
-  const sx = Math.floor(vw * GUIDE.x)
-  const sw = Math.floor(vw * GUIDE.w)
+  // Map the guide (fractions of the on-screen preview) to source pixels in the
+  // video. The preview uses object-fit: cover, so the video is scaled to fill the
+  // preview box and the overflow is cropped evenly on the long axis.
+  const rect = video.getBoundingClientRect()
+  const cw = rect.width  || vw
+  const ch = rect.height || vh
+  const scale = Math.max(cw / vw, ch / vh)
+  const offX  = (vw * scale - cw) / 2
+  const offY  = (vh * scale - ch) / 2
 
-  // Source rectangles in video coords
-  const titleSrcY = Math.floor(vh * GUIDE.y)
-  const titleSrcH = Math.floor(vh * GUIDE.h * TITLE_STRIP_FRAC)
-  const bottomSrcY = Math.floor(vh * (GUIDE.y + GUIDE.h * (1 - BOTTOM_STRIP_FRAC)))
-  const bottomSrcH = Math.floor(vh * GUIDE.h * BOTTOM_STRIP_FRAC)
+  const sx = ((guide.x * cw) + offX) / scale
+  const sy = ((guide.y * ch) + offY) / scale
+  const sw = (guide.w * cw) / scale
+  const sh = (guide.h * ch) / scale
+
+  // Source strips within the guide: title band up top, set/collector band bottom.
+  const sxi        = Math.max(0, Math.floor(sx))
+  const swi        = Math.max(1, Math.floor(sw))
+  const titleSrcY  = Math.max(0, Math.floor(sy))
+  const titleSrcH  = Math.max(1, Math.floor(sh * TITLE_STRIP_FRAC))
+  const bottomSrcY = Math.floor(sy + sh * (1 - BOTTOM_STRIP_FRAC))
+  const bottomSrcH = Math.max(1, Math.floor(sh * BOTTOM_STRIP_FRAC))
 
   // Destination dims (scale so width ≤ STRIP_TARGET_W)
-  const scale = Math.min(1, STRIP_TARGET_W / sw)
-  const outW       = Math.floor(sw * scale)
-  const outTitleH  = Math.floor(titleSrcH * scale)
-  const outBottomH = Math.floor(bottomSrcH * scale)
+  const outScale   = Math.min(1, STRIP_TARGET_W / swi)
+  const outW       = Math.max(1, Math.floor(swi * outScale))
+  const outTitleH  = Math.max(1, Math.floor(titleSrcH * outScale))
+  const outBottomH = Math.max(1, Math.floor(bottomSrcH * outScale))
   const gap        = 8
 
   const c = document.createElement('canvas')
@@ -67,8 +86,8 @@ function captureCardCanvas(video) {
   const ctx = c.getContext('2d')
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, c.width, c.height)
-  ctx.drawImage(video, sx, titleSrcY,  sw, titleSrcH,  0, 0,                   outW, outTitleH)
-  ctx.drawImage(video, sx, bottomSrcY, sw, bottomSrcH, 0, outTitleH + gap,     outW, outBottomH)
+  ctx.drawImage(video, sxi, titleSrcY,  swi, titleSrcH,  0, 0,               outW, outTitleH)
+  ctx.drawImage(video, sxi, bottomSrcY, swi, bottomSrcH, 0, outTitleH + gap, outW, outBottomH)
   return c
 }
 
@@ -311,6 +330,26 @@ export default function CameraModal({
   const [scanCondition, setScanCondition] = useState('NM')
   const [scanLanguage,  setScanLanguage]  = useState('EN')
 
+  // User-adjustable scan guide (persisted). guideRef mirrors it so the scan loop
+  // always reads the current rect without re-subscribing. adjustingRef pauses
+  // scanning while the guide is being dragged/resized.
+  const [guide, setGuide] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem(GUIDE_LS_KEY)); if (s && s.w && s.h) return s } catch {}
+    return DEFAULT_GUIDE
+  })
+  const guideRef    = useRef(guide)
+  const adjustingRef = useRef(false)
+  const dragRef     = useRef(null)
+  useEffect(() => {
+    guideRef.current = guide
+    try { localStorage.setItem(GUIDE_LS_KEY, JSON.stringify(guide)) } catch {}
+  }, [guide])
+
+  // Last identified card — lets the user reload it to pick another variant
+  // (foil / showcase / base) without rescanning.
+  const [lastCard,      setLastCard]      = useState(null)
+  const [lastPrintings, setLastPrintings] = useState([])
+
   //  Camera 
   useEffect(() => {
     let active = true
@@ -370,7 +409,7 @@ export default function CameraModal({
   }, [cameraReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function stabilityCheck() {
-    if (frozenRef.current) return
+    if (frozenRef.current || adjustingRef.current) return
     const video = videoRef.current
     if (!video?.videoWidth) return
     const curr = thumbCanvas(video)
@@ -410,7 +449,7 @@ export default function CameraModal({
     try {
       // Capture title+bottom strip composition, then verify it's sharp enough.
       // Skipping a blurry frame here saves a Claude API call.
-      const canvas = captureCardCanvas(video)
+      const canvas = captureCardCanvas(video, guideRef.current)
       const sharpness = imageVariance(canvas)
       if (sharpness < SHARPNESS_MIN) {
         // Reset stability so next still+sharp frame triggers a fresh scan.
@@ -732,6 +771,8 @@ export default function CameraModal({
   }
 
   function doRescan() {
+    // Remember what we just had so "Reload last card" can bring it back.
+    if (foundCard) { setLastCard(foundCard); setLastPrintings(printings) }
     frozenRef.current = false
     stableRef.current = 0
     prevThumbRef.current = null
@@ -753,6 +794,50 @@ export default function CameraModal({
     setDfcFlipped(false)
     setRapidCountdown(0)
     if (rapidTimerRef.current) { clearInterval(rapidTimerRef.current); rapidTimerRef.current = null }
+  }
+
+  //  Reload the last identified card (to grab another variant without rescanning)
+  function reloadLastCard() {
+    if (!lastCard) return
+    frozenRef.current = true          // pause auto-scan so it doesn't override
+    setFoundCard(lastCard)
+    setPrintings(lastPrintings)
+    setShowPrintings(lastPrintings.length > 1)
+    setPriceMode('normal')
+    setScanError(null)
+    setLookupFailed(false)
+  }
+
+  //  Scan-guide drag / resize (move whole box or pull a corner)
+  function onGuideDown(mode, e) {
+    e.preventDefault(); e.stopPropagation()
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    const r = videoRef.current?.getBoundingClientRect()
+    if (!r) return
+    adjustingRef.current = true
+    dragRef.current = { mode, startX: e.clientX, startY: e.clientY, w: r.width, h: r.height, guide: { ...guide } }
+  }
+  function onGuideMove(e) {
+    const s = dragRef.current
+    if (!s) return
+    const dx = (e.clientX - s.startX) / s.w
+    const dy = (e.clientY - s.startY) / s.h
+    let { x, y, w, h } = s.guide
+    if (s.mode === 'move') {
+      x = Math.max(0, Math.min(1 - w, x + dx))
+      y = Math.max(0, Math.min(1 - h, y + dy))
+    } else {
+      if (s.mode.includes('e')) w = Math.max(MIN_GUIDE, Math.min(1 - x, w + dx))
+      if (s.mode.includes('s')) h = Math.max(MIN_GUIDE, Math.min(1 - y, h + dy))
+      if (s.mode.includes('w')) { const nx = Math.max(0, Math.min(x + w - MIN_GUIDE, x + dx)); w += x - nx; x = nx }
+      if (s.mode.includes('n')) { const ny = Math.max(0, Math.min(y + h - MIN_GUIDE, y + dy)); h += y - ny; y = ny }
+    }
+    setGuide({ x, y, w, h })
+  }
+  function onGuideUp(e) {
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    dragRef.current = null
+    adjustingRef.current = false
   }
 
   //  Rapid Mode auto-add 
@@ -935,15 +1020,64 @@ export default function CameraModal({
         </div>
       )}
 
-      {/*  Card guide outline (no card yet)  */}
+      {/*  Adjustable scan guide (no card yet) — drag to move, pull corners to resize.
+           This exact box is what gets cropped for OCR.  */}
       {!foundCard && !cameraError && (
-        <div style={{
-          position: 'absolute',
-          left: `${GUIDE.x * 100}%`, top: '8%',
-          width: `${GUIDE.w * 100}%`, height: '55%',
-          border: '2px dashed rgba(255,255,255,0.4)', borderRadius: '8px',
-          pointerEvents: 'none', boxSizing: 'border-box',
-        }} />
+        <>
+          <div
+            onPointerDown={e => onGuideDown('move', e)}
+            onPointerMove={onGuideMove}
+            onPointerUp={onGuideUp}
+            style={{
+              position: 'absolute',
+              left: `${guide.x * 100}%`, top: `${guide.y * 100}%`,
+              width: `${guide.w * 100}%`, height: `${guide.h * 100}%`,
+              border: '2px dashed rgba(255,255,255,0.85)', borderRadius: '8px',
+              boxSizing: 'border-box', cursor: 'move', touchAction: 'none', zIndex: 6,
+            }}
+          >
+            {/* Corner resize handles */}
+            {['nw', 'ne', 'sw', 'se'].map(corner => {
+              const pos = {
+                top:    corner[0] === 'n' ? -12 : undefined,
+                bottom: corner[0] === 's' ? -12 : undefined,
+                left:   corner[1] === 'w' ? -12 : undefined,
+                right:  corner[1] === 'e' ? -12 : undefined,
+              }
+              return (
+                <div
+                  key={corner}
+                  onPointerDown={e => onGuideDown(corner, e)}
+                  onPointerMove={onGuideMove}
+                  onPointerUp={onGuideUp}
+                  style={{
+                    position: 'absolute', width: 26, height: 26, ...pos,
+                    background: 'rgba(255,255,255,0.95)', border: '2px solid #16a389',
+                    borderRadius: '50%', touchAction: 'none', cursor: `${corner}-resize`,
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                  }}
+                />
+              )
+            })}
+          </div>
+          {/* Hint + reset, just below the guide */}
+          <div style={{
+            position: 'absolute', left: 0, right: 0,
+            top: `calc(${(guide.y + guide.h) * 100}% + 10px)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, zIndex: 6,
+            pointerEvents: 'none',
+          }}>
+            <span style={{ fontSize: '.68rem', color: 'rgba(255,255,255,0.65)' }}>Drag to move · pull corners to resize</span>
+            <button
+              onClick={() => setGuide(DEFAULT_GUIDE)}
+              style={{
+                pointerEvents: 'auto', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 8, color: 'rgba(255,255,255,0.8)', fontSize: '.66rem', fontWeight: 600,
+                padding: '3px 8px', cursor: 'pointer',
+              }}
+            >Reset</button>
+          </div>
+        </>
       )}
 
       {/*  Card art overlay on camera (when identified)  */}
@@ -1430,14 +1564,31 @@ export default function CameraModal({
                   : 'Hold card steady within the frame'}
               </div>
             </div>
-            <button
-              onClick={handleClose}
-              style={{
-                background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '10px', padding: '9px 20px', flexShrink: 0,
-                color: '#fff', cursor: 'pointer', fontSize: '.84rem', fontWeight: 600,
-              }}
-            >Done</button>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              {lastCard && (
+                <button
+                  onClick={reloadLastCard}
+                  title="Bring back the last card to pick another variant"
+                  style={{
+                    background: 'rgba(30,196,166,0.15)', border: '1px solid rgba(30,196,166,0.4)',
+                    borderRadius: '10px', padding: '9px 14px',
+                    color: '#5eead4', cursor: 'pointer', fontSize: '.82rem', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.27"/></svg>
+                  Reload last
+                </button>
+              )}
+              <button
+                onClick={handleClose}
+                style={{
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '10px', padding: '9px 20px',
+                  color: '#fff', cursor: 'pointer', fontSize: '.84rem', fontWeight: 600,
+                }}
+              >Done</button>
+            </div>
           </div>
         )}
       </div>
