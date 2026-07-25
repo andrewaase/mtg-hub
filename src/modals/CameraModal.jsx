@@ -309,6 +309,9 @@ export default function CameraModal({
   const [scanStatus,     setScanStatus]     = useState('ready')
   const [torchOn,        setTorchOn]        = useState(false)
   const [torchSupported, setTorchSupported] = useState(false)
+  const [zoomSupported,  setZoomSupported]  = useState(false)
+  const [zoomRange,      setZoomRange]      = useState({ min: 1, max: 1, step: 0.1 })
+  const [zoom,           setZoom]           = useState(1)
 
   const [nameRead,      setNameRead]      = useState('')
   const [foundCard,     setFoundCard]     = useState(null)
@@ -382,7 +385,13 @@ export default function CameraModal({
           streamRef.current = stream
           videoRef.current.srcObject = stream
           const track = stream.getVideoTracks()[0]
-          if (track?.getCapabilities?.()?.torch) setTorchSupported(true)
+          const caps  = track?.getCapabilities?.() || {}
+          if (caps.torch) setTorchSupported(true)
+          if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+            setZoomSupported(true)
+            setZoomRange({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 })
+            setZoom(track.getSettings?.().zoom ?? caps.zoom.min)
+          }
           setCameraReady(true)
         }
       } catch {
@@ -408,6 +417,25 @@ export default function CameraModal({
     try { await track.applyConstraints({ advanced: [{ torch: next }] }); setTorchOn(next) }
     catch (e) { console.warn('[Scanner] torch toggle failed:', e) }
   }
+
+  // Deliberate camera zoom (native track zoom) — replaces accidental pinch-zoom.
+  async function applyZoom(z) {
+    const track = streamRef.current?.getVideoTracks()[0]
+    if (!track) return
+    const clamped = Math.max(zoomRange.min, Math.min(zoomRange.max, z))
+    try { await track.applyConstraints({ advanced: [{ zoom: clamped }] }); setZoom(clamped) }
+    catch (e) { console.warn('[Scanner] zoom failed:', e) }
+  }
+  const zoomStep = () => Math.max(zoomRange.step, (zoomRange.max - zoomRange.min) / 6)
+
+  // Lock webview zoom while the scanner is open so an accidental pinch / double-tap
+  // can't zoom the page and throw off the card-guide alignment. Restored on close.
+  useEffect(() => {
+    const vp = document.querySelector('meta[name="viewport"]')
+    const prev = vp?.getAttribute('content')
+    vp?.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no')
+    return () => { if (vp && prev != null) vp.setAttribute('content', prev) }
+  }, [])
 
   //  Sync listing price when card or foil mode changes 
   useEffect(() => {
@@ -914,7 +942,7 @@ export default function CameraModal({
       <video
         ref={videoRef}
         autoPlay playsInline muted
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', touchAction: 'none' }}
       />
 
       {/*  Dark gradient at bottom for sheet readability  */}
@@ -980,6 +1008,21 @@ export default function CameraModal({
                 {torchOn ? 'Flash ON' : 'Flash'}
               </span>
             </button>
+          )}
+
+          {/* Camera zoom (deliberate, replaces accidental pinch-zoom) */}
+          {zoomSupported && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '2px',
+              background: 'rgba(0,0,0,0.55)', border: '1.5px solid rgba(255,255,255,0.18)',
+              borderRadius: '20px', padding: '2px 4px', backdropFilter: 'blur(10px)',
+            }}>
+              <button onClick={() => applyZoom(zoom - zoomStep())} aria-label="Zoom out"
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', width: 22, height: 22, lineHeight: 1 }}>−</button>
+              <span style={{ minWidth: 34, textAlign: 'center', color: '#fff', fontSize: '.68rem', fontWeight: 700 }}>{zoom.toFixed(1)}×</span>
+              <button onClick={() => applyZoom(zoom + zoomStep())} aria-label="Zoom in"
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', width: 22, height: 22, lineHeight: 1 }}>+</button>
+            </div>
           )}
 
           {/* Store Mode (admin only) — scans go to shop inventory */}
