@@ -1913,6 +1913,20 @@ function SettingsTab() {
   const [loading,     setLoading]     = useState(true)
   const [saving,      setSaving]      = useState(false)
   const [result,      setResult]      = useState(null)
+  const [moversBusy,  setMoversBusy]  = useState(false)
+  const [moversMsg,   setMoversMsg]   = useState(null)
+
+  const refreshMovers = async () => {
+    setMoversBusy(true); setMoversMsg(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/compute-market-movers-background', {
+        method: 'POST', headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      if (res.status === 202 || res.ok) setMoversMsg({ ok: true, text: 'Recompute started — the dashboard gainers/losers update in a minute or two.' })
+      else { const j = await res.json().catch(() => ({})); throw new Error(j.error || `HTTP ${res.status}`) }
+    } catch (e) { setMoversMsg({ ok: false, text: e.message }) } finally { setMoversBusy(false) }
+  }
 
   useEffect(() => {
     supabase.from('store_settings')
@@ -2008,6 +2022,20 @@ function SettingsTab() {
           </button>
         </form>
       )}
+
+      {/* Maintenance */}
+      <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontWeight: 800, fontSize: '.92rem', color: 'var(--text-primary)', marginBottom: 4 }}>Maintenance</div>
+        <div style={{ fontSize: '.75rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
+          Recompute the dashboard's gainers/losers now (it normally runs on a daily schedule).
+        </div>
+        {moversMsg && (
+          <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, fontSize: '.78rem', background: moversMsg.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${moversMsg.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: moversMsg.ok ? '#4ade80' : '#fca5a5' }}>{moversMsg.text}</div>
+        )}
+        <button onClick={refreshMovers} disabled={moversBusy} style={{ padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: moversBusy ? 'not-allowed' : 'pointer' }}>
+          {moversBusy ? 'Starting…' : 'Refresh market movers'}
+        </button>
+      </div>
     </div>
   )
 }

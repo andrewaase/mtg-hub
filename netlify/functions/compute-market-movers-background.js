@@ -214,8 +214,12 @@ exports.handler = async (event) => {
     const ref = refPrices[name]
     if (!ref?.price) continue
     // Skip if a different printing became cheapest — comparing two different
-    // products (e.g. base card vs alt art) produces spurious movers.
-    if (ref.img && img && ref.img !== img) continue
+    // products (e.g. base card vs alt art) produces spurious movers. Compare the
+    // path only (it carries the stable Scryfall id); the "?<version>" query gets
+    // bumped whenever Scryfall reprocesses an image, so the same printing would
+    // otherwise look "changed" and get wrongly skipped.
+    const stripVer = (u) => (u ? u.split('?')[0] : u)
+    if (ref.img && img && stripVer(ref.img) !== stripVer(img)) continue
     const oldPrice = ref.price
     if (Math.abs(newPrice - oldPrice) < 0.005) continue  // skip floating-point noise
 
