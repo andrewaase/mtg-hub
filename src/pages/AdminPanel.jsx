@@ -2089,6 +2089,7 @@ function SealedEvTab() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy]       = useState(false)
   const [msg, setMsg]         = useState(null)
+  const [selected, setSelected] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -2174,7 +2175,10 @@ function SealedEvTab() {
                 <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{set.released_at}</span>
               </div>
               {set.boosters.map(b => (
-                <div key={b.booster_type} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                <div key={b.booster_type} onClick={() => setSelected(b)} title="View calculation & stats"
+                  style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                     <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--text-primary)', minWidth: 130 }}>{fmtType(b.booster_type)}</div>
                     <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
@@ -2201,12 +2205,13 @@ function SealedEvTab() {
                     })()}
                   </div>
                   {Array.isArray(b.top_cards) && b.top_cards.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
                       {b.top_cards.slice(0, 6).map((c, i) => (
                         <span key={i} style={{ fontSize: '.68rem', padding: '2px 8px', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                           {c.name}{c.foil ? ' (foil)' : ''} <span style={{ color: '#4ade80', fontWeight: 700 }}>${c.price}</span>
                         </span>
                       ))}
+                      <span style={{ fontSize: '.68rem', color: '#818cf8', fontWeight: 700, marginLeft: 'auto' }}>Details →</span>
                     </div>
                   )}
                 </div>
@@ -2215,7 +2220,103 @@ function SealedEvTab() {
           ))}
         </div>
       )}
+
+      {selected && <SealedEvDetailModal row={selected} onClose={() => setSelected(null)} />}
     </div>
+  )
+}
+
+//  Sealed EV — per-booster calculation + stats detail
+function SealedEvDetailModal({ row, onClose }) {
+  const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
+  const fmtType = (t) => t.charAt(0).toUpperCase() + t.slice(1) + ' Booster'
+  const slots = row.detail?.slots || []
+  const net   = (row.ev_per_box != null && row.box_price != null) ? row.ev_per_box - row.box_price : null
+  const roi   = (row.ev_per_box != null && row.box_price) ? Math.round((row.ev_per_box / row.box_price) * 100) : null
+  const prettySlot = (s) => s.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim()
+
+  const Stat = ({ label, value, color }) => (
+    <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 120px' }}>
+      <div style={{ fontSize: '.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: '1rem', fontWeight: 800, color: color || 'var(--text-primary)' }}>{value}</div>
+    </div>
+  )
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(620px,96vw)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 401, padding: '22px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{row.set_name}</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>{fmtType(row.booster_type)} · {row.released_at}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Economics */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          <Stat label="EV / pack" value={money(row.ev_per_pack)} color="#4ade80" />
+          {row.ev_per_box != null && <Stat label={`EV / box (${row.packs_per_box})`} value={money(row.ev_per_box)} color="#4ade80" />}
+          <Stat label="Box cost" value={money(row.box_price)} />
+          {net != null && <Stat label="Net to crack" value={`${net >= 0 ? '+' : '−'}${money(Math.abs(net)).slice(1)}`} color={net >= 0 ? '#4ade80' : '#f87171'} />}
+          {roi != null && <Stat label="EV / cost" value={`${roi}%`} color={roi >= 100 ? '#4ade80' : '#f87171'} />}
+        </div>
+
+        {/* Methodology */}
+        <div style={{ fontSize: '.75rem', color: 'var(--text-secondary)', lineHeight: 1.65, background: 'var(--bg-hover)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+          <strong style={{ color: 'var(--text-primary)' }}>How this is calculated.</strong> Each pack is built from weighted <em>sheets</em> (MTGJSON's real pull data — e.g. the rare/mythic sheet, the foil sheet, special-guest sheet). For every sheet we take the probability-weighted average card value using live Scryfall market prices (foil sheets use foil prices), multiply by how many of that slot a pack contains, and sum across slots. Box EV = pack EV × {row.packs_per_box || 'packs per box'}. Box cost is the lowest ManaPool listing.
+        </div>
+
+        {/* Slot breakdown */}
+        {slots.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>Where the value comes from</div>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.72rem' }}>
+                <thead><tr style={{ background: 'var(--bg-hover)' }}>
+                  {['Slot', 'Per pack', 'Avg value', 'Pool', 'Contribution'].map(h => (
+                    <th key={h} style={{ padding: '7px 10px', textAlign: h === 'Slot' ? 'left' : 'right', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {slots.map((s, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={{ padding: '6px 10px', color: 'var(--text-primary)', fontWeight: 600 }}>{prettySlot(s.name)}{s.foil ? ' ✦' : ''}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>{s.avg_count}×</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>{money(s.avg_value)}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--text-muted)' }}>{s.pool}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#4ade80' }}>{money(s.contribution)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Top cards */}
+        {Array.isArray(row.top_cards) && row.top_cards.length > 0 && (
+          <div>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>Top chase cards</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {row.top_cards.map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-primary)' }}>{c.name}{c.foil ? <span style={{ color: '#c084fc' }}> · foil</span> : ''}</span>
+                  <span style={{ fontWeight: 700, color: '#4ade80' }}>${c.price}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {row.computed_at && (
+          <div style={{ fontSize: '.66rem', color: 'var(--text-muted)', marginTop: 14, textAlign: 'right' }}>
+            Prices as of {new Date(row.computed_at).toLocaleDateString()}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

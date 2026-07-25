@@ -138,8 +138,26 @@ function computeSetEV(setData, priceById, uuidToScryfall) {
     }
     const topCards = Object.values(topMap)
       .sort((a, b) => b.price - a.price)
-      .slice(0, 8)
+      .slice(0, 12)
       .map(c => ({ name: c.name, foil: c.foil, price: Math.round(c.price * 100) / 100 }))
+
+    // Per-slot breakdown: expected count of each sheet per pack × that sheet's
+    // average card value = the slot's contribution to pack EV (they sum to EV).
+    const slotAgg = {}
+    for (const variation of cfg.boosters) {
+      const vw = (variation.weight || 0) / totalW
+      for (const [sheetName, count] of Object.entries(variation.contents || {})) {
+        slotAgg[sheetName] = (slotAgg[sheetName] || 0) + vw * count
+      }
+    }
+    const slots = Object.entries(slotAgg).map(([name, avgCount]) => ({
+      name,
+      foil:         !!sheets[name]?.foil,
+      avg_count:    Math.round(avgCount * 100) / 100,
+      avg_value:    Math.round((sheetEV[name] || 0) * 100) / 100,
+      contribution: Math.round(avgCount * (sheetEV[name] || 0) * 100) / 100,
+      pool:         Object.keys(sheets[name]?.cards || {}).length,
+    })).sort((a, b) => b.contribution - a.contribution)
 
     results.push({
       booster_type:  boosterType,
@@ -147,6 +165,7 @@ function computeSetEV(setData, priceById, uuidToScryfall) {
       packs_per_box: packsPerBox,
       ev_per_box:    packsPerBox ? Math.round(evPerPack * packsPerBox * 100) / 100 : null,
       top_cards:     topCards,
+      detail:        { slots },
     })
   }
   return results
