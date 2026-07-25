@@ -995,6 +995,22 @@ Mox Pearl,Beta,LP,1250.00,1,false`
   )
 }
 
+// PostgREST caps a select() at 1000 rows, so page through the whole table.
+async function fetchAllListings(ascending = false) {
+  const PAGE = 1000
+  let all = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('store_listings').select('*')
+      .order('created_at', { ascending })
+      .range(from, from + PAGE - 1)
+    if (error || !data?.length) break
+    all = all.concat(data)
+    if (data.length < PAGE) break
+  }
+  return all
+}
+
 //  ManaPool / ManaBox CSV codec (shared by export + sync)
 
 // ManaBox export header, exactly as ManaPool expects it.
@@ -1415,8 +1431,7 @@ function ListingsTab() {
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('store_listings').select('*').order('created_at', { ascending: false })
-    setListings(data || [])
+    setListings(await fetchAllListings(false))
     setLoading(false)
   }, [])
 
@@ -1426,8 +1441,7 @@ function ListingsTab() {
     setMergeResult(null)
     try {
       // Fetch all in created_at order (oldest first = keeper)
-      const { data: all, error } = await supabase.from('store_listings').select('*').order('created_at', { ascending: true })
-      if (error) throw error
+      const all = await fetchAllListings(true)
 
       // Group by name + condition + is_foil
       const groups = {}
