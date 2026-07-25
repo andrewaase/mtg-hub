@@ -2189,19 +2189,25 @@ function SealedEvTab() {
                         Box EV ({b.packs_per_box}): <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(b.ev_per_box)}</span>
                       </div>
                     )}
-                    {b.box_price != null && (
-                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-                        Box cost: <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{money(b.box_price)}</span>
-                      </div>
-                    )}
-                    {b.ev_per_box != null && b.box_price != null && (() => {
-                      const diff = b.ev_per_box - b.box_price
-                      const up = diff >= 0
-                      return (
-                        <div style={{ fontSize: '.78rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: up ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.12)', color: up ? '#4ade80' : '#f87171' }}>
-                          {up ? '+' : '−'}{money(Math.abs(diff)).slice(1)} to crack ({Math.round((b.ev_per_box / b.box_price) * 100)}%)
-                        </div>
-                      )
+                    {(() => {
+                      const boxCost = b.box_price_override ?? b.box_price
+                      return (<>
+                        {boxCost != null && (
+                          <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                            Box cost: <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{money(boxCost)}</span>
+                            {b.box_price_override != null && <span style={{ fontSize: '.62rem', color: '#818cf8', marginLeft: 4 }}>(edited)</span>}
+                          </div>
+                        )}
+                        {b.ev_per_box != null && boxCost != null && (() => {
+                          const diff = b.ev_per_box - boxCost
+                          const up = diff >= 0
+                          return (
+                            <div style={{ fontSize: '.78rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: up ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.12)', color: up ? '#4ade80' : '#f87171' }}>
+                              {up ? '+' : '−'}{money(Math.abs(diff)).slice(1)} to crack ({Math.round((b.ev_per_box / boxCost) * 100)}%)
+                            </div>
+                          )
+                        })()}
+                      </>)
                     })()}
                   </div>
                   {Array.isArray(b.top_cards) && b.top_cards.length > 0 && (
@@ -2221,19 +2227,51 @@ function SealedEvTab() {
         </div>
       )}
 
-      {selected && <SealedEvDetailModal row={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <SealedEvDetailModal
+          row={selected}
+          onClose={() => setSelected(null)}
+          onSaved={(override) => {
+            setRows(rs => rs.map(r => r.id === selected.id ? { ...r, box_price_override: override } : r))
+            setSelected(s => s && s.id === selected.id ? { ...s, box_price_override: override } : s)
+          }}
+        />
+      )}
     </div>
   )
 }
 
 //  Sealed EV — per-booster calculation + stats detail
-function SealedEvDetailModal({ row, onClose }) {
+function SealedEvDetailModal({ row, onClose, onSaved }) {
   const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
   const fmtType = (t) => t.charAt(0).toUpperCase() + t.slice(1) + ' Booster'
   const slots = row.detail?.slots || []
-  const net   = (row.ev_per_box != null && row.box_price != null) ? row.ev_per_box - row.box_price : null
-  const roi   = (row.ev_per_box != null && row.box_price) ? Math.round((row.ev_per_box / row.box_price) * 100) : null
+  const boxCost = row.box_price_override ?? row.box_price
+  const net   = (row.ev_per_box != null && boxCost != null) ? row.ev_per_box - boxCost : null
+  const roi   = (row.ev_per_box != null && boxCost) ? Math.round((row.ev_per_box / boxCost) * 100) : null
   const prettySlot = (s) => s.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim()
+
+  const [editing, setEditing] = useState(false)
+  const [priceInput, setPriceInput] = useState(boxCost != null ? String(boxCost) : '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const save = async (clear) => {
+    setSaving(true); setErr(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/sealed-ev-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ id: row.id, price: clear ? null : priceInput }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`)
+      onSaved?.(j.box_price_override)
+      if (clear) setPriceInput(row.box_price != null ? String(row.box_price) : '')
+      setEditing(false)
+    } catch (e) { setErr(e.message) } finally { setSaving(false) }
+  }
 
   const Stat = ({ label, value, color }) => (
     <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 120px' }}>
@@ -2255,17 +2293,42 @@ function SealedEvDetailModal({ row, onClose }) {
         </div>
 
         {/* Economics */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: err ? 6 : 16 }}>
           <Stat label="EV / pack" value={money(row.ev_per_pack)} color="#4ade80" />
           {row.ev_per_box != null && <Stat label={`EV / box (${row.packs_per_box})`} value={money(row.ev_per_box)} color="#4ade80" />}
-          <Stat label="Box cost" value={money(row.box_price)} />
+
+          {/* Editable box cost */}
+          <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 160px' }}>
+            <div style={{ fontSize: '.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+              <span>Box cost{row.box_price_override != null && !editing ? ' (edited)' : ''}</span>
+              {!editing && <button onClick={() => { setEditing(true); setPriceInput(boxCost != null ? String(boxCost) : '') }} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '.62rem', fontWeight: 700, padding: 0 }}>Edit</button>}
+            </div>
+            {editing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>$</span>
+                  <input type="number" min="0" step="0.01" value={priceInput} onChange={e => setPriceInput(e.target.value)} autoFocus
+                    style={{ width: 80, background: 'var(--bg-input, rgba(255,255,255,.06))', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 6px', fontSize: '.9rem', fontWeight: 800, outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button onClick={() => save(false)} disabled={saving} style={{ padding: '3px 10px', borderRadius: 6, border: 'none', background: '#16a389', color: '#000', fontWeight: 700, fontSize: '.68rem', cursor: 'pointer' }}>{saving ? '…' : 'Save'}</button>
+                  {row.box_price_override != null && <button onClick={() => save(true)} disabled={saving} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text-secondary)', fontSize: '.68rem', cursor: 'pointer' }}>Use market</button>}
+                  <button onClick={() => setEditing(false)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text-secondary)', fontSize: '.68rem', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{money(boxCost)}</div>
+            )}
+          </div>
+
           {net != null && <Stat label="Net to crack" value={`${net >= 0 ? '+' : '−'}${money(Math.abs(net)).slice(1)}`} color={net >= 0 ? '#4ade80' : '#f87171'} />}
           {roi != null && <Stat label="EV / cost" value={`${roi}%`} color={roi >= 100 ? '#4ade80' : '#f87171'} />}
         </div>
+        {err && <div style={{ marginBottom: 12, fontSize: '.72rem', color: '#fca5a5' }}>{err}</div>}
 
         {/* Methodology */}
         <div style={{ fontSize: '.75rem', color: 'var(--text-secondary)', lineHeight: 1.65, background: 'var(--bg-hover)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-          <strong style={{ color: 'var(--text-primary)' }}>How this is calculated.</strong> Each pack is built from weighted <em>sheets</em> (MTGJSON's real pull data — e.g. the rare/mythic sheet, the foil sheet, special-guest sheet). For every sheet we take the probability-weighted average card value using live Scryfall market prices (foil sheets use foil prices), multiply by how many of that slot a pack contains, and sum across slots. Box EV = pack EV × {row.packs_per_box || 'packs per box'}. Box cost is the lowest ManaPool listing.
+          <strong style={{ color: 'var(--text-primary)' }}>How this is calculated.</strong> Each pack is built from weighted <em>sheets</em> (MTGJSON's real pull data — e.g. the rare/mythic sheet, the foil sheet, special-guest sheet). For every sheet we take the probability-weighted average card value using live Scryfall market prices (foil sheets use foil prices), multiply by how many of that slot a pack contains, and sum across slots. Box EV = pack EV × {row.packs_per_box || 'packs per box'}. Box cost defaults to the lowest ManaPool listing but you can override it above — your value sticks through recomputes.
         </div>
 
         {/* Slot breakdown */}
