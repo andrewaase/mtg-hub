@@ -2320,12 +2320,171 @@ function SealedEvDetailModal({ row, onClose }) {
   )
 }
 
+//  Sealed Deals admin tab — best sealed prices harvested across game stores
+function DealsTab() {
+  const [stores, setStores]     = useState([])
+  const [listings, setListings] = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [domain, setDomain]     = useState('')
+  const [adding, setAdding]     = useState(false)
+  const [harvesting, setHarvesting] = useState(false)
+  const [msg, setMsg]           = useState(null)
+  const [search, setSearch]     = useState('')
+  const [inStockOnly, setInStockOnly] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [s, l] = await Promise.all([
+      supabase.from('deal_stores').select('*').order('created_at', { ascending: true }),
+      supabase.from('sealed_listings').select('*').order('price', { ascending: true }).limit(8000),
+    ])
+    setStores(s.data || [])
+    setListings(l.data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const callAdmin = async (payload) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/.netlify/functions/deals-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+      body: JSON.stringify(payload),
+    })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`)
+    return j
+  }
+
+  const addStore = async () => {
+    if (!domain.trim()) return
+    setAdding(true); setMsg(null)
+    try {
+      const { store } = await callAdmin({ action: 'add', domain })
+      setMsg({ ok: store.platform === 'shopify', text: store.platform === 'shopify'
+        ? `Added ${store.name} (Shopify) — hit Harvest to pull its sealed stock.`
+        : `${store.name} runs on ${store.platform}, which isn't supported yet — it won't harvest.` })
+      setDomain('')
+      await load()
+    } catch (e) { setMsg({ ok: false, text: e.message }) } finally { setAdding(false) }
+  }
+
+  const toggleStore = async (s) => { try { await callAdmin({ action: 'toggle', id: s.id, active: !s.active }); await load() } catch (e) { setMsg({ ok: false, text: e.message }) } }
+  const removeStore = async (s) => { if (!window.confirm(`Remove ${s.name}?`)) return; try { await callAdmin({ action: 'remove', id: s.id }); await load() } catch (e) { setMsg({ ok: false, text: e.message }) } }
+
+  const harvest = async () => {
+    setHarvesting(true); setMsg(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/harvest-deals-background', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+      if (res.status === 202 || res.ok) setMsg({ ok: true, text: 'Harvest started — give it a minute, then Refresh.' })
+      else throw new Error(`HTTP ${res.status}`)
+    } catch (e) { setMsg({ ok: false, text: e.message }) } finally { setHarvesting(false) }
+  }
+
+  // Group listings by product; keep the cheapest per product, note the market ref.
+  const deals = useMemo(() => {
+    const groups = new Map()
+    for (const l of listings) {
+      if (inStockOnly && !l.in_stock) continue
+      const k = l.norm_key || l.title
+      const g = groups.get(k)
+      if (!g) groups.set(k, { key: k, title: l.title, best: l, market: l.market_price, count: 1 })
+      else {
+        g.count++
+        if (l.market_price != null && g.market == null) g.market = l.market_price
+        if ((l.price ?? 1e9) < (g.best.price ?? 1e9)) g.best = l
+      }
+    }
+    let out = [...groups.values()].map(g => {
+      const disc = (g.market != null && g.best.price != null && g.market > 0) ? (g.market - g.best.price) / g.market : null
+      return { ...g, disc, savings: g.market != null ? g.market - g.best.price : null }
+    })
+    if (search) { const q = search.toLowerCase(); out = out.filter(d => d.title.toLowerCase().includes(q)) }
+    // Deals with a discount first (biggest %), then the rest by price.
+    out.sort((a, b) => {
+      if ((b.disc ?? -1) !== (a.disc ?? -1)) return (b.disc ?? -1) - (a.disc ?? -1)
+      return (a.best.price ?? 1e9) - (b.best.price ?? 1e9)
+    })
+    return out
+  }, [listings, search, inStockOnly])
+
+  const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
+
+  return (
+    <div>
+      {/* Store directory */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: stores.length ? 12 : 0 }}>
+          <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="add a store domain (e.g. zulusgames.com)" onKeyDown={e => e.key === 'Enter' && addStore()}
+            className="form-input" style={{ flex: 1, minWidth: 200, padding: '8px 12px', fontSize: '.82rem' }} />
+          <button onClick={addStore} disabled={adding} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.1)', color: '#93c5fd', fontWeight: 700, fontSize: '.82rem', cursor: adding ? 'not-allowed' : 'pointer' }}>{adding ? 'Detecting…' : 'Add store'}</button>
+          <button onClick={harvest} disabled={harvesting} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: harvesting ? 'not-allowed' : 'pointer' }}>{harvesting ? 'Starting…' : 'Harvest now'}</button>
+          <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>Refresh</button>
+        </div>
+        {stores.map(s => (
+          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: '.78rem', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{s.name}</span>
+            <span style={{ color: 'var(--text-muted)' }}>{s.domain}</span>
+            <span style={{ fontSize: '.68rem', padding: '1px 7px', borderRadius: 6, background: s.platform === 'shopify' ? 'rgba(74,222,128,.12)' : 'var(--border)', color: s.platform === 'shopify' ? '#4ade80' : '#94a3b8' }}>{s.platform}</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '.7rem' }}>{s.status}</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <button onClick={() => toggleStore(s)} style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '.68rem', fontWeight: 600 }}>{s.active ? 'Active' : 'Paused'}</button>
+              <button onClick={() => removeStore(s)} style={{ padding: '3px 9px', borderRadius: 6, border: '1px solid rgba(239,68,68,.3)', background: 'none', color: '#f87171', cursor: 'pointer', fontSize: '.68rem', fontWeight: 600 }}>Remove</button>
+            </div>
+          </div>
+        ))}
+        {stores.length === 0 && <div style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: 10 }}>No stores yet. Add a Shopify store domain above, then Harvest.</div>}
+      </div>
+
+      {msg && <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 8, fontSize: '.78rem', background: msg.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: msg.ok ? '#4ade80' : '#fca5a5' }}>{msg.text}</div>}
+
+      {/* Deals */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search deals…" className="form-input" style={{ flex: 1, minWidth: 160, padding: '8px 12px', fontSize: '.82rem' }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '.75rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} /> In stock only
+        </label>
+        <span style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>{deals.length} products</span>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>
+      ) : deals.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>No sealed listings yet — add a store and Harvest.</div>
+      ) : (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+          {deals.slice(0, 300).map(d => (
+            <a key={d.key} href={d.best.url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderBottom: '1px solid var(--border)', textDecoration: 'none', color: 'inherit' }}>
+              {d.best.image && <img src={d.best.image} alt="" style={{ width: 34, height: 34, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.title}</div>
+                <div style={{ fontSize: '.68rem', color: 'var(--text-secondary)' }}>
+                  {d.best.store_name}{d.count > 1 ? ` · ${d.count} stores` : ''}{d.market != null ? ` · market ${money(d.market)}` : ''}{d.best.in_stock ? '' : ' · out of stock'}
+                </div>
+              </div>
+              {d.disc != null && d.disc > 0.01 && (
+                <div style={{ fontSize: '.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: 'rgba(74,222,128,.12)', color: '#4ade80', flexShrink: 0 }}>
+                  {Math.round(d.disc * 100)}% off
+                </div>
+              )}
+              <div style={{ fontWeight: 800, fontSize: '.9rem', color: 'var(--text-primary)', flexShrink: 0 }}>{money(d.best.price)}</div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'overview',  label: ' Overview'  },
   { id: 'listings',  label: ' Listings'  },
   { id: 'orders',    label: ' Orders'    },
   { id: 'meta',      label: ' Meta'      },
   { id: 'sealedev',  label: ' Sealed EV' },
+  { id: 'deals',     label: ' Deals'     },
   { id: 'settings',  label: ' Settings'  },
   { id: 'reports',   label: ' Reports'   },
 ]
@@ -3195,6 +3354,8 @@ export default function AdminPanel({ user, isAdmin }) {
       {tab === 'meta' && <MetaTab />}
 
       {tab === 'sealedev' && <SealedEvTab />}
+
+      {tab === 'deals' && <DealsTab />}
 
       {/*  Settings tab  */}
       {tab === 'settings' && <SettingsTab />}

@@ -28,6 +28,10 @@
 [functions."compute-sealed-ev-background"]
   schedule = "0 10 * * 1"
 
+# Harvest sealed prices from tracked game stores (Shopify feeds) every 3 hours
+[functions."harvest-deals-background"]
+  schedule = "0 */3 * * *"
+
 [[redirects]]
   from = "https://vaultedsingles.com/*"
   to = "https://www.manamint.store/:splat"
