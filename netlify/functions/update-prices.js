@@ -7,6 +7,20 @@ const { corsHeaders } = require('./_cors')
 //      so event.httpMethod is undefined. No auth needed for that path.
 //   2. Manually via HTTP POST from the admin panel (requires admin JWT)
 
+// fetch() has no built-in timeout — a single stalled Scryfall batch request in the
+// loop below would hang the whole run indefinitely with nothing ever written
+// (this is what silently broke market movers). AbortController turns a hang into
+// a catchable error so one bad batch doesn't take down the rest.
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 exports.handler = async (event) => {
   // CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -91,14 +105,14 @@ exports.handler = async (event) => {
     const identifiers = batch.map(l => ({ id: l.scryfall_id }))
 
     try {
-      const res = await fetch('https://api.scryfall.com/cards/collection', {
+      const res = await fetchWithTimeout('https://api.scryfall.com/cards/collection', {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent':   'VaultedSingles/1.0 (contact: mtgvaultedsingles@gmail.com)',
         },
         body: JSON.stringify({ identifiers }),
-      })
+      }, 15000)
 
       if (!res.ok) {
         scryfallErrors.push(`Batch ${i / BATCH + 1}: HTTP ${res.status}`)

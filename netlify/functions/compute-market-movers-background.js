@@ -13,10 +13,103 @@
 
 const { corsHeaders } = require('./_cors')
 
-const DELAY_MS = 120 // ~8 req/s — safely under Scryfall's 10 req/s limit
+const CONCURRENCY    = 4      // parallel page requests
+const MIN_GAP_MS     = 130    // global minimum spacing between request *starts*
+                               // (~7.7 req/s) — enforced independent of concurrency,
+                               // since Scryfall rate-limits on burst dispatch, not
+                               // just steady-state average (verified: concurrency=6
+                               // with no dispatch gate got 429'd after ~30 pages)
+const FETCH_TIMEOUT  = 15000  // abort a single page request if it hangs this long
+const MAX_RETRIES    = 3      // per-page retries before giving up on that page
+const SEARCH_QUERY =
+  'q=game%3Apaper+not%3Aextra+not%3Abasic+not%3Aart_series+lang%3Aen' +
+  '+-frame%3Ashowcase+-frame%3Aextendedart+-border%3Aborderless+-is%3Apromo+-is%3Aoversized' +
+  '&order=usd&dir=asc&unique=cards'
 
 function delay(ms) {
   return new Promise(r => setTimeout(r, ms))
+}
+
+// fetch() has no built-in timeout — a single stalled request (dropped connection,
+// slow response) leaves the awaiting promise pending forever, which would silently
+// hang the whole run until the platform kills the invocation with nothing written.
+// AbortController turns a hang into a catchable error.
+async function fetchWithTimeout(url, opts = {}, timeoutMs = FETCH_TIMEOUT) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// Global dispatch gate shared by every concurrent worker: only one request may
+// START every MIN_GAP_MS, regardless of how many are in flight. This is what
+// actually keeps us under Scryfall's rate limit — capping concurrency alone
+// still lets several workers fire in the same instant.
+let lastDispatch = 0
+async function throttleGate() {
+  const now  = Date.now()
+  const wait = Math.max(0, (lastDispatch + MIN_GAP_MS) - now)
+  lastDispatch = now + wait
+  if (wait) await delay(wait)
+}
+
+// Fetch one page of the search (by page number), with retries. Returns the
+// parsed response body, or null if every attempt failed.
+async function fetchPage(pageNum) {
+  const url = `https://api.scryfall.com/cards/search?${SEARCH_QUERY}&page=${pageNum}`
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    await throttleGate()
+    try {
+      const res = await fetchWithTimeout(url, {
+        headers: {
+          'User-Agent': 'VaultedSingles/1.0 (contact: mtgvaultedsingles@gmail.com)',
+          Accept: 'application/json',
+        },
+      })
+      if (res.status === 429) {
+        const retryAfter = parseFloat(res.headers.get('retry-after')) || 2
+        if (attempt < MAX_RETRIES) { await delay(retryAfter * 1000 + 300); continue }
+        throw new Error('HTTP 429 (rate limited, retries exhausted)')
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.json()
+    } catch (err) {
+      const msg = err.name === 'AbortError' ? 'timed out' : err.message
+      if (attempt < MAX_RETRIES) { await delay(500 * (attempt + 1)); continue }
+      console.error(`[compute-market-movers] page ${pageNum} failed after ${MAX_RETRIES + 1} attempts:`, msg)
+      return null
+    }
+  }
+}
+
+function mergeCardsIntoMap(cards, priceMap) {
+  for (const card of cards) {
+    const price = card.prices?.usd ? parseFloat(card.prices.usd) : null
+    if (price == null || price < 0.5) continue
+    const img =
+      card.image_uris?.small ||
+      card.card_faces?.[0]?.image_uris?.small ||
+      null
+    // Store legalities so format filtering works in the UI
+    const leg = card.legalities || {}
+    const legalities = {
+      standard:  leg.standard  || 'not_legal',
+      pioneer:   leg.pioneer   || 'not_legal',
+      modern:    leg.modern    || 'not_legal',
+      legacy:    leg.legacy    || 'not_legal',
+      pauper:    leg.pauper    || 'not_legal',
+      premodern: leg.premodern || 'not_legal',
+    }
+    // Backstop: keep the LOWEST price seen for this card name. With
+    // order=usd&dir=asc + unique=cards Scryfall already returns the cheapest
+    // printing first, but this guarantees the base price wins even if an
+    // expensive alt art slips through the frame filters.
+    if (priceMap[card.name] && priceMap[card.name].price <= price) continue
+    priceMap[card.name] = { price, img, legalities }
+  }
 }
 
 // ── Scryfall pagination ────────────────────────────────────────────────────────
@@ -28,66 +121,49 @@ function delay(ms) {
 // order by usd ascending + unique=cards so Scryfall returns the cheapest
 // printing as the representative, then apply the $0.50 floor below on that
 // base price (so sub-$0.50 cards are dropped entirely, not mis-priced).
+//
+// Pages are fetched with bounded concurrency (paced by a shared dispatch gate,
+// not just a concurrency cap — bursting several requests in the same instant
+// gets 429'd by Scryfall even under the 10 req/s average) rather than
+// one-at-a-time. A serial fetch of ~180 pages was taking 5-8+ minutes in
+// practice (Scryfall per-request latency, not the query itself), which sat
+// dangerously close to the background function's execution ceiling and
+// explains the historical intermittent silent failures (nothing written, no
+// error — the platform just killed a run that was still going). This cuts
+// that to ~3.5 minutes with zero page failures (verified against production).
+//
 // Returns a map of { [cardName]: { price: number, img: string|null } }
 async function fetchAllCardPrices() {
   const priceMap = {}
-  let url =
-    'https://api.scryfall.com/cards/search' +
-    '?q=game%3Apaper+not%3Aextra+not%3Abasic+not%3Aart_series+lang%3Aen' +
-    '+-frame%3Ashowcase+-frame%3Aextendedart+-border%3Aborderless+-is%3Apromo+-is%3Aoversized' +
-    '&order=usd&dir=asc&unique=cards&page=1'
 
-  let pageCount = 0
+  // Page 1 first, alone — it tells us total_cards so we know how many more
+  // pages to request, and Scryfall's own pagination size (up to 175/page).
+  const first = await fetchPage(1)
+  if (!first) { console.error('[compute-market-movers] page 1 failed — aborting'); return priceMap }
+  mergeCardsIntoMap(first.data || [], priceMap)
 
-  while (url) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'VaultedSingles/1.0 (contact: mtgvaultedsingles@gmail.com)',
-          Accept: 'application/json',
-        },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const pageSize   = (first.data || []).length || 175
+  const totalPages = Math.max(1, Math.ceil((first.total_cards || 0) / pageSize))
+  let pageCount = 1
+  let failures  = 0
 
-      const data = await res.json()
-      const cards = data.data || []
+  // Simple bounded-concurrency pool over the remaining page numbers.
+  const remaining = []
+  for (let p = 2; p <= totalPages; p++) remaining.push(p)
 
-      for (const card of cards) {
-        const price = card.prices?.usd ? parseFloat(card.prices.usd) : null
-        if (price == null || price < 0.5) continue
-        const img =
-          card.image_uris?.small ||
-          card.card_faces?.[0]?.image_uris?.small ||
-          null
-        // Store legalities so format filtering works in the UI
-        const leg = card.legalities || {}
-        const legalities = {
-          standard:  leg.standard  || 'not_legal',
-          pioneer:   leg.pioneer   || 'not_legal',
-          modern:    leg.modern    || 'not_legal',
-          legacy:    leg.legacy    || 'not_legal',
-          pauper:    leg.pauper    || 'not_legal',
-          premodern: leg.premodern || 'not_legal',
-        }
-        // Backstop: keep the LOWEST price seen for this card name. With
-        // order=usd&dir=asc + unique=cards Scryfall already returns the cheapest
-        // printing first, but this guarantees the base price wins even if an
-        // expensive alt art slips through the frame filters.
-        if (priceMap[card.name] && priceMap[card.name].price <= price) continue
-        priceMap[card.name] = { price, img, legalities }
-      }
-
+  async function worker() {
+    while (remaining.length) {
+      const pageNum = remaining.shift()
+      const data = await fetchPage(pageNum)
+      if (!data) { failures++; continue }
+      mergeCardsIntoMap(data.data || [], priceMap)
       pageCount++
-      url = data.has_more ? data.next_page : null
-      if (url) await delay(DELAY_MS)
-    } catch (err) {
-      console.error(`[compute-market-movers] Scryfall error on page ${pageCount + 1}:`, err.message)
-      break
     }
   }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, totalPages - 1) }, () => worker()))
 
   const cardCount = Object.keys(priceMap).length
-  console.log(`[compute-market-movers] Fetched ${cardCount} cards across ${pageCount} pages`)
+  console.log(`[compute-market-movers] Fetched ${cardCount} cards across ${pageCount}/${totalPages} pages (${failures} page failures)`)
   return priceMap
 }
 
@@ -119,9 +195,9 @@ exports.handler = async (event) => {
       return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) }
     }
     try {
-      const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      const verifyRes = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
         headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${userJwt}` },
-      })
+      }, 20000)
       if (!verifyRes.ok) throw new Error('invalid token')
       const { email } = await verifyRes.json()
       if (email !== ADMIN_EMAIL) {
@@ -141,9 +217,10 @@ exports.handler = async (event) => {
   const today = new Date().toISOString().slice(0, 10)
 
   // ── 1. Snapshot today's prices (skip if already done today) ─────────────────
-  const existRes = await fetch(
+  const existRes = await fetchWithTimeout(
     `${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${today}&select=snapshot_date`,
-    { headers: adminHeaders }
+    { headers: adminHeaders },
+    20000
   )
   const existRows = await existRes.json()
   const snapshotExists = Array.isArray(existRows) && existRows.length > 0
@@ -157,11 +234,11 @@ exports.handler = async (event) => {
       return { statusCode: 503, body: JSON.stringify({ error: 'Scryfall returned no cards' }) }
     }
 
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/price_daily_snapshots`, {
+    const insertRes = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/price_daily_snapshots`, {
       method:  'POST',
       headers: { ...adminHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body:    JSON.stringify({ snapshot_date: today, prices: priceMap, card_count: cardCount }),
-    })
+    }, 30000)
     if (!insertRes.ok) {
       const txt = await insertRes.text()
       console.error('[compute-market-movers] Snapshot insert failed:', txt)
@@ -173,9 +250,10 @@ exports.handler = async (event) => {
   }
 
   // ── 2. Load today's snapshot ──────────────────────────────────────────────────
-  const todayRes  = await fetch(
+  const todayRes  = await fetchWithTimeout(
     `${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${today}&select=prices`,
-    { headers: adminHeaders }
+    { headers: adminHeaders },
+    20000
   )
   const todayRows   = await todayRes.json()
   const todayPrices = todayRows?.[0]?.prices || {}
@@ -185,10 +263,11 @@ exports.handler = async (event) => {
   refTarget.setDate(refTarget.getDate() - 7)
   const refTargetStr = refTarget.toISOString().slice(0, 10)
 
-  const refRes  = await fetch(
+  const refRes  = await fetchWithTimeout(
     `${SUPABASE_URL}/rest/v1/price_daily_snapshots` +
     `?snapshot_date=lte.${refTargetStr}&select=snapshot_date,prices&order=snapshot_date.desc&limit=1`,
-    { headers: adminHeaders }
+    { headers: adminHeaders },
+    20000
   )
   const refRows = await refRes.json()
   const refRow  = refRows?.[0]
@@ -243,7 +322,7 @@ exports.handler = async (event) => {
     .slice(0, 100)
 
   // ── 5. Upsert into market_movers ──────────────────────────────────────────────
-  const moversRes = await fetch(`${SUPABASE_URL}/rest/v1/market_movers`, {
+  const moversRes = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/market_movers`, {
     method:  'POST',
     headers: { ...adminHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({
@@ -253,7 +332,7 @@ exports.handler = async (event) => {
       ref_date:   refDateActual,
       days_apart: daysApart,
     }),
-  })
+  }, 20000)
 
   if (!moversRes.ok) {
     const txt = await moversRes.text()
