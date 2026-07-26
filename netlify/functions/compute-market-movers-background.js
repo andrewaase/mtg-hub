@@ -167,6 +167,28 @@ async function fetchAllCardPrices() {
   return priceMap
 }
 
+// ── Run-status logging (TEMPORARY, for diagnosing the silent-failure reports) ──
+// Writes to an isolated sentinel snapshot_date the real app never reads, so we
+// can see exactly how far the NEXT invocation (scheduled or manual) got —
+// including a possible silent auth failure, which background functions would
+// otherwise hide entirely (Netlify always returns 202 to the caller regardless
+// of what the handler actually does).
+const RUN_LOG_DATE = '1999-05-05'
+async function logStatus(SUPABASE_URL, SERVICE_KEY, step, detail) {
+  try {
+    const h = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }
+    const r = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${RUN_LOG_DATE}&select=prices`, { headers: h }, 8000)
+    const rows = await r.json().catch(() => [])
+    const prevLog = rows?.[0]?.prices?.log || []
+    const entry = { t: new Date().toISOString(), step, ...(detail ? { detail } : {}) }
+    const newLog = [...prevLog, entry].slice(-40)
+    await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/price_daily_snapshots`, {
+      method: 'POST', headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ snapshot_date: RUN_LOG_DATE, prices: { log: newLog }, card_count: -2 }),
+    }, 8000)
+  } catch { /* logging must never break the real run */ }
+}
+
 // ── Handler ────────────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   // CORS preflight
@@ -187,175 +209,193 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  // ── Auth check (manual HTTP POST only) ──────────────────────────────────────
-  if (event.httpMethod === 'POST') {
-    const authHeader = (event.headers || {})['authorization'] || ''
-    const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (!userJwt) {
-      return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) }
-    }
-    try {
-      const verifyRes = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${userJwt}` },
-      }, 20000)
-      if (!verifyRes.ok) throw new Error('invalid token')
-      const { email } = await verifyRes.json()
-      if (email !== ADMIN_EMAIL) {
-        return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
+  await logStatus(SUPABASE_URL, SERVICE_KEY, 'invoked', { httpMethod: event.httpMethod || '(scheduled)' })
+
+  try {
+    // ── Auth check (manual HTTP POST only) ────────────────────────────────────
+    if (event.httpMethod === 'POST') {
+      const authHeader = (event.headers || {})['authorization'] || ''
+      const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
+      if (!userJwt) {
+        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: 'missing token' })
+        return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) }
       }
-    } catch {
-      return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) }
-    }
-  }
-
-  const adminHeaders = {
-    apikey:        SERVICE_KEY,
-    Authorization: `Bearer ${SERVICE_KEY}`,
-    'Content-Type': 'application/json',
-  }
-
-  const today = new Date().toISOString().slice(0, 10)
-
-  // ── 1. Snapshot today's prices (skip if already done today) ─────────────────
-  const existRes = await fetchWithTimeout(
-    `${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${today}&select=snapshot_date`,
-    { headers: adminHeaders },
-    20000
-  )
-  const existRows = await existRes.json()
-  const snapshotExists = Array.isArray(existRows) && existRows.length > 0
-
-  if (!snapshotExists) {
-    console.log('[compute-market-movers] Fetching all card prices from Scryfall…')
-    const priceMap  = await fetchAllCardPrices()
-    const cardCount = Object.keys(priceMap).length
-
-    if (cardCount === 0) {
-      return { statusCode: 503, body: JSON.stringify({ error: 'Scryfall returned no cards' }) }
+      try {
+        const verifyRes = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${userJwt}` },
+        }, 20000)
+        if (!verifyRes.ok) throw new Error(`verify HTTP ${verifyRes.status}`)
+        const { email } = await verifyRes.json()
+        if (email !== ADMIN_EMAIL) {
+          await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: 'email mismatch', email })
+          return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
+        }
+        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_ok', { email })
+      } catch (e) {
+        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: e.message })
+        return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) }
+      }
     }
 
-    const insertRes = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/price_daily_snapshots`, {
+    const adminHeaders = {
+      apikey:        SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+    }
+
+    const today = new Date().toISOString().slice(0, 10)
+
+    // ── 1. Snapshot today's prices (skip if already done today) ─────────────────
+    const existRes = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${today}&select=snapshot_date`,
+      { headers: adminHeaders },
+      20000
+    )
+    const existRows = await existRes.json()
+    const snapshotExists = Array.isArray(existRows) && existRows.length > 0
+    await logStatus(SUPABASE_URL, SERVICE_KEY, 'snapshot_check', { today, snapshotExists })
+
+    if (!snapshotExists) {
+      console.log('[compute-market-movers] Fetching all card prices from Scryfall…')
+      const priceMap  = await fetchAllCardPrices()
+      const cardCount = Object.keys(priceMap).length
+      await logStatus(SUPABASE_URL, SERVICE_KEY, 'fetch_done', { cardCount })
+
+      if (cardCount === 0) {
+        await logStatus(SUPABASE_URL, SERVICE_KEY, 'abort', { reason: 'zero cards fetched' })
+        return { statusCode: 503, body: JSON.stringify({ error: 'Scryfall returned no cards' }) }
+      }
+
+      const insertRes = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/price_daily_snapshots`, {
+        method:  'POST',
+        headers: { ...adminHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body:    JSON.stringify({ snapshot_date: today, prices: priceMap, card_count: cardCount }),
+      }, 30000)
+      if (!insertRes.ok) {
+        const txt = await insertRes.text()
+        console.error('[compute-market-movers] Snapshot insert failed:', txt)
+        await logStatus(SUPABASE_URL, SERVICE_KEY, 'snapshot_insert_failed', { status: insertRes.status, body: txt.slice(0, 300) })
+        return { statusCode: 500, body: JSON.stringify({ error: 'Failed to save snapshot' }) }
+      }
+      console.log(`[compute-market-movers] Saved snapshot for ${today} (${cardCount} cards)`)
+      await logStatus(SUPABASE_URL, SERVICE_KEY, 'snapshot_saved', { cardCount })
+    } else {
+      console.log(`[compute-market-movers] Snapshot for ${today} already exists — skipping fetch`)
+    }
+
+    // ── 2. Load today's snapshot ──────────────────────────────────────────────────
+    const todayRes  = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${today}&select=prices`,
+      { headers: adminHeaders },
+      20000
+    )
+    const todayRows   = await todayRes.json()
+    const todayPrices = todayRows?.[0]?.prices || {}
+
+    // ── 3. Load reference snapshot (~7 days ago, or earliest available) ──────────
+    const refTarget = new Date()
+    refTarget.setDate(refTarget.getDate() - 7)
+    const refTargetStr = refTarget.toISOString().slice(0, 10)
+
+    const refRes  = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/price_daily_snapshots` +
+      `?snapshot_date=lte.${refTargetStr}&select=snapshot_date,prices&order=snapshot_date.desc&limit=1`,
+      { headers: adminHeaders },
+      20000
+    )
+    const refRows = await refRes.json()
+    const refRow  = refRows?.[0]
+
+    if (!refRow) {
+      console.log('[compute-market-movers] No reference snapshot found — need more history')
+      await logStatus(SUPABASE_URL, SERVICE_KEY, 'no_reference_snapshot')
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
+        body: JSON.stringify({ message: 'Accumulating history — movers appear after day 8', today }),
+      }
+    }
+
+    const refPrices     = refRow.prices || {}
+    const refDateActual = refRow.snapshot_date
+    const daysApart     = Math.round(
+      (new Date(today) - new Date(refDateActual)) / (1000 * 60 * 60 * 24)
+    )
+
+    // ── 4. Compute gainers / losers ───────────────────────────────────────────────
+    const deltas = []
+    for (const [name, { price: newPrice, img }] of Object.entries(todayPrices)) {
+      const ref = refPrices[name]
+      if (!ref?.price) continue
+      // Skip if a different printing became cheapest — comparing two different
+      // products (e.g. base card vs alt art) produces spurious movers. Compare the
+      // path only (it carries the stable Scryfall id); the "?<version>" query gets
+      // bumped whenever Scryfall reprocesses an image, so the same printing would
+      // otherwise look "changed" and get wrongly skipped.
+      const stripVer = (u) => (u ? u.split('?')[0] : u)
+      if (ref.img && img && stripVer(ref.img) !== stripVer(img)) continue
+      const oldPrice = ref.price
+      if (Math.abs(newPrice - oldPrice) < 0.005) continue  // skip floating-point noise
+
+      const dollarChange = Math.round((newPrice - oldPrice) * 100) / 100
+      const pctChange    = Math.round(((newPrice - oldPrice) / oldPrice) * 1000) / 10
+
+      // Noise filter: require at least $0.10 OR 5% move
+      if (Math.abs(dollarChange) < 0.10 && Math.abs(pctChange) < 5) continue
+
+      deltas.push({ name, img, oldPrice, newPrice, dollarChange, pctChange, legalities: todayPrices[name]?.legalities || null })
+    }
+
+    const gainers = deltas
+      .filter(d => d.dollarChange > 0)
+      .sort((a, b) => b.dollarChange - a.dollarChange)
+      .slice(0, 100)
+
+    const losers = deltas
+      .filter(d => d.dollarChange < 0)
+      .sort((a, b) => a.dollarChange - b.dollarChange)
+      .slice(0, 100)
+
+    await logStatus(SUPABASE_URL, SERVICE_KEY, 'deltas_computed', { deltas: deltas.length, gainers: gainers.length, losers: losers.length, refDate: refDateActual, daysApart })
+
+    // ── 5. Upsert into market_movers ──────────────────────────────────────────────
+    const moversRes = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/market_movers`, {
       method:  'POST',
       headers: { ...adminHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body:    JSON.stringify({ snapshot_date: today, prices: priceMap, card_count: cardCount }),
-    }, 30000)
-    if (!insertRes.ok) {
-      const txt = await insertRes.text()
-      console.error('[compute-market-movers] Snapshot insert failed:', txt)
-      return { statusCode: 500, body: JSON.stringify({ error: 'Failed to save snapshot' }) }
+      body: JSON.stringify({
+        computed_date: today,
+        gainers,
+        losers,
+        ref_date:   refDateActual,
+        days_apart: daysApart,
+      }),
+    }, 20000)
+
+    if (!moversRes.ok) {
+      const txt = await moversRes.text()
+      console.error('[compute-market-movers] Movers insert failed:', txt)
+      await logStatus(SUPABASE_URL, SERVICE_KEY, 'movers_upsert_failed', { status: moversRes.status, body: txt.slice(0, 300) })
+      return { statusCode: 500, body: JSON.stringify({ error: 'Failed to save movers' }) }
     }
-    console.log(`[compute-market-movers] Saved snapshot for ${today} (${cardCount} cards)`)
-  } else {
-    console.log(`[compute-market-movers] Snapshot for ${today} already exists — skipping fetch`)
-  }
 
-  // ── 2. Load today's snapshot ──────────────────────────────────────────────────
-  const todayRes  = await fetchWithTimeout(
-    `${SUPABASE_URL}/rest/v1/price_daily_snapshots?snapshot_date=eq.${today}&select=prices`,
-    { headers: adminHeaders },
-    20000
-  )
-  const todayRows   = await todayRes.json()
-  const todayPrices = todayRows?.[0]?.prices || {}
-
-  // ── 3. Load reference snapshot (~7 days ago, or earliest available) ──────────
-  const refTarget = new Date()
-  refTarget.setDate(refTarget.getDate() - 7)
-  const refTargetStr = refTarget.toISOString().slice(0, 10)
-
-  const refRes  = await fetchWithTimeout(
-    `${SUPABASE_URL}/rest/v1/price_daily_snapshots` +
-    `?snapshot_date=lte.${refTargetStr}&select=snapshot_date,prices&order=snapshot_date.desc&limit=1`,
-    { headers: adminHeaders },
-    20000
-  )
-  const refRows = await refRes.json()
-  const refRow  = refRows?.[0]
-
-  if (!refRow) {
-    console.log('[compute-market-movers] No reference snapshot found — need more history')
+    const summary = {
+      today,
+      ref_date:    refDateActual,
+      days_apart:  daysApart,
+      gainers:     gainers.length,
+      losers:      losers.length,
+      total_cards: Object.keys(todayPrices).length,
+    }
+    console.log('[compute-market-movers]', summary)
+    await logStatus(SUPABASE_URL, SERVICE_KEY, 'done', summary)
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
-      body: JSON.stringify({ message: 'Accumulating history — movers appear after day 8', today }),
+      body: JSON.stringify(summary),
     }
-  }
-
-  const refPrices     = refRow.prices || {}
-  const refDateActual = refRow.snapshot_date
-  const daysApart     = Math.round(
-    (new Date(today) - new Date(refDateActual)) / (1000 * 60 * 60 * 24)
-  )
-
-  // ── 4. Compute gainers / losers ───────────────────────────────────────────────
-  const deltas = []
-  for (const [name, { price: newPrice, img }] of Object.entries(todayPrices)) {
-    const ref = refPrices[name]
-    if (!ref?.price) continue
-    // Skip if a different printing became cheapest — comparing two different
-    // products (e.g. base card vs alt art) produces spurious movers. Compare the
-    // path only (it carries the stable Scryfall id); the "?<version>" query gets
-    // bumped whenever Scryfall reprocesses an image, so the same printing would
-    // otherwise look "changed" and get wrongly skipped.
-    const stripVer = (u) => (u ? u.split('?')[0] : u)
-    if (ref.img && img && stripVer(ref.img) !== stripVer(img)) continue
-    const oldPrice = ref.price
-    if (Math.abs(newPrice - oldPrice) < 0.005) continue  // skip floating-point noise
-
-    const dollarChange = Math.round((newPrice - oldPrice) * 100) / 100
-    const pctChange    = Math.round(((newPrice - oldPrice) / oldPrice) * 1000) / 10
-
-    // Noise filter: require at least $0.10 OR 5% move
-    if (Math.abs(dollarChange) < 0.10 && Math.abs(pctChange) < 5) continue
-
-    deltas.push({ name, img, oldPrice, newPrice, dollarChange, pctChange, legalities: todayPrices[name]?.legalities || null })
-  }
-
-  const gainers = deltas
-    .filter(d => d.dollarChange > 0)
-    .sort((a, b) => b.dollarChange - a.dollarChange)
-    .slice(0, 100)
-
-  const losers = deltas
-    .filter(d => d.dollarChange < 0)
-    .sort((a, b) => a.dollarChange - b.dollarChange)
-    .slice(0, 100)
-
-  // ── 5. Upsert into market_movers ──────────────────────────────────────────────
-  const moversRes = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/market_movers`, {
-    method:  'POST',
-    headers: { ...adminHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({
-      computed_date: today,
-      gainers,
-      losers,
-      ref_date:   refDateActual,
-      days_apart: daysApart,
-    }),
-  }, 20000)
-
-  if (!moversRes.ok) {
-    const txt = await moversRes.text()
-    console.error('[compute-market-movers] Movers insert failed:', txt)
-    return { statusCode: 500, body: JSON.stringify({ error: 'Failed to save movers' }) }
-  }
-
-  const summary = {
-    today,
-    ref_date:    refDateActual,
-    days_apart:  daysApart,
-    gainers:     gainers.length,
-    losers:      losers.length,
-    total_cards: Object.keys(todayPrices).length,
-  }
-  console.log('[compute-market-movers]', summary)
-  return {
-    statusCode: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(event) },
-    body: JSON.stringify(summary),
+  } catch (e) {
+    console.error('[compute-market-movers] Uncaught error:', e)
+    await logStatus(SUPABASE_URL, SERVICE_KEY, 'uncaught_error', { message: e.message, stack: e.stack?.slice(0, 400) })
+    return { statusCode: 500, body: JSON.stringify({ error: e.message }) }
   }
 }
-
-// Exposed for a diagnostic function to exercise the exact deployed fetch logic
-// without duplicating it. Does not affect the handler above.
-module.exports.fetchAllCardPrices = fetchAllCardPrices
