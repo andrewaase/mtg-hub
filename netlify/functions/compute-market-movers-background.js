@@ -355,3 +355,7 @@ exports.handler = async (event) => {
     body: JSON.stringify(summary),
   }
 }
+
+// Exposed for a diagnostic function to exercise the exact deployed fetch logic
+// without duplicating it. Does not affect the handler above.
+module.exports.fetchAllCardPrices = fetchAllCardPrices

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { addCard, upsertStoreListing, updateCollectionCard, removeCard } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { CONDITIONS, LANGUAGES } from '../lib/utils'
@@ -419,14 +419,23 @@ export default function CameraModal({
   }
 
   // Deliberate camera zoom (native track zoom) — replaces accidental pinch-zoom.
+  // zoomRange.min can be BELOW 1x on wide-angle-capable phones, and the step is
+  // an arbitrary fraction of the full hardware range — so repeated +/- taps can
+  // walk right past 1.0 without ever landing on it exactly (e.g. 1.0 -> 2.07 ->
+  // 1.0 - step lands on 0.93, then next tap undershoots past the hardware floor
+  // and clamps at min, with no step size that ever re-lands on exactly 1). Snap
+  // through 1x whenever a step would cross it, so "no zoom" is always reachable.
   async function applyZoom(z) {
     const track = streamRef.current?.getVideoTracks()[0]
     if (!track) return
-    const clamped = Math.max(zoomRange.min, Math.min(zoomRange.max, z))
-    try { await track.applyConstraints({ advanced: [{ zoom: clamped }] }); setZoom(clamped) }
+    let target = Math.max(zoomRange.min, Math.min(zoomRange.max, z))
+    const crossedOne = (zoom - 1) * (target - 1) < 0 // opposite signs = stepped over 1x
+    if (crossedOne || Math.abs(target - 1) < zoomStep() / 2) target = 1
+    try { await track.applyConstraints({ advanced: [{ zoom: target }] }); setZoom(target) }
     catch (e) { console.warn('[Scanner] zoom failed:', e) }
   }
   const zoomStep = () => Math.max(zoomRange.step, (zoomRange.max - zoomRange.min) / 6)
+  const resetZoom = () => applyZoom(1)
 
   // Lock webview zoom while the scanner is open so an accidental pinch / double-tap
   // can't zoom the page and throw off the card-guide alignment. Restored on close.
@@ -674,9 +683,7 @@ export default function CameraModal({
       }
 
       // Capture pre-add qty so undo can restore it (rather than always removing)
-      const existingInCollection = (collection || []).find(
-        c => c.name.toLowerCase() === card.name.toLowerCase()
-      )
+      const existingInCollection = collectionByName.get(card.name.toLowerCase())
       const qtyBefore = existingInCollection?.qty || 0
 
       const saved = await addCard(card, user?.id)
@@ -917,7 +924,22 @@ export default function CameraModal({
 
   function handleClose() { stopTracks(); onClose() }
 
-  //  Derived 
+  // Lowercase-name index into the collection, so "already owned" is an O(1)
+  // lookup instead of an O(n) .find() (with a .toLowerCase() call per item) on
+  // every render. That scan used to re-run on every render — including every
+  // 60ms tick of the Rapid Mode countdown timer — and after scanning a large
+  // collection, that repeated full-array scan was what made the scanner feel
+  // like it hangs: this only rebuilds when the collection itself changes.
+  const collectionByName = useMemo(() => {
+    const m = new Map()
+    for (const c of (collection || [])) {
+      const k = c.name.toLowerCase()
+      if (!m.has(k)) m.set(k, c) // first match wins, same semantics as the old .find()
+    }
+    return m
+  }, [collection])
+
+  //  Derived
   const DFC_LAYOUTS  = ['transform', 'modal_dfc', 'reversible_card', 'double_faced_token']
   const isDFC        = !!foundCard && DFC_LAYOUTS.includes(foundCard.layout) && (foundCard.card_faces?.length || 0) >= 2
   const faceIdx      = isDFC && dfcFlipped ? 1 : 0
@@ -928,9 +950,7 @@ export default function CameraModal({
   const priceUsd     = foundCard?.prices?.usd      ? parseFloat(foundCard.prices.usd)      : null
   const priceUsdFoil = foundCard?.prices?.usd_foil ? parseFloat(foundCard.prices.usd_foil) : null
   const displayPrice = priceMode === 'foil' && priceUsdFoil != null ? priceUsdFoil : priceUsd
-  const alreadyOwned = foundCard
-    ? (collection || []).find(c => c.name.toLowerCase() === foundCard.name.toLowerCase())
-    : null
+  const alreadyOwned = foundCard ? collectionByName.get(foundCard.name.toLowerCase()) : null
   const sameSetVariants = foundCard ? printings.filter(p => p.set === foundCard.set).length : 0
   const extraPrints     = printings.length > 1 ? printings.length - 1 : 0
 
@@ -1019,7 +1039,8 @@ export default function CameraModal({
             }}>
               <button onClick={() => applyZoom(zoom - zoomStep())} aria-label="Zoom out"
                 style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', width: 22, height: 22, lineHeight: 1 }}>−</button>
-              <span style={{ minWidth: 34, textAlign: 'center', color: '#fff', fontSize: '.68rem', fontWeight: 700 }}>{zoom.toFixed(1)}×</span>
+              <span onClick={resetZoom} title="Tap to reset to 1×" aria-label="Reset zoom to 1x"
+                style={{ minWidth: 34, textAlign: 'center', color: '#fff', fontSize: '.68rem', fontWeight: 700, cursor: 'pointer' }}>{zoom.toFixed(1)}×</span>
               <button onClick={() => applyZoom(zoom + zoomStep())} aria-label="Zoom in"
                 style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', width: 22, height: 22, lineHeight: 1 }}>+</button>
             </div>
