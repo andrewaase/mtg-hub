@@ -307,51 +307,23 @@ export async function bulkAddCards(cards, userId, { onProgress } = {}) {
 // This means a regular printing and a showcase/extended-art/foil printing of
 // the same card will always be separate store listings with independent pricing.
 export async function upsertStoreListing({ name, set_name, condition, is_foil, price, img_url, scryfall_id, qty = 1 }) {
-  // Build the dedup query
-  let dupQuery = supabase.from('store_listings').select('id, qty_available').eq('active', true)
-  if (scryfall_id) {
-    dupQuery = dupQuery
-      .eq('scryfall_id', scryfall_id)
-      .eq('condition',   condition || 'NM')
-      .eq('is_foil',     is_foil   || false)
-  } else {
-    dupQuery = dupQuery
-      .eq('name',      name)
-      .is('scryfall_id', null)
-      .eq('condition', condition || 'NM')
-      .eq('is_foil',   is_foil   || false)
+  // Routed through a service-role Netlify function — a direct client INSERT here
+  // was being rejected with "new row violates row-level security policy for
+  // table store_listings" whenever the card had no existing listing yet (the
+  // UPDATE path for bumping quantity has a looser RLS policy, which is why this
+  // only surfaced on genuinely new cards, e.g. while scanning).
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/.netlify/functions/upsert-store-listing', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+    body:    JSON.stringify({ name, set_name, condition, is_foil, price, img_url, scryfall_id, qty }),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    console.error('[db] upsertStoreListing error:', json.error || res.status)
+    throw new Error(json.error || `HTTP ${res.status}`)
   }
-  const { data: existing, error: selErr } = await dupQuery.maybeSingle()
-
-  if (selErr) {
-    console.error('[db] upsertStoreListing select error:', selErr)
-    throw new Error(selErr.message)
-  }
-
-  if (existing) {
-    // Existing listing — just bump the quantity (and re-activate if hidden)
-    const { error: updErr } = await supabase
-      .from('store_listings')
-      .update({ qty_available: existing.qty_available + qty, active: true })
-      .eq('id', existing.id)
-    if (updErr) {
-      console.error('[db] upsertStoreListing update error:', updErr)
-      throw new Error(updErr.message)
-    }
-    return { merged: true, id: existing.id }
-  }
-
-  // No match — create a fresh listing
-  const { data, error: insErr } = await supabase
-    .from('store_listings')
-    .insert({ name, set_name, condition: condition || 'NM', is_foil: is_foil || false, price, qty_available: qty, img_url, active: true, scryfall_id })
-    .select('id')
-    .single()
-  if (insErr) {
-    console.error('[db] upsertStoreListing insert error:', insErr)
-    throw new Error(insErr.message)
-  }
-  return { merged: false, id: data.id }
+  return { merged: json.merged, id: json.id }
 }
 
 export async function removeCard(id, userId) {
