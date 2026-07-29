@@ -2,6 +2,7 @@
 // Admin-only management of the sealed-deals store directory: add a store (with
 // platform auto-detection), toggle active, or remove. Writes use the service key.
 const { corsHeaders } = require('./_cors')
+const { verifyAdmin } = require('./_admin')
 
 // Fingerprint a store domain. Shopify (incl. BinderPOS) exposes /products.json;
 // BigCommerce serves cdn11.bigcommerce.com assets. Anything else = unsupported.
@@ -40,15 +41,9 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  const jwt = ((event.headers || {})['authorization'] || '').replace(/^Bearer\s+/i, '').trim()
-  try {
-    const v = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${jwt}` } })
-    if (!v.ok) throw new Error('bad token')
-    if ((await v.json()).email !== ADMIN_EMAIL) {
-      return { statusCode: 403, headers: corsHeaders(event), body: JSON.stringify({ error: 'Forbidden' }) }
-    }
-  } catch {
-    return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Unauthorized' }) }
+  const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+  if (!admin.ok) {
+    return { statusCode: admin.statusCode, headers: corsHeaders(event), body: JSON.stringify({ error: admin.error }) }
   }
 
   const H = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }

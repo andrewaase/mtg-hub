@@ -12,6 +12,7 @@
 //   market_movers (computed_date DATE PK, gainers JSONB, losers JSONB, ref_date DATE, days_apart INT)
 
 const { corsHeaders } = require('./_cors')
+const { isScheduledInvocation, verifyAdmin } = require('./_admin')
 
 const CONCURRENCY    = 4      // parallel page requests
 const MIN_GAP_MS     = 130    // global minimum spacing between request *starts*
@@ -196,8 +197,14 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(event) }
   }
 
-  // Block non-POST HTTP methods (scheduler invocations have no httpMethod)
-  if (event.httpMethod && event.httpMethod !== 'POST') {
+  // Netlify's scheduler invokes with httpMethod 'POST' (not an absent method,
+  // despite what this file used to assume) and the x-nf-event: schedule header —
+  // that header, not httpMethod, is the only reliable way to recognize a genuine
+  // cron trigger. Getting this wrong meant every scheduled run fell into the
+  // auth-required branch below and was silently rejected for having no token.
+  const scheduled = isScheduledInvocation(event)
+
+  if (!scheduled && event.httpMethod && event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
@@ -209,32 +216,17 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  await logStatus(SUPABASE_URL, SERVICE_KEY, 'invoked', { httpMethod: event.httpMethod || '(scheduled)' })
+  await logStatus(SUPABASE_URL, SERVICE_KEY, 'invoked', { httpMethod: event.httpMethod, scheduled })
 
   try {
-    // ── Auth check (manual HTTP POST only) ────────────────────────────────────
-    if (event.httpMethod === 'POST') {
-      const authHeader = (event.headers || {})['authorization'] || ''
-      const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
-      if (!userJwt) {
-        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: 'missing token' })
-        return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) }
+    // ── Auth check (skipped for genuine scheduled invocations) ────────────────
+    if (!scheduled) {
+      const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+      if (!admin.ok) {
+        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: admin.error })
+        return { statusCode: admin.statusCode, body: JSON.stringify({ error: admin.error }) }
       }
-      try {
-        const verifyRes = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
-          headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${userJwt}` },
-        }, 20000)
-        if (!verifyRes.ok) throw new Error(`verify HTTP ${verifyRes.status}`)
-        const { email } = await verifyRes.json()
-        if (email !== ADMIN_EMAIL) {
-          await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: 'email mismatch', email })
-          return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
-        }
-        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_ok', { email })
-      } catch (e) {
-        await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_fail', { reason: e.message })
-        return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) }
-      }
+      await logStatus(SUPABASE_URL, SERVICE_KEY, 'auth_ok', { email: admin.email })
     }
 
     const adminHeaders = {

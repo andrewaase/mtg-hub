@@ -1,5 +1,6 @@
 // netlify/functions/manapool-sync.js
 const { corsHeaders } = require('./_cors')
+const { isScheduledInvocation, verifyAdmin } = require('./_admin')
 // Pulls current inventory from ManaPool (the primary sales channel) and
 // reconciles Mana Mint's store_listings quantities to match — ManaPool is the
 // source of truth. Any card previously sent to ManaPool that's no longer in its
@@ -7,7 +8,9 @@ const { corsHeaders } = require('./_cors')
 // (last_exported_at IS NULL) are left untouched.
 //
 // Triggered two ways (same pattern as update-prices):
-//   1. Netlify scheduler — invoked directly, event.httpMethod is undefined, no auth.
+//   1. Netlify scheduler — arrives as httpMethod 'POST' with the x-nf-event:
+//      schedule header (that header, not an absent httpMethod, is what marks
+//      a genuine cron trigger). No auth for that path.
 //   2. Manual HTTP POST from the admin "Sync now" button (requires admin JWT).
 
 const MP_BASE = 'https://manapool.com/api/v1'
@@ -41,7 +44,8 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: corsHeaders(event) }
   }
-  if (event.httpMethod && event.httpMethod !== 'POST') {
+  const scheduled = isScheduledInvocation(event)
+  if (!scheduled && event.httpMethod && event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
@@ -58,24 +62,11 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'ManaPool API credentials not configured' }) }
   }
 
-  // ── Auth check (manual HTTP POST only; scheduler passes through) ──────────
-  if (event.httpMethod === 'POST') {
-    const authHeader = (event.headers || {})['authorization'] || ''
-    const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (!userJwt) {
-      return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Missing auth token' }) }
-    }
-    try {
-      const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
-      })
-      if (!verifyRes.ok) throw new Error('invalid token')
-      const { email } = await verifyRes.json()
-      if (email !== ADMIN_EMAIL) {
-        return { statusCode: 403, headers: corsHeaders(event), body: JSON.stringify({ error: 'Forbidden' }) }
-      }
-    } catch {
-      return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
+  // ── Auth check (skipped for genuine scheduled invocations) ────────────────
+  if (!scheduled) {
+    const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+    if (!admin.ok) {
+      return { statusCode: admin.statusCode, headers: corsHeaders(event), body: JSON.stringify({ error: admin.error }) }
     }
   }
 

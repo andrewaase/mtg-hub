@@ -3,6 +3,7 @@
 // (via the public /products.json feed), attaches a ManaPool market price where
 // it can match, and refreshes sealed_listings. Scheduled daily + manual admin POST.
 const { corsHeaders } = require('./_cors')
+const { isScheduledInvocation, verifyAdmin } = require('./_admin')
 
 const SEALED_TYPE   = /sealed/i
 const SINGLE_TYPE   = /single/i
@@ -74,20 +75,18 @@ async function manapoolMarket(email, token) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(event) }
-  if (event.httpMethod && event.httpMethod !== 'POST') return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
+
+  const scheduled = isScheduledInvocation(event)
+  if (!scheduled && event.httpMethod && event.httpMethod !== 'POST') return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
 
   const ADMIN_EMAIL  = process.env.ADMIN_EMAIL
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
   if (!SUPABASE_URL || !SERVICE_KEY || !ADMIN_EMAIL) return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
 
-  if (event.httpMethod === 'POST') {
-    const jwt = ((event.headers || {})['authorization'] || '').replace(/^Bearer\s+/i, '').trim()
-    try {
-      const v = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${jwt}` } })
-      if (!v.ok) throw new Error('bad token')
-      if ((await v.json()).email !== ADMIN_EMAIL) return { statusCode: 403, headers: corsHeaders(event), body: JSON.stringify({ error: 'Forbidden' }) }
-    } catch { return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Unauthorized' }) } }
+  if (!scheduled) {
+    const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+    if (!admin.ok) return { statusCode: admin.statusCode, headers: corsHeaders(event), body: JSON.stringify({ error: admin.error }) }
   }
 
   const H = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }

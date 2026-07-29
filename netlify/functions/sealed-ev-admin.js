@@ -3,6 +3,7 @@
 // Stored in box_price_override (separate from the auto box_price) so it survives
 // the weekly recompute, which only writes box_price.
 const { corsHeaders } = require('./_cors')
+const { verifyAdmin } = require('./_admin')
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(event) }
@@ -13,13 +14,9 @@ exports.handler = async (event) => {
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
   if (!SUPABASE_URL || !SERVICE_KEY || !ADMIN_EMAIL) return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
 
-  const jwt = ((event.headers || {})['authorization'] || '').replace(/^Bearer\s+/i, '').trim()
-  try {
-    const v = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${jwt}` } })
-    if (!v.ok) throw new Error('bad token')
-    if ((await v.json()).email !== ADMIN_EMAIL) return { statusCode: 403, headers: corsHeaders(event), body: JSON.stringify({ error: 'Forbidden' }) }
-  } catch {
-    return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Unauthorized' }) }
+  const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+  if (!admin.ok) {
+    return { statusCode: admin.statusCode, headers: corsHeaders(event), body: JSON.stringify({ error: admin.error }) }
   }
 
   let body

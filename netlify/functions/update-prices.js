@@ -1,10 +1,14 @@
 // netlify/functions/update-prices.js
 const { corsHeaders } = require('./_cors')
+const { isScheduledInvocation, verifyAdmin } = require('./_admin')
 // Syncs store listing prices with current Scryfall market data.
 //
 // Triggered two ways:
-//   1. Daily by Netlify scheduler — Netlify invokes the function directly,
-//      so event.httpMethod is undefined. No auth needed for that path.
+//   1. Daily by Netlify scheduler — arrives as httpMethod 'POST' with the
+//      x-nf-event: schedule header (NOT an absent httpMethod — that was a
+//      wrong assumption that made every scheduled run hit the auth-required
+//      branch below and get silently rejected with no token). No auth needed
+//      for that path.
 //   2. Manually via HTTP POST from the admin panel (requires admin JWT)
 
 // fetch() has no built-in timeout — a single stalled Scryfall batch request in the
@@ -27,9 +31,11 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(event) }
   }
 
-  // Block all plain HTTP requests that are not admin POSTs.
-  // Scheduler invocations have no httpMethod, so they pass through unaffected.
-  if (event.httpMethod && event.httpMethod !== 'POST') {
+  const scheduled = isScheduledInvocation(event)
+
+  // Block all plain HTTP requests that are not admin POSTs (or a genuine
+  // scheduled invocation, which also arrives as POST).
+  if (!scheduled && event.httpMethod && event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
@@ -41,26 +47,11 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  // ── Auth check (only for manual HTTP POST calls) ──────────────────────────
-  if (event.httpMethod === 'POST') {
-    const authHeader = (event.headers || {})['authorization'] || ''
-    const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
-
-    if (!userJwt) {
-      return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) }
-    }
-
-    try {
-      const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${userJwt}` },
-      })
-      if (!verifyRes.ok) throw new Error('invalid token')
-      const { email } = await verifyRes.json()
-      if (email !== ADMIN_EMAIL) {
-        return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
-      }
-    } catch {
-      return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) }
+  // ── Auth check (skipped for genuine scheduled invocations) ────────────────
+  if (!scheduled) {
+    const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+    if (!admin.ok) {
+      return { statusCode: admin.statusCode, body: JSON.stringify({ error: admin.error }) }
     }
   }
 

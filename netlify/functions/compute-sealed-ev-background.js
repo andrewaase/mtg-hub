@@ -1,5 +1,6 @@
 // netlify/functions/compute-sealed-ev-background.js
 const { corsHeaders } = require('./_cors')
+const { isScheduledInvocation, verifyAdmin } = require('./_admin')
 // Computes accurate sealed Expected Value (EV) for recent sets using MTGJSON
 // booster configurations (real slot sheets + pull weights) priced with live
 // Scryfall market data, plus the real box price from the ManaPool API, and
@@ -173,7 +174,9 @@ function computeSetEV(setData, priceById, uuidToScryfall) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(event) }
-  if (event.httpMethod && event.httpMethod !== 'POST') {
+
+  const scheduled = isScheduledInvocation(event)
+  if (!scheduled && event.httpMethod && event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
@@ -186,17 +189,10 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  if (event.httpMethod === 'POST') {
-    const jwt = ((event.headers || {})['authorization'] || '').replace(/^Bearer\s+/i, '').trim()
-    if (!jwt) return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Missing auth token' }) }
-    try {
-      const v = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${jwt}` } })
-      if (!v.ok) throw new Error('bad token')
-      if ((await v.json()).email !== ADMIN_EMAIL) {
-        return { statusCode: 403, headers: corsHeaders(event), body: JSON.stringify({ error: 'Forbidden' }) }
-      }
-    } catch {
-      return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid token' }) }
+  if (!scheduled) {
+    const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+    if (!admin.ok) {
+      return { statusCode: admin.statusCode, headers: corsHeaders(event), body: JSON.stringify({ error: admin.error }) }
     }
   }
 

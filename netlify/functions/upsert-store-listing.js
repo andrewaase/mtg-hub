@@ -8,6 +8,7 @@
 // which is why this only surfaced on genuinely new cards). Caller must be admin.
 
 const { corsHeaders } = require('./_cors')
+const { verifyAdmin } = require('./_admin')
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -25,26 +26,10 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
-  // Verify the caller is the admin
-  const authHeader = (event.headers || {})['authorization'] || ''
-  const userJwt    = authHeader.replace(/^Bearer\s+/i, '').trim()
-  if (!userJwt) {
-    return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Missing auth token' }) }
-  }
-
-  let callerEmail
-  try {
-    const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${userJwt}` },
-    })
-    if (!verifyRes.ok) throw new Error('invalid token')
-    callerEmail = (await verifyRes.json()).email
-  } catch {
-    return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
-  }
-
-  if (callerEmail !== ADMIN_EMAIL) {
-    return { statusCode: 403, headers: corsHeaders(event), body: JSON.stringify({ error: 'Forbidden' }) }
+  // Verify the caller is an admin (primary ADMIN_EMAIL or a granted admin)
+  const admin = await verifyAdmin(SUPABASE_URL, SERVICE_KEY, ADMIN_EMAIL, (event.headers || {})['authorization'])
+  if (!admin.ok) {
+    return { statusCode: admin.statusCode, headers: corsHeaders(event), body: JSON.stringify({ error: admin.error }) }
   }
 
   let body
