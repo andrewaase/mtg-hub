@@ -2282,6 +2282,11 @@ function SealedEvTab() {
 const CMD_EV_LS_KEY = 'mm-commander-ev-settings-v1'
 const CMD_EV_DEFAULTS = { platform: 'tcgplayer', tcgplayerFeePct: 10.25, manapoolFeePct: 12 }
 
+// Data older than this auto-triggers a silent background recompute when the
+// tab is opened — comfortably longer than the daily cron interval so a normal
+// visit doesn't re-trigger on top of a run that's already in flight.
+const CMD_EV_STALE_MS = 20 * 60 * 60 * 1000 // 20h
+
 function CommanderEvTab({ onBack }) {
   const [rows, setRows]         = useState([])
   const [loading, setLoading]   = useState(true)
@@ -2303,11 +2308,12 @@ function CommanderEvTab({ onBack }) {
       .order('sell_value', { ascending: false })
     setRows(data || [])
     setLoading(false)
+    return data || []
   }, [])
   useEffect(() => { load() }, [load])
 
-  const recompute = async () => {
-    setBusy(true); setMsg(null)
+  const recompute = useCallback(async (silent = false) => {
+    setBusy(true); if (!silent) setMsg(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/.netlify/functions/compute-commander-decks-background', {
@@ -2315,7 +2321,12 @@ function CommanderEvTab({ onBack }) {
         headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       })
       if (res.status === 202 || res.ok) {
-        setMsg({ ok: true, text: 'Recompute started — pricing ~190 decklists takes a few minutes. Hit Refresh after.' })
+        setMsg({ ok: true, text: silent ? 'Prices were stale — refreshing in the background now.' : 'Refreshing — pricing ~190 decklists takes a few minutes, this page will update on its own.' })
+        // Background job has no completion signal, so poll a couple of times
+        // to pick up the finished result without the admin lifting a finger.
+        const t1 = setTimeout(load, 75000)
+        const t2 = setTimeout(load, 180000)
+        return () => { clearTimeout(t1); clearTimeout(t2) }
       } else {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error || `HTTP ${res.status}`)
@@ -2325,9 +2336,26 @@ function CommanderEvTab({ onBack }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [load])
+
+  // Auto-refresh: once rows have loaded, check whether the data is stale (or
+  // missing entirely) and silently kick off a recompute — no button needed.
+  const autoCheckedRef = useRef(false)
+  useEffect(() => {
+    if (loading || autoCheckedRef.current) return
+    autoCheckedRef.current = true
+    const mostRecent = rows.reduce((max, r) => {
+      const t = r.computed_at ? new Date(r.computed_at).getTime() : 0
+      return t > max ? t : max
+    }, 0)
+    if (!mostRecent || Date.now() - mostRecent > CMD_EV_STALE_MS) recompute(true)
+  }, [loading, rows, recompute])
 
   const feePct = settings.platform === 'tcgplayer' ? settings.tcgplayerFeePct : settings.manapoolFeePct
+  const lastUpdated = rows.reduce((max, r) => {
+    const t = r.computed_at ? new Date(r.computed_at).getTime() : 0
+    return t > max ? t : max
+  }, 0)
 
   const bySet = useMemo(() => {
     const m = new Map()
@@ -2347,6 +2375,16 @@ function CommanderEvTab({ onBack }) {
     return { afterFees, net: cost != null ? afterFees - cost : null }
   }
 
+  const ago = (ms) => {
+    if (!ms) return null
+    const mins = Math.round((Date.now() - ms) / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.round(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.round(hrs / 24)}d ago`
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -2356,12 +2394,19 @@ function CommanderEvTab({ onBack }) {
         <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', flex: 1, minWidth: 160 }}>
           Every official Commander precon's decklist, priced as singles. Enter what you paid (or would pay) per deck to see net EV.
         </div>
-        <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
-          Refresh
-        </button>
-        <button onClick={recompute} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
-          {busy ? 'Starting…' : 'Recompute'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.72rem', color: 'var(--text-muted)' }}>
+          {busy ? (
+            <span style={{ color: '#6ee7b7' }}>⟳ Refreshing…</span>
+          ) : lastUpdated ? (
+            <span>Updated {ago(lastUpdated)} · auto-refreshes daily</span>
+          ) : (
+            <span>No data yet — fetching now…</span>
+          )}
+          <button onClick={() => recompute(false)} disabled={busy} title="Force a refresh now"
+            style={{ background: 'none', border: 'none', color: '#818cf8', cursor: busy ? 'not-allowed' : 'pointer', fontSize: '.72rem', fontWeight: 700, padding: 0, opacity: busy ? 0.6 : 1 }}>
+            Refresh now
+          </button>
+        </div>
       </div>
 
       {/* Fee / platform settings */}
