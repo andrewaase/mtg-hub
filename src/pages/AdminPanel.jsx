@@ -2113,6 +2113,7 @@ function ReportsTab() {
 //  Sealed EV admin tab
 
 function SealedEvTab() {
+  const [view, setView]       = useState('boosters') // 'boosters' | 'commander'
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy]       = useState(false)
@@ -2168,12 +2169,17 @@ function SealedEvTab() {
   const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
   const fmtType = (t) => t.charAt(0).toUpperCase() + t.slice(1) + ' Booster'
 
+  if (view === 'commander') return <CommanderEvTab onBack={() => setView('boosters')} />
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
         <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', flex: 1, minWidth: 200 }}>
           Expected value of sealed product if opened — real pack odds (MTGJSON) priced with live Scryfall market data. Recent sets, refreshed weekly.
         </div>
+        <button onClick={() => setView('commander')} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(139,92,246,.3)', background: 'rgba(139,92,246,.1)', color: '#c4b5fd', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+          Commander Deck EV
+        </button>
         <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
           Refresh
         </button>
@@ -2266,6 +2272,293 @@ function SealedEvTab() {
         />
       )}
     </div>
+  )
+}
+
+//  Commander Deck EV — decklist + live singles prices for every official
+//  Commander precon, grouped by set. Purchase price is a plain field you fill
+//  in yourself (no reliable auto sealed-price source); fee % and platform are
+//  local calculation settings, not shared data.
+const CMD_EV_LS_KEY = 'mm-commander-ev-settings-v1'
+const CMD_EV_DEFAULTS = { platform: 'tcgplayer', tcgplayerFeePct: 10.25, manapoolFeePct: 12 }
+
+function CommanderEvTab({ onBack }) {
+  const [rows, setRows]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [busy, setBusy]         = useState(false)
+  const [msg, setMsg]           = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [search, setSearch]     = useState('')
+  const [settings, setSettings] = useState(() => {
+    try { return { ...CMD_EV_DEFAULTS, ...JSON.parse(localStorage.getItem(CMD_EV_LS_KEY)) } } catch { return CMD_EV_DEFAULTS }
+  })
+  useEffect(() => { try { localStorage.setItem(CMD_EV_LS_KEY, JSON.stringify(settings)) } catch {} }, [settings])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('commander_deck_ev')
+      .select('*')
+      .order('released_at', { ascending: false })
+      .order('sell_value', { ascending: false })
+    setRows(data || [])
+    setLoading(false)
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const recompute = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/compute-commander-decks-background', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      if (res.status === 202 || res.ok) {
+        setMsg({ ok: true, text: 'Recompute started — pricing ~190 decklists takes a few minutes. Hit Refresh after.' })
+      } else {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || `HTTP ${res.status}`)
+      }
+    } catch (e) {
+      setMsg({ ok: false, text: e.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const feePct = settings.platform === 'tcgplayer' ? settings.tcgplayerFeePct : settings.manapoolFeePct
+
+  const bySet = useMemo(() => {
+    const m = new Map()
+    let list = rows
+    if (search) { const q = search.toLowerCase(); list = list.filter(r => r.deck_name.toLowerCase().includes(q) || (r.commander_names || '').toLowerCase().includes(q)) }
+    for (const r of list) {
+      if (!m.has(r.set_code)) m.set(r.set_code, { set_name: r.set_name, released_at: r.released_at, decks: [] })
+      m.get(r.set_code).decks.push(r)
+    }
+    return [...m.values()]
+  }, [rows, search])
+
+  const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
+  const netEv = (deck) => {
+    const cost = deck.purchase_price_override
+    const afterFees = deck.sell_value * (1 - (parseFloat(feePct) || 0) / 100)
+    return { afterFees, net: cost != null ? afterFees - cost : null }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+        <button onClick={onBack} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+          ← Booster EV
+        </button>
+        <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)', flex: 1, minWidth: 160 }}>
+          Every official Commander precon's decklist, priced as singles. Enter what you paid (or would pay) per deck to see net EV.
+        </div>
+        <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+          Refresh
+        </button>
+        <button onClick={recompute} disabled={busy} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.12)', color: '#6ee7b7', fontWeight: 700, fontSize: '.82rem', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
+          {busy ? 'Starting…' : 'Recompute'}
+        </button>
+      </div>
+
+      {/* Fee / platform settings */}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: 'var(--bg-hover)', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[['tcgplayer', 'TCGplayer'], ['manapool', 'ManaPool']].map(([val, label]) => (
+            <button key={val} onClick={() => setSettings(s => ({ ...s, platform: val }))}
+              style={{ padding: '5px 12px', borderRadius: 99, fontSize: '.74rem', fontWeight: 700, cursor: 'pointer', border: '1px solid', background: settings.platform === val ? 'var(--accent-gold)' : 'transparent', color: settings.platform === val ? '#fff' : 'var(--text-secondary)', borderColor: settings.platform === val ? 'var(--accent-gold)' : 'var(--border)' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.75rem', color: 'var(--text-secondary)' }}>
+          TCGplayer fee %
+          <input type="number" min="0" step="0.1" value={settings.tcgplayerFeePct}
+            onChange={e => setSettings(s => ({ ...s, tcgplayerFeePct: e.target.value }))}
+            style={{ width: 60, background: 'var(--bg-input, rgba(255,255,255,.06))', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 6px', fontSize: '.8rem' }} />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.75rem', color: 'var(--text-secondary)' }}>
+          ManaPool fee %
+          <input type="number" min="0" step="0.1" value={settings.manapoolFeePct}
+            onChange={e => setSettings(s => ({ ...s, manapoolFeePct: e.target.value }))}
+            style={{ width: 60, background: 'var(--bg-input, rgba(255,255,255,.06))', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 6px', fontSize: '.8rem' }} />
+        </label>
+        <span style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>Estimated defaults — adjust to your actual seller rate. Applies to every deck below.</span>
+      </div>
+
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search decks or commanders…" className="form-input" style={{ width: '100%', padding: '8px 12px', fontSize: '.82rem', marginBottom: 12 }} />
+
+      {msg && (
+        <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 8, fontSize: '.78rem', background: msg.ok ? 'rgba(74,222,128,.08)' : 'rgba(239,68,68,.08)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,.25)' : 'rgba(239,68,68,.25)'}`, color: msg.ok ? '#4ade80' : '#fca5a5' }}>
+          {msg.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>
+      ) : bySet.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>
+          No decks yet. Click <strong>Recompute</strong> to build the list (takes a few minutes), then Refresh.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {bySet.map(set => (
+            <div key={set.set_name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 800, fontSize: '.92rem', color: 'var(--text-primary)' }}>{set.set_name}</span>
+                <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{set.released_at}</span>
+              </div>
+              {set.decks.map(deck => {
+                const { afterFees, net } = netEv(deck)
+                return (
+                  <div key={deck.id} onClick={() => setSelected(deck)} title="View full decklist"
+                    style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                      <div style={{ minWidth: 160 }}>
+                        <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--text-primary)' }}>{deck.deck_name}</div>
+                        {deck.commander_names && <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{deck.commander_names}</div>}
+                      </div>
+                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                        Sell value ({deck.card_count}): <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{money(deck.sell_value)}</span>
+                      </div>
+                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                        After fees: <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(afterFees)}</span>
+                      </div>
+                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                        Paid: <span style={{ fontWeight: 700, color: deck.purchase_price_override != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>{deck.purchase_price_override != null ? money(deck.purchase_price_override) : 'not set'}</span>
+                      </div>
+                      {net != null && (
+                        <div style={{ fontSize: '.78rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: net >= 0 ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.12)', color: net >= 0 ? '#4ade80' : '#f87171', marginLeft: 'auto' }}>
+                          {net >= 0 ? '+' : '−'}{money(Math.abs(net)).slice(1)} net
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <CommanderDeckDetailModal
+          deck={selected}
+          feePct={feePct}
+          platform={settings.platform}
+          onClose={() => setSelected(null)}
+          onSaved={(price) => {
+            setRows(rs => rs.map(r => r.id === selected.id ? { ...r, purchase_price_override: price } : r))
+            setSelected(s => s && s.id === selected.id ? { ...s, purchase_price_override: price } : s)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) {
+  const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
+  const [editing, setEditing]   = useState(false)
+  const [priceInput, setPriceInput] = useState(deck.purchase_price_override != null ? String(deck.purchase_price_override) : '')
+  const [saving, setSaving]     = useState(false)
+  const [err, setErr]           = useState(null)
+
+  const afterFees = deck.sell_value * (1 - (parseFloat(feePct) || 0) / 100)
+  const net = deck.purchase_price_override != null ? afterFees - deck.purchase_price_override : null
+
+  const save = async (clear) => {
+    setSaving(true); setErr(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/.netlify/functions/commander-ev-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ id: deck.id, price: clear ? null : priceInput }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`)
+      onSaved?.(j.purchase_price_override)
+      if (clear) setPriceInput('')
+      setEditing(false)
+    } catch (e) { setErr(e.message) } finally { setSaving(false) }
+  }
+
+  const tcgSearchUrl = `https://www.tcgplayer.com/search/magic/product?productLineName=magic&q=${encodeURIComponent(deck.deck_name)}`
+
+  const Stat = ({ label, value, color }) => (
+    <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 120px' }}>
+      <div style={{ fontSize: '.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: '1rem', fontWeight: 800, color: color || 'var(--text-primary)' }}>{value}</div>
+    </div>
+  )
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', zIndex: 400 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'min(620px,96vw)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 18, zIndex: 401, padding: '22px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{deck.deck_name}</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>{deck.set_name} · {deck.released_at}{deck.commander_names ? ` · ${deck.commander_names}` : ''}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: err ? 6 : 16 }}>
+          <Stat label="Sell value" value={money(deck.sell_value)} />
+          <Stat label={`After ${platform === 'tcgplayer' ? 'TCGplayer' : 'ManaPool'} fees (${feePct}%)`} value={money(afterFees)} color="#4ade80" />
+
+          <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 160px' }}>
+            <div style={{ fontSize: '.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+              <span>Paid for deck</span>
+              {!editing && <button onClick={() => { setEditing(true); setPriceInput(deck.purchase_price_override != null ? String(deck.purchase_price_override) : '') }} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '.62rem', fontWeight: 700, padding: 0 }}>Edit</button>}
+            </div>
+            {editing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>$</span>
+                  <input type="number" min="0" step="0.01" value={priceInput} onChange={e => setPriceInput(e.target.value)} autoFocus
+                    style={{ width: 80, background: 'var(--bg-input, rgba(255,255,255,.06))', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 6px', fontSize: '.9rem', fontWeight: 800, outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button onClick={() => save(false)} disabled={saving} style={{ padding: '3px 10px', borderRadius: 6, border: 'none', background: '#16a389', color: '#000', fontWeight: 700, fontSize: '.68rem', cursor: 'pointer' }}>{saving ? '…' : 'Save'}</button>
+                  {deck.purchase_price_override != null && <button onClick={() => save(true)} disabled={saving} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text-secondary)', fontSize: '.68rem', cursor: 'pointer' }}>Clear</button>}
+                  <button onClick={() => setEditing(false)} style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--text-secondary)', fontSize: '.68rem', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: deck.purchase_price_override != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>{deck.purchase_price_override != null ? money(deck.purchase_price_override) : 'Not set'}</div>
+            )}
+          </div>
+
+          {net != null && <Stat label="Net EV" value={`${net >= 0 ? '+' : '−'}${money(Math.abs(net)).slice(1)}`} color={net >= 0 ? '#4ade80' : '#f87171'} />}
+        </div>
+        {err && <div style={{ marginBottom: 12, fontSize: '.72rem', color: '#fca5a5' }}>{err}</div>}
+
+        <a href={tcgSearchUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: '.72rem', color: '#818cf8', marginBottom: 16 }}>
+          Check current TCGplayer price →
+        </a>
+
+        {/* Full decklist */}
+        <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>
+          Decklist ({deck.card_count} cards)
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 360, overflowY: 'auto' }}>
+          {(deck.cards || []).map((c, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.78rem', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ color: 'var(--text-primary)' }}>{c.count > 1 ? `${c.count}× ` : ''}{c.name}{c.foil ? <span style={{ color: '#c084fc' }}> · foil</span> : ''}</span>
+              <span style={{ fontWeight: 700, color: c.price > 0 ? '#4ade80' : 'var(--text-muted)' }}>{c.price > 0 ? money(c.price * c.count) : '—'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   )
 }
 

@@ -32,6 +32,10 @@
 [functions."harvest-deals-background"]
   schedule = "0 */3 * * *"
 
+# Recompute Commander precon decklist singles values weekly, Mon 11am UTC
+[functions."compute-commander-decks-background"]
+  schedule = "0 11 * * 1"
+
 [[redirects]]
   from = "https://vaultedsingles.com/*"
   to = "https://www.manamint.store/:splat"
