@@ -6,28 +6,39 @@ const { verifyAdmin } = require('./_admin')
 
 // Fingerprint a store domain. Shopify (incl. BinderPOS) exposes /products.json;
 // BigCommerce serves cdn11.bigcommerce.com assets. Anything else = unsupported.
-async function detectPlatform(domain) {
-  try {
-    const r = await fetch(`https://${domain}/products.json?limit=1`, { headers: { 'User-Agent': 'ManaMint/1.0 (deals)' } })
-    if (r.ok) {
-      const j = await r.json().catch(() => null)
-      if (j && Array.isArray(j.products)) return 'shopify'
-    }
-  } catch { /* fall through */ }
-  try {
-    const html = await (await fetch(`https://${domain}`, { headers: { 'User-Agent': 'ManaMint/1.0 (deals)' } })).text()
-    if (/cdn11\.bigcommerce\.com|bigcommerce/i.test(html)) return 'bigcommerce'
-  } catch { /* ignore */ }
-  return 'unsupported'
+// This function is NOT a -background function (no schedule, normal Netlify
+// timeout), so every external fetch is capped and run in parallel — an
+// unbounded sequential fetch chain here previously let a slow/unresponsive
+// store domain hang the whole request past Netlify's timeout (504).
+const FETCH_TIMEOUT = 6000
+async function fetchWithTimeout(url, opts = {}, timeoutMs = FETCH_TIMEOUT) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try { return await fetch(url, { ...opts, signal: controller.signal }) }
+  finally { clearTimeout(timer) }
 }
 
-async function storeName(domain) {
-  try {
-    const html = await (await fetch(`https://${domain}`, { headers: { 'User-Agent': 'ManaMint/1.0 (deals)' } })).text()
+async function detectPlatformAndName(domain) {
+  const [productsRes, homeRes] = await Promise.all([
+    fetchWithTimeout(`https://${domain}/products.json?limit=1`, { headers: { 'User-Agent': 'ManaMint/1.0 (deals)' } }).catch(() => null),
+    fetchWithTimeout(`https://${domain}`, { headers: { 'User-Agent': 'ManaMint/1.0 (deals)' } }).catch(() => null),
+  ])
+
+  let platform = 'unsupported'
+  if (productsRes?.ok) {
+    const j = await productsRes.json().catch(() => null)
+    if (j && Array.isArray(j.products)) platform = 'shopify'
+  }
+
+  let name = domain
+  if (homeRes) {
+    const html = await homeRes.text().catch(() => '')
+    if (platform === 'unsupported' && /cdn11\.bigcommerce\.com|bigcommerce/i.test(html)) platform = 'bigcommerce'
     const m = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-    if (m) return m[1].split(/[|\-–—·]/)[0].trim().slice(0, 80)
-  } catch { /* ignore */ }
-  return domain
+    if (m) name = m[1].split(/[|\-–—·]/)[0].trim().slice(0, 80)
+  }
+
+  return { platform, name }
 }
 
 exports.handler = async (event) => {
@@ -56,8 +67,7 @@ exports.handler = async (event) => {
       const domain = String(body.domain || '').trim().toLowerCase()
         .replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '')
       if (!domain || !domain.includes('.')) return { statusCode: 400, headers: corsHeaders(event), body: JSON.stringify({ error: 'Enter a valid store domain' }) }
-      const platform = await detectPlatform(domain)
-      const name = await storeName(domain)
+      const { platform, name } = await detectPlatformAndName(domain)
       const res = await fetch(`${SUPABASE_URL}/rest/v1/deal_stores?on_conflict=domain`, {
         method: 'POST',
         headers: { ...H, Prefer: 'resolution=merge-duplicates,return=representation' },
