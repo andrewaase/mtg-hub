@@ -114,7 +114,27 @@ exports.handler = async (event) => {
   for (const deck of decks) {
     for (const c of deck.cards) uniqueCards.set(cardKey(c), { set: c.set_code, collector_number: c.number })
   }
+
+  // This community deck data appends a stray trailing letter to some split/
+  // MDFC collector numbers (e.g. "28a") that neither Scryfall nor ManaPool's
+  // catalogs use — their real number is "28". Track a stripped-number
+  // fallback per affected key so those cards still price correctly instead
+  // of silently coming back as $0.
+  const stripSuffix = (num) => /^\d+[a-z]$/.test(num || '') ? num.slice(0, -1) : null
+  const fallbackFor = new Map() // "set#strippedNumber" -> Set of original "set#number" keys
+  for (const [key, id] of uniqueCards) {
+    const stripped = stripSuffix(id.collector_number)
+    if (!stripped) continue
+    const fk = `${id.set}#${stripped}`.toLowerCase()
+    if (!fallbackFor.has(fk)) fallbackFor.set(fk, new Set())
+    fallbackFor.get(fk).add(key)
+  }
+
   const identifiers = [...uniqueCards.values()]
+  for (const fk of fallbackFor.keys()) {
+    const [set, collector_number] = fk.split('#')
+    identifiers.push({ set, collector_number })
+  }
 
   const priceByKey = {} // "set#number" -> { name, usd, usd_foil }
   for (let i = 0; i < identifiers.length; i += 75) {
@@ -128,6 +148,11 @@ exports.handler = async (event) => {
         usd_foil: c.prices?.usd_foil != null ? parseFloat(c.prices.usd_foil) : null,
       }
     }
+  }
+  // Copy stripped-suffix results back onto the original lettered keys.
+  for (const [fk, origKeys] of fallbackFor) {
+    if (!priceByKey[fk]) continue
+    for (const origKey of origKeys) if (!priceByKey[origKey]) priceByKey[origKey] = priceByKey[fk]
   }
   summary.cardsPriced = Object.keys(priceByKey).length
 
@@ -151,10 +176,15 @@ exports.handler = async (event) => {
       mpDebug.rawRows = (data || []).length
       for (const c of (data || [])) {
         const k = `${c.set_code}#${c.number}`.toLowerCase()
-        if (!uniqueCards.has(k)) continue
+        if (!uniqueCards.has(k) && !fallbackFor.has(k)) continue
         const market     = c.price_market      != null ? c.price_market      / 100 : (c.price_cents      != null ? c.price_cents      / 100 : null)
         const marketFoil = c.price_market_foil != null ? c.price_market_foil / 100 : (c.price_cents_foil != null ? c.price_cents_foil / 100 : null)
         mpPriceByKey[k] = { market, marketFoil }
+      }
+      // Copy stripped-suffix results back onto the original lettered keys.
+      for (const [fk, origKeys] of fallbackFor) {
+        if (!mpPriceByKey[fk]) continue
+        for (const origKey of origKeys) if (!mpPriceByKey[origKey]) mpPriceByKey[origKey] = mpPriceByKey[fk]
       }
       mpDebug.matchedRows = Object.keys(mpPriceByKey).length
       mpDebug.ok = true
