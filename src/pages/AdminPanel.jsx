@@ -2304,6 +2304,7 @@ function CommanderEvTab({ onBack }) {
     const { data } = await supabase
       .from('commander_deck_ev')
       .select('*')
+      .neq('set_code', '_debug')
       .order('released_at', { ascending: false })
       .order('sell_value', { ascending: false })
     setRows(data || [])

@@ -136,12 +136,19 @@ exports.handler = async (event) => {
   // only the rows this deck set actually needs, so the big array can be GC'd
   // immediately rather than held onto for the rest of the run.
   const mpPriceByKey = {} // "set#number" -> { market, marketFoil } in dollars
+  // TEMP diagnostics — this whole block's outcome gets written to a
+  // queryable sentinel row below so a failure is visible without Netlify
+  // function-log access. Remove once ManaPool pricing is confirmed working.
+  const mpDebug = { attempted: true, ok: false, httpStatus: null, rawRows: 0, matchedRows: 0, error: null, ms: 0 }
+  const mpStart = Date.now()
   try {
     const res = await fetchWithTimeout('https://manapool.com/api/v1/prices/singles', {
       headers: { 'User-Agent': 'ManaMint/1.0 (commander-ev)', Accept: 'application/json' },
-    }, 60000)
+    }, 120000)
+    mpDebug.httpStatus = res.status
     if (res.ok) {
       const { data } = await res.json()
+      mpDebug.rawRows = (data || []).length
       for (const c of (data || [])) {
         const k = `${c.set_code}#${c.number}`.toLowerCase()
         if (!uniqueCards.has(k)) continue
@@ -149,12 +156,16 @@ exports.handler = async (event) => {
         const marketFoil = c.price_market_foil != null ? c.price_market_foil / 100 : (c.price_cents_foil != null ? c.price_cents_foil / 100 : null)
         mpPriceByKey[k] = { market, marketFoil }
       }
+      mpDebug.matchedRows = Object.keys(mpPriceByKey).length
+      mpDebug.ok = true
     } else {
       summary.errors.push(`ManaPool prices fetch: HTTP ${res.status}`)
     }
   } catch (e) {
+    mpDebug.error = `${e.name}: ${e.message}`
     summary.errors.push(`ManaPool prices fetch: ${e.message}`)
   }
+  mpDebug.ms = Date.now() - mpStart
 
   // 3. Build each deck's card list + sell value (both platforms), and upsert.
   const rows = []
@@ -191,6 +202,15 @@ exports.handler = async (event) => {
       computed_at:       new Date().toISOString(),
     })
   }
+
+  // TEMP diagnostics sentinel row — queryable via the public read policy
+  // without needing Netlify function-log access. Remove alongside mpDebug above.
+  rows.push({
+    set_code: '_debug', set_name: '_debug', deck_name: '_diagnostics',
+    card_count: 0, sell_value: 0, sell_value_mp: 0,
+    cards: { mpDebug, uniqueCardCount: uniqueCards.size, decksFound: summary.decksFound },
+    computed_at: new Date().toISOString(),
+  })
 
   try {
     for (let i = 0; i < rows.length; i += 100) {
