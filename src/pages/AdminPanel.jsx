@@ -2362,16 +2362,22 @@ function CommanderEvTab({ onBack }) {
     let list = rows
     if (search) { const q = search.toLowerCase(); list = list.filter(r => r.deck_name.toLowerCase().includes(q) || (r.commander_names || '').toLowerCase().includes(q)) }
     for (const r of list) {
-      if (!m.has(r.set_code)) m.set(r.set_code, { set_name: r.set_name, released_at: r.released_at, decks: [] })
+      if (!m.has(r.set_code)) m.set(r.set_code, { set_code: r.set_code, set_name: r.set_name, released_at: r.released_at, decks: [] })
       m.get(r.set_code).decks.push(r)
     }
     return [...m.values()]
   }, [rows, search])
 
+  // Sets start collapsed — with ~40 sets and 190 decks, that's the only way
+  // to scroll the tab without scrolling forever. Search results force-open.
+  const [expandedSets, setExpandedSets] = useState(() => new Set())
+  const toggleSet = (code) => setExpandedSets(s => { const n = new Set(s); n.has(code) ? n.delete(code) : n.add(code); return n })
+
   const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
+  const sellVal = (deck) => settings.platform === 'manapool' ? deck.sell_value_mp : deck.sell_value
   const netEv = (deck) => {
     const cost = deck.purchase_price_override
-    const afterFees = deck.sell_value * (1 - (parseFloat(feePct) || 0) / 100)
+    const afterFees = sellVal(deck) * (1 - (parseFloat(feePct) || 0) / 100)
     return { afterFees, net: cost != null ? afterFees - cost : null }
   }
 
@@ -2446,48 +2452,56 @@ function CommanderEvTab({ onBack }) {
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>
       ) : bySet.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '.85rem' }}>
-          No decks yet. Click <strong>Recompute</strong> to build the list (takes a few minutes), then Refresh.
+          No decks yet — fetching automatically, this takes a few minutes. Hit <strong>Refresh now</strong> above once it's done.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {bySet.map(set => (
-            <div key={set.set_name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 800, fontSize: '.92rem', color: 'var(--text-primary)' }}>{set.set_name}</span>
-                <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{set.released_at}</span>
-              </div>
-              {set.decks.map(deck => {
-                const { afterFees, net } = netEv(deck)
-                return (
-                  <div key={deck.id} onClick={() => setSelected(deck)} title="View full decklist"
-                    style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 160 }}>
-                        <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--text-primary)' }}>{deck.deck_name}</div>
-                        {deck.commander_names && <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{deck.commander_names}</div>}
-                      </div>
-                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-                        Sell value ({deck.card_count}): <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{money(deck.sell_value)}</span>
-                      </div>
-                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-                        After fees: <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(afterFees)}</span>
-                      </div>
-                      <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-                        Paid: <span style={{ fontWeight: 700, color: deck.purchase_price_override != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>{deck.purchase_price_override != null ? money(deck.purchase_price_override) : 'not set'}</span>
-                      </div>
-                      {net != null && (
-                        <div style={{ fontSize: '.78rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: net >= 0 ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.12)', color: net >= 0 ? '#4ade80' : '#f87171', marginLeft: 'auto' }}>
-                          {net >= 0 ? '+' : '−'}{money(Math.abs(net)).slice(1)} net
+          {bySet.map(set => {
+            const isOpen = !!search || expandedSets.has(set.set_code)
+            return (
+              <div key={set.set_name} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div onClick={() => toggleSet(set.set_code)} title={isOpen ? 'Collapse' : 'Expand'}
+                  style={{ padding: '12px 16px', borderBottom: isOpen ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', cursor: 'pointer', userSelect: 'none' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <span style={{ fontSize: '.7rem', color: 'var(--text-muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .12s', display: 'inline-block' }}>▶</span>
+                  <span style={{ fontWeight: 800, fontSize: '.92rem', color: 'var(--text-primary)' }}>{set.set_name}</span>
+                  <span style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{set.released_at}</span>
+                  <span style={{ fontSize: '.68rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{set.decks.length} deck{set.decks.length === 1 ? '' : 's'}</span>
+                </div>
+                {isOpen && set.decks.map(deck => {
+                  const { afterFees, net } = netEv(deck)
+                  return (
+                    <div key={deck.id} onClick={() => setSelected(deck)} title="View full decklist"
+                      style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                        <div style={{ minWidth: 160 }}>
+                          <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--text-primary)' }}>{deck.deck_name}</div>
+                          {deck.commander_names && <div style={{ fontSize: '.68rem', color: 'var(--text-muted)' }}>{deck.commander_names}</div>}
                         </div>
-                      )}
+                        <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                          Sell value ({deck.card_count}): <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{money(sellVal(deck))}</span>
+                        </div>
+                        <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                          After fees: <span style={{ fontWeight: 800, color: '#4ade80' }}>{money(afterFees)}</span>
+                        </div>
+                        <div style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }}>
+                          Paid: <span style={{ fontWeight: 700, color: deck.purchase_price_override != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>{deck.purchase_price_override != null ? money(deck.purchase_price_override) : 'not set'}</span>
+                        </div>
+                        {net != null && (
+                          <div style={{ fontSize: '.78rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: net >= 0 ? 'rgba(74,222,128,.12)' : 'rgba(239,68,68,.12)', color: net >= 0 ? '#4ade80' : '#f87171', marginLeft: 'auto' }}>
+                            {net >= 0 ? '+' : '−'}{money(Math.abs(net)).slice(1)} net
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
+                  )
+                })}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -2507,6 +2521,34 @@ function CommanderEvTab({ onBack }) {
   )
 }
 
+// Builds a TCGplayer Mass Entry link that lands with the whole decklist
+// dropped into the cart-builder (confirmed against tcgplayer.com's own
+// client bundle: ?c=<qty> <name> [<SET>] <number>||...&productline=Magic).
+function tcgCartUrl(cards) {
+  const entries = (cards || []).map(c => {
+    let s = `${c.count} ${c.name}`
+    if (c.set) { s += ` [${c.set.toUpperCase()}]`; if (c.number) s += ` ${c.number}` }
+    return encodeURIComponent(s)
+  })
+  return `https://www.tcgplayer.com/massentry?c=${entries.join('||')}&productline=Magic`
+}
+// Same idea for ManaPool's Mass Entry (confirmed against manapool.com's own
+// client bundle: ?deck=<base64url of "qty name [SET] number" lines>).
+function toBase64Url(str) {
+  const bytes = new TextEncoder().encode(str)
+  let bin = ''
+  bytes.forEach(b => { bin += String.fromCharCode(b) })
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+function manaPoolCartUrl(cards) {
+  const lines = (cards || []).map(c => {
+    let s = `${c.count} ${c.name}`
+    if (c.set) { s += ` [${c.set.toUpperCase()}]`; if (c.number) s += ` ${c.number}` }
+    return s
+  })
+  return `https://manapool.com/add-deck?deck=${toBase64Url(lines.join('\n'))}`
+}
+
 function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) {
   const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
   const [editing, setEditing]   = useState(false)
@@ -2514,7 +2556,8 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
   const [saving, setSaving]     = useState(false)
   const [err, setErr]           = useState(null)
 
-  const afterFees = deck.sell_value * (1 - (parseFloat(feePct) || 0) / 100)
+  const sellValue = platform === 'manapool' ? deck.sell_value_mp : deck.sell_value
+  const afterFees = sellValue * (1 - (parseFloat(feePct) || 0) / 100)
   const net = deck.purchase_price_override != null ? afterFees - deck.purchase_price_override : null
 
   const save = async (clear) => {
@@ -2533,8 +2576,6 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
       setEditing(false)
     } catch (e) { setErr(e.message) } finally { setSaving(false) }
   }
-
-  const tcgSearchUrl = `https://www.tcgplayer.com/search/magic/product?productLineName=magic&q=${encodeURIComponent(deck.deck_name)}`
 
   const Stat = ({ label, value, color }) => (
     <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 120px' }}>
@@ -2556,8 +2597,8 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: err ? 6 : 16 }}>
-          <Stat label="Sell value" value={money(deck.sell_value)} />
-          <Stat label={`After ${platform === 'tcgplayer' ? 'TCGplayer' : 'ManaPool'} fees (${feePct}%)`} value={money(afterFees)} color="#4ade80" />
+          <Stat label={`Sell value (${platform === 'tcgplayer' ? 'TCGplayer' : 'ManaPool'})`} value={money(sellValue)} />
+          <Stat label={`After fees (${feePct}%)`} value={money(afterFees)} color="#4ade80" />
 
           <div style={{ background: 'var(--bg-hover)', borderRadius: 10, padding: '10px 12px', flex: '1 1 160px' }}>
             <div style={{ fontSize: '.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
@@ -2586,21 +2627,29 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
         </div>
         {err && <div style={{ marginBottom: 12, fontSize: '.72rem', color: '#fca5a5' }}>{err}</div>}
 
-        <a href={tcgSearchUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: '.72rem', color: '#818cf8', marginBottom: 16 }}>
-          Check current TCGplayer price →
-        </a>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+          <a href={tcgCartUrl(deck.cards)} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: '#818cf8', fontWeight: 700 }}>
+            Add whole deck to TCGplayer cart →
+          </a>
+          <a href={manaPoolCartUrl(deck.cards)} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: '#818cf8', fontWeight: 700 }}>
+            Add whole deck to ManaPool cart →
+          </a>
+        </div>
 
         {/* Full decklist */}
         <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>
           Decklist ({deck.card_count} cards)
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 360, overflowY: 'auto' }}>
-          {(deck.cards || []).map((c, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.78rem', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ color: 'var(--text-primary)' }}>{c.count > 1 ? `${c.count}× ` : ''}{c.name}{c.foil ? <span style={{ color: '#c084fc' }}> · foil</span> : ''}</span>
-              <span style={{ fontWeight: 700, color: c.price > 0 ? '#4ade80' : 'var(--text-muted)' }}>{c.price > 0 ? money(c.price * c.count) : '—'}</span>
-            </div>
-          ))}
+          {(deck.cards || []).map((c, i) => {
+            const unitPrice = platform === 'manapool' ? c.mpPrice : c.price
+            return (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.78rem', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-primary)' }}>{c.count > 1 ? `${c.count}× ` : ''}{c.name}{c.foil ? <span style={{ color: '#c084fc' }}> · foil</span> : ''}</span>
+                <span style={{ fontWeight: 700, color: unitPrice > 0 ? '#4ade80' : 'var(--text-muted)' }}>{unitPrice > 0 ? money(unitPrice * c.count) : '—'}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
     </>

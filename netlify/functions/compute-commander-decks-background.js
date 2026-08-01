@@ -131,16 +131,50 @@ exports.handler = async (event) => {
   }
   summary.cardsPriced = Object.keys(priceByKey).length
 
-  // 3. Build each deck's card list + sell value, and upsert.
+  // 2b. ManaPool has no per-set/bulk-lookup endpoint — /prices/singles always
+  // returns its entire ~100k-card catalog in one shot. Pull it once and keep
+  // only the rows this deck set actually needs, so the big array can be GC'd
+  // immediately rather than held onto for the rest of the run.
+  const mpPriceByKey = {} // "set#number" -> { market, marketFoil } in dollars
+  try {
+    const res = await fetchWithTimeout('https://manapool.com/api/v1/prices/singles', {
+      headers: { 'User-Agent': 'ManaMint/1.0 (commander-ev)', Accept: 'application/json' },
+    }, 60000)
+    if (res.ok) {
+      const { data } = await res.json()
+      for (const c of (data || [])) {
+        const k = `${c.set_code}#${c.number}`.toLowerCase()
+        if (!uniqueCards.has(k)) continue
+        const market     = c.price_market      != null ? c.price_market      / 100 : (c.price_cents      != null ? c.price_cents      / 100 : null)
+        const marketFoil = c.price_market_foil != null ? c.price_market_foil / 100 : (c.price_cents_foil != null ? c.price_cents_foil / 100 : null)
+        mpPriceByKey[k] = { market, marketFoil }
+      }
+    } else {
+      summary.errors.push(`ManaPool prices fetch: HTTP ${res.status}`)
+    }
+  } catch (e) {
+    summary.errors.push(`ManaPool prices fetch: ${e.message}`)
+  }
+
+  // 3. Build each deck's card list + sell value (both platforms), and upsert.
   const rows = []
   for (const deck of decks) {
     let sellValue = 0
+    let sellValueMp = 0
     const cardRows = []
     for (const c of deck.cards) {
-      const p = priceByKey[cardKey(c)]
-      const price = p ? (c.foil ? (p.usd_foil ?? p.usd ?? 0) : (p.usd ?? 0)) : 0
-      sellValue += price * (c.count || 1)
-      cardRows.push({ name: c.name, count: c.count || 1, foil: !!c.foil, price: Math.round(price * 100) / 100 })
+      const p  = priceByKey[cardKey(c)]
+      const mp = mpPriceByKey[cardKey(c)]
+      const price   = p  ? (c.foil ? (p.usd_foil ?? p.usd ?? 0) : (p.usd ?? 0)) : 0
+      const mpPrice = mp ? (c.foil ? (mp.marketFoil ?? mp.market ?? 0) : (mp.market ?? 0)) : 0
+      sellValue   += price * (c.count || 1)
+      sellValueMp += mpPrice * (c.count || 1)
+      cardRows.push({
+        name: c.name, count: c.count || 1, foil: !!c.foil,
+        set: c.set_code, number: c.number,
+        price: Math.round(price * 100) / 100,
+        mpPrice: Math.round(mpPrice * 100) / 100,
+      })
     }
     cardRows.sort((a, b) => (b.price * b.count) - (a.price * a.count))
 
@@ -152,6 +186,7 @@ exports.handler = async (event) => {
       commander_names:  (deck.commander || []).map(c => c.name).join(' / ') || null,
       card_count:        deck.cards.reduce((s, c) => s + (c.count || 1), 0),
       sell_value:        Math.round(sellValue * 100) / 100,
+      sell_value_mp:     Math.round(sellValueMp * 100) / 100,
       cards:             cardRows,
       computed_at:       new Date().toISOString(),
     })
