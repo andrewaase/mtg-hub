@@ -470,7 +470,7 @@ async function runClientIngest(offsetWeeks = 0, accessToken = null) {
   if (cardSnapshots.length === 0 && archetypeSnapshots.length === 0) return { ok: false, reason: 'no data fetched' }
 
   const authHeaders = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}
-  const res = await fetch('/.netlify/functions/ingest-meta', {
+  const res = await fetch('/.netlify/functions/run-ingest-meta', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders },
     body:    JSON.stringify({ cardSnapshots, archetypeSnapshots }),
@@ -492,7 +492,7 @@ function SpikePredictor() {
   useEffect(() => {
     async function checkAndIngest() {
       try {
-        const res  = await fetch('/.netlify/functions/ingest-meta')
+        const res  = await fetch('/.netlify/functions/run-ingest-meta')
         const json = await res.json()
         const { latestWeek, currentWeek } = json
         // Ingest if never ingested, or snapshot is more than 6 days old

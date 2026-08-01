@@ -1226,7 +1226,7 @@ function SyncFromManaPoolModal({ listings, onClose, onDone }) {
     setApiBusy(true); setApiResult(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/.netlify/functions/manapool-sync', {
+      const res = await fetch('/.netlify/functions/run-manapool-sync', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       })
@@ -1492,7 +1492,7 @@ function ListingsTab() {
       const jwt = session?.access_token
       if (!jwt) throw new Error('Not signed in')
 
-      const res  = await fetch('/.netlify/functions/update-prices', {
+      const res  = await fetch('/.netlify/functions/run-update-prices', {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${jwt}` },
       })
@@ -1920,7 +1920,7 @@ function SettingsTab() {
     setMoversBusy(true); setMoversMsg(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/.netlify/functions/compute-market-movers-background', {
+      const res = await fetch('/.netlify/functions/run-compute-market-movers-background', {
         method: 'POST', headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       })
       if (res.status === 202 || res.ok) setMoversMsg({ ok: true, text: 'Recompute started — the dashboard gainers/losers update in a minute or two.' })
@@ -2138,7 +2138,7 @@ function SealedEvTab() {
     setBusy(true); setMsg(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/.netlify/functions/compute-sealed-ev-background', {
+      const res = await fetch('/.netlify/functions/run-compute-sealed-ev-background', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       })
@@ -2316,7 +2316,7 @@ function CommanderEvTab({ onBack }) {
     setBusy(true); if (!silent) setMsg(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/.netlify/functions/compute-commander-decks-background', {
+      const res = await fetch('/.netlify/functions/run-compute-commander-decks-background', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       })
@@ -2805,7 +2805,7 @@ function DealsTab() {
     setHarvesting(true); setMsg(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/.netlify/functions/harvest-deals-background', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+      const res = await fetch('/.netlify/functions/run-harvest-deals-background', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
       if (res.status === 202 || res.ok) setMsg({ ok: true, text: 'Harvest started — give it a minute, then Refresh.' })
       else throw new Error(`HTTP ${res.status}`)
     } catch (e) { setMsg({ ok: false, text: e.message }) } finally { setHarvesting(false) }
@@ -3042,7 +3042,7 @@ function MetaTab() {
       const jwt = session?.access_token
       if (!jwt) throw new Error('Not signed in')
       // Background function — returns 202 immediately; work runs for up to 15 min
-      const res = await fetch('/.netlify/functions/compute-market-movers-background', {
+      const res = await fetch('/.netlify/functions/run-compute-market-movers-background', {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${jwt}` },
       })
