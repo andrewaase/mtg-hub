@@ -23,13 +23,47 @@ function isSealed(p) {
   return SEALED_TITLE.test(p.title || '')
 }
 
+// Fetches one products.json page, retrying on 429/transient errors and
+// honoring the store's own Retry-After — never spoofs a different client
+// identity to dodge a rate limit, just backs off like a well-behaved client.
+async function fetchShopifyPage(domain, page) {
+  let lastErr
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    let res
+    try {
+      res = await fetch(`https://${domain}/products.json?limit=250&page=${page}`, {
+        headers: { 'User-Agent': 'ManaMint/1.0 (deals; +https://www.manamint.store)', Accept: 'application/json' },
+      })
+    } catch (e) {
+      lastErr = new Error(`network error: ${e.message}`)
+      if (attempt < 2) { await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); continue }
+      throw lastErr
+    }
+    if (res.status === 429) {
+      const retryAfter = parseFloat(res.headers.get('retry-after')) || 5
+      lastErr = new Error('rate limited (429) by store')
+      if (attempt < 2) { await new Promise(r => setTimeout(r, retryAfter * 1000)); continue }
+      throw lastErr
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res
+  }
+  throw lastErr
+}
+
 async function harvestShopify(domain) {
   const rows = []
   for (let page = 1; page <= MAX_PAGES; page++) {
     let res
-    try { res = await fetch(`https://${domain}/products.json?limit=250&page=${page}`, { headers: { 'User-Agent': 'ManaMint/1.0 (deals)' } }) }
-    catch { break }
-    if (!res.ok) break
+    try {
+      res = await fetchShopifyPage(domain, page)
+    } catch (e) {
+      // Page 1 failing means nothing was harvested at all — surface that as
+      // a real error instead of silently reporting "0 sealed products".
+      // A later page failing just means we keep the partial results so far.
+      if (page === 1) throw e
+      break
+    }
     const products = (await res.json()).products || []
     if (!products.length) break
     for (const p of products) {
@@ -50,7 +84,7 @@ async function harvestShopify(domain) {
       })
     }
     if (products.length < 250) break
-    await new Promise(r => setTimeout(r, 250)) // be polite
+    await new Promise(r => setTimeout(r, 350)) // be polite
   }
   return rows
 }
