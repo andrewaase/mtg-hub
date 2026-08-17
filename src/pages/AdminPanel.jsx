@@ -867,20 +867,23 @@ Mox Pearl,Beta,LP,1250.00,1,false`
   const parseCSV = (text) => {
     setParseErr(null); setRows(null)
     if (!text.trim()) return
-    const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean)
-    if (lines.length < 2) { setParseErr('Need at least a header row and one data row'); return }
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    // Use the RFC-4180-aware parser (handles quoted fields with embedded
+    // commas — e.g. "Braids, Arisen Nightmare" — which a naive split(',')
+    // would otherwise shift out of alignment).
+    const { headers: rawHeaders, rows: rawRows } = parseCsvRows(text)
+    if (!rawRows.length) { setParseErr('Need at least a header row and one data row'); return }
+    const headers = rawHeaders.map(h => h.trim().toLowerCase())
     const required = ['name', 'price']
     for (const r of required) {
       if (!headers.includes(r)) { setParseErr(`Missing required column: "${r}"`); return }
     }
     const parsed = []
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',').map(c => c.trim())
+    for (let i = 0; i < rawRows.length; i++) {
+      const raw = rawRows[i]
       const row = {}
-      headers.forEach((h, idx) => { row[h] = cols[idx] ?? '' })
-      if (!row.name || !row.price) { setParseErr(`Row ${i + 1}: name and price are required`); return }
-      if (isNaN(parseFloat(row.price))) { setParseErr(`Row ${i + 1}: invalid price "${row.price}"`); return }
+      rawHeaders.forEach(h => { row[h.trim().toLowerCase()] = raw[h] ?? '' })
+      if (!row.name || !row.price) { setParseErr(`Row ${i + 2}: name and price are required`); return }
+      if (isNaN(parseFloat(row.price))) { setParseErr(`Row ${i + 2}: invalid price "${row.price}"`); return }
       parsed.push({
         product_type:  'single',
         name:          row.name,
@@ -2550,6 +2553,28 @@ function manaPoolCartUrl(cards) {
   return `https://manapool.com/add-deck?deck=${toBase64Url(lines.join('\n'))}`
 }
 
+// Downloads the decklist as a CSV matching the Listings tab's Bulk Import
+// format (name,set_name,condition,price,qty_available,is_foil) — qty is per
+// ONE copy of the deck; opening N sealed copies just means multiplying the
+// qty column by N before re-uploading.
+function csvField(v) {
+  const s = String(v ?? '')
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+function downloadCommanderDeckCsv(deck, platform) {
+  const header = 'name,set_name,condition,price,qty_available,is_foil'
+  const lines = (deck.cards || []).map(c => {
+    const price = platform === 'manapool' ? c.mpPrice : c.price
+    return [csvField(c.name), csvField(deck.set_name), 'NM', (price || 0).toFixed(2), c.count, c.foil ? 'true' : 'false'].join(',')
+  })
+  const blob = new Blob([header + '\n' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `${deck.deck_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-inventory.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) {
   const money = (v) => v == null ? '—' : `$${Number(v).toFixed(2)}`
   const [editing, setEditing]   = useState(false)
@@ -2628,13 +2653,17 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
         </div>
         {err && <div style={{ marginBottom: 12, fontSize: '.72rem', color: '#fca5a5' }}>{err}</div>}
 
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
           <a href={tcgCartUrl(deck.cards)} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: '#818cf8', fontWeight: 700 }}>
             Add whole deck to TCGplayer cart →
           </a>
           <a href={manaPoolCartUrl(deck.cards)} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: '#818cf8', fontWeight: 700 }}>
             Add whole deck to ManaPool cart →
           </a>
+          <button onClick={() => downloadCommanderDeckCsv(deck, platform)} title="One row per card, qty = one copy of this deck — bump the qty column before re-uploading if you're opening several"
+            style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.1)', color: '#6ee7b7', fontWeight: 700, fontSize: '.72rem', cursor: 'pointer' }}>
+            ⬇ Export to inventory CSV
+          </button>
         </div>
 
         {/* Full decklist */}
