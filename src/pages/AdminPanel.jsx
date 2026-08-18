@@ -2553,21 +2553,24 @@ function manaPoolCartUrl(cards) {
   return `https://manapool.com/add-deck?deck=${toBase64Url(lines.join('\n'))}`
 }
 
-// Downloads the decklist as a CSV matching the Listings tab's Bulk Import
-// format (name,set_name,condition,price,qty_available,is_foil) — qty is per
-// ONE copy of the deck; opening N sealed copies just means multiplying the
-// qty column by N before re-uploading.
-function csvField(v) {
-  const s = String(v ?? '')
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
+// Downloads the decklist as a ManaBox-format CSV — the same format the
+// Listings tab's "Download CSV" export already uses, confirmed to upload
+// directly into ManaPool's own CSV importer. Unlike that export, we already
+// have exact set code + collector number per card here, so this builds the
+// rows directly with no extra Scryfall round-trip. Qty is per ONE copy of
+// the deck; opening N sealed copies just means multiplying the Quantity
+// column by N before re-uploading.
 function downloadCommanderDeckCsv(deck, platform) {
-  const header = 'name,set_name,condition,price,qty_available,is_foil'
-  const lines = (deck.cards || []).map(c => {
+  const esc = (v) => { if (v == null) return ''; const s = String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+  const rows = (deck.cards || []).map(c => {
     const price = platform === 'manapool' ? c.mpPrice : c.price
-    return [csvField(c.name), csvField(deck.set_name), 'NM', (price || 0).toFixed(2), c.count, c.foil ? 'true' : 'false'].join(',')
+    return [
+      'Mana Mint', 'list', c.name, (c.set || '').toUpperCase(), deck.set_name || '', c.number || '',
+      c.foil ? 'foil' : 'normal', '', c.count, '', '', (price || 0).toFixed(2), 'false', 'false',
+      'mint', 'en', 'USD',
+    ].map(esc).join(',')
   })
-  const blob = new Blob([header + '\n' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob([MANABOX_COLUMNS.join(',') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
   a.download = `${deck.deck_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-inventory.csv`
