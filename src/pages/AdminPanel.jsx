@@ -2555,18 +2555,58 @@ function manaPoolCartUrl(cards) {
 
 // Downloads the decklist as a ManaBox-format CSV — the same format the
 // Listings tab's "Download CSV" export already uses, confirmed to upload
-// directly into ManaPool's own CSV importer. Unlike that export, we already
-// have exact set code + collector number per card here, so this builds the
-// rows directly with no extra Scryfall round-trip. Qty is per ONE copy of
-// the deck; opening N sealed copies just means multiplying the Quantity
-// column by N before re-uploading.
-function downloadCommanderDeckCsv(deck, platform) {
+// directly into ManaPool's own CSV importer (ManaPool requires Scryfall ID
+// to match rows precisely). We already have exact set code + collector
+// number per card here, so resolving it is a couple of batch lookups, not
+// a full name-based search like that other export needs. Qty is per ONE
+// copy of the deck; opening N sealed copies just means multiplying the
+// Quantity column by N before re-uploading.
+async function fetchScryfallIdsBySetNumber(cards) {
+  const idByKey = {}
+  // Same split/MDFC number-suffix quirk fixed server-side for pricing
+  // (e.g. "28a" when Scryfall's real number is "28") — request both so
+  // those cards still resolve a Scryfall ID instead of coming back blank.
+  const stripSuffix = (num) => /^\d+[a-z]$/.test(num || '') ? num.slice(0, -1) : null
+  const identifiers = []
+  const seen = new Set()
+  for (const c of cards) {
+    const key = `${c.set}#${c.number}`.toLowerCase()
+    if (!seen.has(key)) { seen.add(key); identifiers.push({ set: c.set, collector_number: c.number }) }
+    const stripped = stripSuffix(c.number)
+    if (stripped) {
+      const sKey = `${c.set}#${stripped}`.toLowerCase()
+      if (!seen.has(sKey)) { seen.add(sKey); identifiers.push({ set: c.set, collector_number: stripped }) }
+    }
+  }
+  for (let i = 0; i < identifiers.length; i += 75) {
+    const res = await fetch('https://api.scryfall.com/cards/collection', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifiers: identifiers.slice(i, i + 75) }),
+    })
+    const data = await res.json().catch(() => ({}))
+    for (const c of (data.data || [])) {
+      idByKey[`${c.set}#${c.collector_number}`.toLowerCase()] = c.id
+    }
+    if (i + 75 < identifiers.length) await new Promise(r => setTimeout(r, 100))
+  }
+  for (const c of cards) {
+    const key = `${c.set}#${c.number}`.toLowerCase()
+    if (idByKey[key]) continue
+    const stripped = stripSuffix(c.number)
+    const sKey = stripped && `${c.set}#${stripped}`.toLowerCase()
+    if (sKey && idByKey[sKey]) idByKey[key] = idByKey[sKey]
+  }
+  return idByKey
+}
+async function downloadCommanderDeckCsv(deck, platform) {
+  const idByKey = await fetchScryfallIdsBySetNumber(deck.cards || [])
   const esc = (v) => { if (v == null) return ''; const s = String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
   const rows = (deck.cards || []).map(c => {
     const price = platform === 'manapool' ? c.mpPrice : c.price
+    const scryfallId = idByKey[`${c.set}#${c.number}`.toLowerCase()] || ''
     return [
       'Mana Mint', 'list', c.name, (c.set || '').toUpperCase(), deck.set_name || '', c.number || '',
-      c.foil ? 'foil' : 'normal', '', c.count, '', '', (price || 0).toFixed(2), 'false', 'false',
+      c.foil ? 'foil' : 'normal', '', c.count, '', scryfallId, (price || 0).toFixed(2), 'false', 'false',
       'mint', 'en', 'USD',
     ].map(esc).join(',')
   })
@@ -2584,6 +2624,7 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
   const [priceInput, setPriceInput] = useState(deck.purchase_price_override != null ? String(deck.purchase_price_override) : '')
   const [saving, setSaving]     = useState(false)
   const [err, setErr]           = useState(null)
+  const [exportingCsv, setExportingCsv] = useState(false)
 
   const sellValue = platform === 'manapool' ? deck.sell_value_mp : deck.sell_value
   const afterFees = sellValue * (1 - (parseFloat(feePct) || 0) / 100)
@@ -2663,9 +2704,10 @@ function CommanderDeckDetailModal({ deck, feePct, platform, onClose, onSaved }) 
           <a href={manaPoolCartUrl(deck.cards)} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.72rem', color: '#818cf8', fontWeight: 700 }}>
             Add whole deck to ManaPool cart →
           </a>
-          <button onClick={() => downloadCommanderDeckCsv(deck, platform)} title="One row per card, qty = one copy of this deck — bump the qty column before re-uploading if you're opening several"
-            style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.1)', color: '#6ee7b7', fontWeight: 700, fontSize: '.72rem', cursor: 'pointer' }}>
-            ⬇ Export to inventory CSV
+          <button onClick={async () => { setExportingCsv(true); try { await downloadCommanderDeckCsv(deck, platform) } finally { setExportingCsv(false) } }}
+            disabled={exportingCsv} title="One row per card, qty = one copy of this deck — bump the Quantity column before re-uploading if you're opening several"
+            style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.1)', color: '#6ee7b7', fontWeight: 700, fontSize: '.72rem', cursor: exportingCsv ? 'not-allowed' : 'pointer', opacity: exportingCsv ? 0.6 : 1 }}>
+            {exportingCsv ? 'Resolving Scryfall IDs…' : '⬇ Export to inventory CSV'}
           </button>
         </div>
 
