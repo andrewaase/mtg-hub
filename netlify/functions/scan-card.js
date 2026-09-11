@@ -60,20 +60,25 @@ exports.handler = async (event) => {
     return { statusCode: 401, headers: corsHeaders(event), body: JSON.stringify({ error: 'Invalid or expired token' }) }
   }
 
-  // Admins always scan for free — skip the tier + limit check entirely
-  const isAdmin = ADMIN_EMAIL && userEmail === ADMIN_EMAIL
+  // Admins always scan for free — skip the tier + limit check entirely.
+  // Matches verifyAdmin() in _admin.js: either the primary ADMIN_EMAIL, or a
+  // granted admin via profiles.is_admin = true. Checking only ADMIN_EMAIL (as
+  // this function used to) incorrectly subjected granted admin accounts to
+  // the free-tier daily scan limit.
+  const isPrimaryAdmin = Boolean(ADMIN_EMAIL && userEmail === ADMIN_EMAIL)
 
   // Used both for the free-tier limit check below and for the scan_logs insert
-  // further down — declared here so it's in scope for both regardless of isAdmin.
+  // further down — declared here so it's in scope regardless of admin status.
   const today = new Date().toISOString().slice(0, 10)
 
   // ── Check membership tier & daily scan limit ─────────────────────────────────
   // Fire both Supabase lookups in parallel — saves one sequential round-trip
-  // (~100-200 ms) for free users who need both the tier check and the scan count.
-  if (!isAdmin) {
+  // (~100-200 ms). Fetched even for the primary admin so we still have
+  // `profile` for the granted-admin (is_admin) check below.
+  if (!isPrimaryAdmin) {
     const [profileRes, scanCountRes] = await Promise.all([
       fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end,is_admin`,
         { headers: adminHeaders }
       ),
       fetch(
@@ -84,6 +89,7 @@ exports.handler = async (event) => {
 
     const profiles = await profileRes.json()
     const profile  = Array.isArray(profiles) ? profiles[0] : null
+    const isGrantedAdmin = profile?.is_admin === true
     let tier = profile?.membership_tier || 'free'
 
     // Treat expired pro as free
@@ -91,7 +97,7 @@ exports.handler = async (event) => {
       tier = 'free'
     }
 
-    if (tier !== 'pro') {
+    if (tier !== 'pro' && !isGrantedAdmin) {
       const scanRows   = await scanCountRes.json()
       const scansToday = Array.isArray(scanRows) ? scanRows.length : 0
 
