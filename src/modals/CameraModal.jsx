@@ -295,11 +295,15 @@ export default function CameraModal({
   const consecutiveMatchRef = useRef(0)    // how many consecutive scans agree on the name
   const pendingLookupRef    = useRef(null) // { name, promise } — Scryfall started on first match
   const lastScanTimeRef     = useRef(0)    // timestamp of last scan start (cooldown gate)
+  const scanErrorCountRef   = useRef(0)    // consecutive scan-request failures (for backoff)
 
   const MAX_UNKNOWN      = 2
   const STABLE_NEEDED    = 2
   const CONSENSUS_NEEDED = 2    // consecutive matching OCR reads before showing a card
   const SCAN_COOLDOWN_MS = 750  // minimum ms between scan attempts
+  const SCAN_FETCH_TIMEOUT_MS = 12000 // give up on a hung request instead of blocking the scanner forever
+  const SCAN_ERROR_BACKOFF_MS = 2000  // extra delay per consecutive failure, on top of the normal cooldown
+  const SCAN_ERROR_BACKOFF_MAX_MS = 8000
   const [showUpgrade, setShowUpgrade] = useState(false)
 
   const videoRef  = useRef(null)
@@ -499,6 +503,7 @@ export default function CameraModal({
     scanningRef.current = true
     setScanStatus('scanning')
     setScanError(null)
+    let errorHandled = false // set once the catch-worthy error already got its own message + backoff accounting
 
     try {
       // Capture title+bottom strip composition, then verify it's sharp enough.
@@ -516,14 +521,26 @@ export default function CameraModal({
 
       const image = canvasToBase64(canvas)
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/.netlify/functions/scan-card', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ image }),
-      })
+
+      // Bound the request — a hung fetch (dead network, stalled cold-start)
+      // would otherwise leave scanningRef stuck true forever, silently
+      // freezing the scanner with no visible error.
+      const controller = new AbortController()
+      const timeoutId  = setTimeout(() => controller.abort(), SCAN_FETCH_TIMEOUT_MS)
+      let res
+      try {
+        res = await fetch('/.netlify/functions/scan-card', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ image }),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
 
       if (!res.ok) {
         // 429 = daily scan limit reached
@@ -536,6 +553,7 @@ export default function CameraModal({
         }
         // Try to surface a human-readable error from the function body
         let msg = `Scan service error (${res.status})`
+        let retryable = res.status === 503
         try {
           const errJson = await res.json()
           if (errJson?.error) {
@@ -543,11 +561,17 @@ export default function CameraModal({
               ? 'Scan API key not set — check Netlify env vars'
               : errJson.error
           }
+          if (errJson?.retryable) retryable = true
         } catch { /* ignore parse failure */ }
+        // Transient upstream errors (rate limit / overload / timeout) back off
+        // instead of retrying every cooldown window and hammering a struggling API.
+        scanErrorCountRef.current = retryable ? scanErrorCountRef.current + 1 : 0
         setScanError(msg)
+        errorHandled = true
         throw new Error(msg)
       }
 
+      scanErrorCountRef.current = 0
       const { name, setCode, collectorNumber } = await res.json()
 
       const cleanName = (name || '').trim().replace(/["""]/g, '"').replace(/[''']/g, "'")
@@ -648,6 +672,20 @@ export default function CameraModal({
       }
     } catch (e) {
       console.warn('[Scanner] scan error:', e)
+      // A network-level failure (offline, DNS blip, or our own fetch timeout
+      // firing) never reached the res.ok branch above, so it hasn't been
+      // counted toward the backoff or given a message yet — do that here.
+      if (!errorHandled) {
+        setScanError(e.name === 'AbortError' ? 'Scan timed out — retrying' : 'Network error — retrying')
+        scanErrorCountRef.current++
+      }
+    }
+
+    // Back off after consecutive failures instead of retrying every cooldown
+    // window — avoids hammering a struggling API and gives it room to recover.
+    if (scanErrorCountRef.current > 0) {
+      const backoff = Math.min(scanErrorCountRef.current * SCAN_ERROR_BACKOFF_MS, SCAN_ERROR_BACKOFF_MAX_MS)
+      lastScanTimeRef.current = Date.now() + backoff - SCAN_COOLDOWN_MS
     }
 
     setScanStatus('ready')

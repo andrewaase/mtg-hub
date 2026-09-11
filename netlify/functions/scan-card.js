@@ -29,7 +29,7 @@ exports.handler = async (event) => {
   const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
 
   if (!apiKey || !SUPABASE_URL || !SERVICE_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured' }) }
+    return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'Server not configured' }) }
   }
 
   // Require a logged-in user — prevents anonymous API quota drain
@@ -63,11 +63,14 @@ exports.handler = async (event) => {
   // Admins always scan for free — skip the tier + limit check entirely
   const isAdmin = ADMIN_EMAIL && userEmail === ADMIN_EMAIL
 
+  // Used both for the free-tier limit check below and for the scan_logs insert
+  // further down — declared here so it's in scope for both regardless of isAdmin.
+  const today = new Date().toISOString().slice(0, 10)
+
   // ── Check membership tier & daily scan limit ─────────────────────────────────
   // Fire both Supabase lookups in parallel — saves one sequential round-trip
   // (~100-200 ms) for free users who need both the tier check and the scan count.
   if (!isAdmin) {
-    const today = new Date().toISOString().slice(0, 10)
     const [profileRes, scanCountRes] = await Promise.all([
       fetch(
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=membership_tier,membership_end`,
@@ -129,27 +132,35 @@ exports.handler = async (event) => {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 120,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: 'image/jpeg', data: image },
-              },
-              {
-                type: 'text',
-                text: `This image shows two strips of a Magic: The Gathering card — the title bar (top) and the bottom info strip, separated by a small black gap. Read both strips carefully and reply with ONLY a JSON object in this exact format (no markdown, no extra text):
+    // Bound the Claude call so a stalled upstream request fails fast with a
+    // clear error instead of hanging until Netlify's own function timeout
+    // kills the lambda (which returns a bare, unhelpful 502 to the client).
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    let response
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 120,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: 'image/jpeg', data: image },
+                },
+                {
+                  type: 'text',
+                  text: `This image shows two strips of a Magic: The Gathering card — the title bar (top) and the bottom info strip, separated by a small black gap. Read both strips carefully and reply with ONLY a JSON object in this exact format (no markdown, no extra text):
 {"name":"<card's official English name>","setCode":"<2-4 letter set code from bottom strip, lowercase>","collectorNumber":"<collector number from bottom strip>"}
 
 The card may be printed in ANY language (English, Japanese, Korean, Chinese, German, French, Italian, etc.). ALWAYS return the card's official ENGLISH name — identify the card from its art and title even when the printed name is not in English, and translate it to its English name. Give your best guess if unsure.
@@ -158,17 +169,30 @@ The set code is the 2-4 letter abbreviation printed at the bottom (e.g. "one", "
 The collector number is the number printed at the bottom (e.g. "112", "261a", "082").
 If you cannot read a field, use null.
 If this is clearly not a Magic card, reply with: {"name":"unknown","setCode":null,"collectorNumber":null}`,
-              },
-            ],
-          },
-        ],
-      }),
-    })
+                },
+              ],
+            },
+          ],
+        }),
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!response.ok) {
       const err = await response.text()
-      console.error('[scan-card] Claude API error:', err)
-      return { statusCode: 502, body: JSON.stringify({ error: 'Claude API error' }) }
+      console.error('[scan-card] Claude API error:', response.status, err)
+      // Anthropic rate-limit (429) or transient overload (529) — surface as a
+      // distinct, retryable status so the client can back off instead of
+      // hammering the endpoint or showing a generic "broken" error.
+      if (response.status === 429 || response.status === 529) {
+        return {
+          statusCode: 503,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': '3', ...corsHeaders(event) },
+          body: JSON.stringify({ error: 'Scanner is busy, retrying shortly', retryable: true }),
+        }
+      }
+      return { statusCode: 502, headers: corsHeaders(event), body: JSON.stringify({ error: 'Claude API error' }) }
     }
 
     const json = await response.json()
@@ -228,6 +252,13 @@ If this is clearly not a Magic card, reply with: {"name":"unknown","setCode":nul
     }
   } catch (err) {
     console.error('[scan-card] fetch error:', err)
+    if (err.name === 'AbortError') {
+      return {
+        statusCode: 503,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '3', ...corsHeaders(event) },
+        body: JSON.stringify({ error: 'Scan timed out, retrying shortly', retryable: true }),
+      }
+    }
     return { statusCode: 500, headers: corsHeaders(event), body: JSON.stringify({ error: 'Internal error' }) }
   }
 }
