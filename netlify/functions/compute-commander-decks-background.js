@@ -177,8 +177,11 @@ exports.handler = async (event) => {
       for (const c of (data || [])) {
         const k = `${c.set_code}#${c.number}`.toLowerCase()
         if (!uniqueCards.has(k) && !fallbackFor.has(k)) continue
-        const market     = c.price_market      != null ? c.price_market      / 100 : (c.price_cents      != null ? c.price_cents      / 100 : null)
-        const marketFoil = c.price_market_foil != null ? c.price_market_foil / 100 : (c.price_cents_foil != null ? c.price_cents_foil / 100 : null)
+        // Use the lowest active listing (price_cents) — that's what singles
+        // actually sell at — and only fall back to the market price when a
+        // card has no low listing.
+        const market     = c.price_cents      != null ? c.price_cents      / 100 : (c.price_market      != null ? c.price_market      / 100 : null)
+        const marketFoil = c.price_cents_foil != null ? c.price_cents_foil / 100 : (c.price_market_foil != null ? c.price_market_foil / 100 : null)
         mpPriceByKey[k] = { market, marketFoil }
       }
       // Copy stripped-suffix results back onto the original lettered keys.
