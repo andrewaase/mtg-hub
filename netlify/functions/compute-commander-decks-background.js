@@ -236,15 +236,6 @@ exports.handler = async (event) => {
     })
   }
 
-  // TEMP diagnostics sentinel row — queryable via the public read policy
-  // without needing Netlify function-log access. Remove alongside mpDebug above.
-  rows.push({
-    set_code: '_debug', set_name: '_debug', deck_name: '_diagnostics',
-    card_count: 0, sell_value: 0, sell_value_mp: 0,
-    cards: { mpDebug, uniqueCardCount: uniqueCards.size, decksFound: summary.decksFound },
-    computed_at: new Date().toISOString(),
-  })
-
   try {
     for (let i = 0; i < rows.length; i += 100) {
       const res = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/commander_deck_ev?on_conflict=set_code,deck_name`, {
@@ -259,6 +250,6 @@ exports.handler = async (event) => {
     summary.errors.push(e.message)
   }
 
-  console.log('[commander-ev]', summary)
+  console.log('[commander-ev]', summary, 'manapool:', JSON.stringify(mpDebug))
   return { statusCode: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(event) }, body: JSON.stringify(summary) }
 }
