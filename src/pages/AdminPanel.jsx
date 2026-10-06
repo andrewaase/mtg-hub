@@ -858,6 +858,14 @@ function BulkImportModal({ onClose, onSaved }) {
   const [parseErr,setParseErr]= useState(null)
   const [saving,  setSaving]  = useState(false)
   const [result,  setResult]  = useState(null)
+  const [progress, setProgress] = useState(null)
+
+  const readFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setCsv(String(reader.result || ''))
+    reader.readAsText(file)
+  }
 
   const TEMPLATE = `name,set_name,condition,price,qty_available,is_foil
 Lightning Bolt,Magic 2011,NM,2.49,3,false
@@ -873,6 +881,8 @@ Mox Pearl,Beta,LP,1250.00,1,false`
     const { headers: rawHeaders, rows: rawRows } = parseCsvRows(text)
     if (!rawRows.length) { setParseErr('Need at least a header row and one data row'); return }
     const headers = rawHeaders.map(h => h.trim().toLowerCase())
+    // ManaPool inventory export: product_type,product_id,name,set,number,...,finish,condition,price,...,quantity
+    const isManaPool = headers.includes('product_type') && headers.includes('set') && headers.includes('number') && headers.includes('quantity')
     const required = ['name', 'price']
     for (const r of required) {
       if (!headers.includes(r)) { setParseErr(`Missing required column: "${r}"`); return }
@@ -882,6 +892,27 @@ Mox Pearl,Beta,LP,1250.00,1,false`
       const raw = rawRows[i]
       const row = {}
       rawHeaders.forEach(h => { row[h.trim().toLowerCase()] = raw[h] ?? '' })
+      if (isManaPool) {
+        if (row.product_type !== 'mtg_single') continue // sealed etc. aren't single listings
+        const qty = parseInt(row.quantity, 10) || 0
+        const price = parseFloat(row.price)
+        if (!row.name || qty <= 0 || isNaN(price)) continue
+        const condRaw = (row.condition || '').toLowerCase()
+        const fin = (row.finish || '').toUpperCase()
+        parsed.push({
+          product_type:  'single',
+          name:          row.name,
+          set_name:      null,               // filled from Scryfall at import time
+          condition:     MANABOX_TO_CONDITION[condRaw] || (row.condition || 'NM').toUpperCase(),
+          price,
+          qty_available: qty,
+          is_foil:       !!fin && fin !== 'NF',
+          active:        true,
+          _set:          (row.set || '').toLowerCase(),
+          _number:       row.number || '',
+        })
+        continue
+      }
       if (!row.name || !row.price) { setParseErr(`Row ${i + 2}: name and price are required`); return }
       if (isNaN(parseFloat(row.price))) { setParseErr(`Row ${i + 2}: invalid price "${row.price}"`); return }
       parsed.push({
@@ -902,11 +933,46 @@ Mox Pearl,Beta,LP,1250.00,1,false`
 
   const handleImport = async () => {
     if (!rows || rows.length === 0) return
-    setSaving(true); setResult(null)
+    setSaving(true); setResult(null); setProgress(null)
     try {
-      const { error: insErr } = await supabase.from('store_listings').insert(rows)
-      if (insErr) throw new Error(insErr.message)
-      setResult({ ok: true, count: rows.length })
+      const out = rows.map(r => ({ ...r }))
+      // ManaPool rows only carry set code + number — look each card up on Scryfall
+      // for its id, full set name and image (needed for price updates + the store).
+      const needLookup = out.filter(r => r._set && r._number)
+      const unique = [...new Map(needLookup.map(r => [`${r._set}#${r._number}`, { set: r._set, collector_number: r._number }])).values()]
+      const found = {}
+      for (let i = 0; i < unique.length; i += 75) {
+        setProgress(`Looking up cards… ${Math.min(i + 75, unique.length)} / ${unique.length}`)
+        const res = await fetch('https://api.scryfall.com/cards/collection', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifiers: unique.slice(i, i + 75) }),
+        })
+        if (res.ok) {
+          const { data } = await res.json()
+          for (const c of (data || [])) found[`${c.set}#${c.collector_number}`.toLowerCase()] = c
+        }
+        await new Promise(r => setTimeout(r, 120))
+      }
+      for (const r of out) {
+        if (r._set) {
+          const c = found[`${r._set}#${r._number}`.toLowerCase()]
+          if (c) {
+            r.scryfall_id = c.id
+            r.set_name    = c.set_name
+            r.img_url     = c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal || null
+          }
+        }
+        delete r._set; delete r._number
+      }
+      // Insert in chunks with a uniform column set (PostgREST bulk insert requirement).
+      const full = out.map(r => ({ scryfall_id: null, img_url: null, ...r }))
+      for (let i = 0; i < full.length; i += 500) {
+        setProgress(`Saving… ${Math.min(i + 500, full.length)} / ${full.length}`)
+        const { error: insErr } = await supabase.from('store_listings').insert(full.slice(i, i + 500))
+        if (insErr) throw new Error(`${insErr.message} (after ${i} rows saved)`)
+      }
+      setResult({ ok: true, count: full.length })
+      setProgress(null)
       onSaved()
     } catch (e) {
       setResult({ ok: false, message: e.message })
@@ -927,9 +993,18 @@ Mox Pearl,Beta,LP,1250.00,1,false`
           Paste a CSV with columns: <code style={{ color: 'var(--text-secondary)' }}>name</code>, <code style={{ color: 'var(--text-secondary)' }}>set_name</code>, <code style={{ color: 'var(--text-secondary)' }}>condition</code>, <code style={{ color: 'var(--text-secondary)' }}>price</code>, <code style={{ color: 'var(--text-secondary)' }}>qty_available</code>, <code style={{ color: 'var(--text-secondary)' }}>is_foil</code>. Only <code style={{ color: '#16a389' }}>name</code> and <code style={{ color: '#16a389' }}>price</code> are required.
         </div>
 
-        <button onClick={() => setCsv(TEMPLATE)} style={{ fontSize: '.7rem', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: 8 }}>
-          Load example
-        </button>
+        <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', marginBottom: 10 }}>
+          Or choose a <strong>ManaPool inventory export</strong> file — it's read directly (sealed products are skipped; set names, images and Scryfall IDs are looked up automatically).
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <label style={{ fontSize: '.7rem', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+            Choose CSV file…
+            <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => { readFile(e.target.files?.[0]); e.target.value = '' }} />
+          </label>
+          <button onClick={() => setCsv(TEMPLATE)} style={{ fontSize: '.7rem', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-hover)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            Load example
+          </button>
+        </div>
 
         <textarea
           value={csv}
@@ -990,7 +1065,7 @@ Mox Pearl,Beta,LP,1250.00,1,false`
             disabled={!rows || rows.length === 0 || saving}
             style={{ flex: 1, padding: 11, borderRadius: 10, border: 'none', background: (!rows || rows.length === 0) ? 'rgba(30,196,166,.3)' : '#16a389', color: '#000', fontWeight: 800, fontSize: '.85rem', cursor: (!rows || rows.length === 0 || saving) ? 'not-allowed' : 'pointer' }}
           >
-            {saving ? 'Importing…' : rows && rows.length > 0 ? `Import ${rows.length} listing${rows.length !== 1 ? 's' : ''}` : 'Paste CSV above'}
+            {saving ? (progress || 'Importing…') : rows && rows.length > 0 ? `Import ${rows.length} listing${rows.length !== 1 ? 's' : ''}` : 'Paste CSV above'}
           </button>
         </div>
       </div>
