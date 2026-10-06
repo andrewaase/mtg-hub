@@ -943,15 +943,27 @@ Mox Pearl,Beta,LP,1250.00,1,false`
       const found = {}
       for (let i = 0; i < unique.length; i += 75) {
         setProgress(`Looking up cards… ${Math.min(i + 75, unique.length)} / ${unique.length}`)
-        const res = await fetch('https://api.scryfall.com/cards/collection', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifiers: unique.slice(i, i + 75) }),
-        })
-        if (res.ok) {
-          const { data } = await res.json()
-          for (const c of (data || [])) found[`${c.set}#${c.collector_number}`.toLowerCase()] = c
+        // Scryfall rate-limits (and a 429 surfaces as a bare "Failed to fetch" in the
+        // browser), so retry each batch with growing back-off instead of aborting.
+        let ok = false
+        for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+          try {
+            const res = await fetch('https://api.scryfall.com/cards/collection', {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({ identifiers: unique.slice(i, i + 75) }),
+            })
+            if (res.ok) {
+              const { data } = await res.json()
+              for (const c of (data || [])) found[`${c.set}#${c.collector_number}`.toLowerCase()] = c
+              ok = true
+            } else if (res.status !== 429 && res.status < 500) {
+              ok = true // a 4xx that retrying won't fix — skip this batch
+            }
+          } catch { /* network / rate-limit — fall through to back-off */ }
+          if (!ok) await new Promise(r => setTimeout(r, 1500 * (attempt + 1)))
         }
-        await new Promise(r => setTimeout(r, 120))
+        if (!ok) throw new Error(`Card lookup kept failing at ${i} / ${unique.length} — nothing was saved, wait a minute and try again`)
+        await new Promise(r => setTimeout(r, 250))
       }
       for (const r of out) {
         if (r._set) {
