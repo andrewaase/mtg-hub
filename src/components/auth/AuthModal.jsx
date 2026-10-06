@@ -68,7 +68,10 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
 
   const handleSignOut = async () => {
     setLoading(true)
-    await supabase.auth.signOut()
+    // scope:'local' clears the on-device session without a server round-trip,
+    // so sign-out still works when the auth server is slow or unreachable.
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) { showToast('Could not sign out — try again'); setLoading(false); return }
     clearLocalCache()
     showToast('Signed out successfully')
     setLoading(false)
@@ -111,7 +114,7 @@ export default function AuthModal({ onClose, showToast, user, prompt, defaultTab
       showToast('Signed in successfully!')
       onClose()
     } catch (err) {
-      setError(err.message)
+      setError(err?.message && err.message !== '{}' ? err.message : 'Could not reach the sign-in server — please try again in a moment.')
     } finally {
       setLoading(false)
     }
